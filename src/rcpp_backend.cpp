@@ -120,7 +120,7 @@ class Gibbs_Sampler{
   
   
   // Theta value for which to compute the Gibbs sampler statistic
-  double theta;
+  NumericVector theta;
   
   // vector of observed counts (over observations)
   NumericVector x_vec;
@@ -168,7 +168,6 @@ class Gibbs_Sampler{
   Gibbs_Sampler(NumericVector x_vec_p,                       // x vector
                      NumericVector n_vec_p,                  // n vector
                      NumericVector a_vec_p,                  // Interval partition
-                     NumericVector theta_p,                  // theta value used for estimating the statictic
                      IntegerVector n_gibbs_p,                // total number of gibs iterations
                      IntegerVector n_gibbs_burnin_p,         // number of gibbs iterations discarded - "burn in"
                      IntegerVector IsExact_p,                // should integration be exact - ?
@@ -201,7 +200,7 @@ class Gibbs_Sampler{
     n_gibbs = n_gibbs_p(0);
     n_gibbs_burn_in = n_gibbs_burnin_p(0);
     
-    theta = theta_p(0);
+    theta = NumericVector(K);
     L = L_(0);
     I = std::pow(2,L); // removed +1
     
@@ -715,11 +714,12 @@ class Gibbs_Sampler{
    * compute P_k_i matrix, row by row (row = observation).
    * P_k_i gives the posterior probability of the kth obervation to be received from a p coming from the ith interval of the a grid
    */
-  NumericMatrix compute_p_k_i(NumericVector x_v, NumericVector n_v,double theta, NumericVector a_v){
+  NumericMatrix compute_p_k_i(NumericVector x_v, NumericVector n_v,NumericVector theta, NumericVector a_v){
     NumericMatrix p_mat(K,I);
-    NumericVector a_v_plus_theta = a_v + theta;
+    NumericVector a_v_plus_theta = a_v;
     for(int k = 0; k < K ; k++)
     {
+      a_v_plus_theta = a_v +theta(k);
       p_mat(k,_) = compute_p_k_i_vec( x_v(k), n_v(k), a_v_plus_theta );
     }
     return(p_mat);
@@ -854,7 +854,6 @@ class Gibbs_Sampler{
 List rcpp_Gibbs_Prob_Results(NumericVector x_vec,
                                    NumericVector n_vec,
                                    NumericVector a_vec,
-                                   NumericVector theta,
                                    IntegerVector n_gibbs,
                                    IntegerVector n_gibbs_burnin,
                                    IntegerVector IsExact,
@@ -870,7 +869,7 @@ List rcpp_Gibbs_Prob_Results(NumericVector x_vec,
                                    IntegerVector Prior_Type,
                                    IntegerVector Two_Layer_Dirichlet_I1){
   
-  Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, theta, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1);
+  Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1);
   
   List ret;
   ret["p_k_i"]           = _gibbs.get_p_k_i();

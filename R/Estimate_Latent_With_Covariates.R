@@ -46,7 +46,6 @@ Estimate_Latent_With_Covarites	<- function(
   res = Wrapper_rcpp_Gibbs(x.smp,
                            n.smp,
                            a.vec.used,
-                           0,
                            nr.gibbs,nr.gibbs.burnin,
                            as.integer(exact.numeric.integration),
                            as.integer(0), #verbose - turned off
@@ -119,7 +118,6 @@ if(F){
   res = Estimate_Latent_With_Covarites(x, n, L = 6,
                                                      I1=8,
                                                      VERBOSE = T,
-                                                     CDF.vec = seq(0.05,0.95,0.05),
                                                      a.max = 4,
                                                      theta.vec = seq(-2,2,0.125), Prior_Type = 1
                                                      )

@@ -7,15 +7,14 @@
 using namespace Rcpp;
 
 // rcpp_Gibbs_Prob_Results
-List rcpp_Gibbs_Prob_Results(NumericVector x_vec, NumericVector n_vec, NumericVector a_vec, NumericVector theta, IntegerVector n_gibbs, IntegerVector n_gibbs_burnin, IntegerVector IsExact, IntegerVector Verbose, IntegerVector L, IntegerVector InitGiven, NumericVector Init, IntegerVector Sample_Gamma_From_Bank, NumericMatrix Bank, IntegerVector P_k_i_is_given, NumericMatrix P_k_i_precomputed, NumericVector Pki_Integration_Stepsize, IntegerVector Prior_Type, IntegerVector Two_Layer_Dirichlet_I1);
-RcppExport SEXP _mcleod_rcpp_Gibbs_Prob_Results(SEXP x_vecSEXP, SEXP n_vecSEXP, SEXP a_vecSEXP, SEXP thetaSEXP, SEXP n_gibbsSEXP, SEXP n_gibbs_burninSEXP, SEXP IsExactSEXP, SEXP VerboseSEXP, SEXP LSEXP, SEXP InitGivenSEXP, SEXP InitSEXP, SEXP Sample_Gamma_From_BankSEXP, SEXP BankSEXP, SEXP P_k_i_is_givenSEXP, SEXP P_k_i_precomputedSEXP, SEXP Pki_Integration_StepsizeSEXP, SEXP Prior_TypeSEXP, SEXP Two_Layer_Dirichlet_I1SEXP) {
+List rcpp_Gibbs_Prob_Results(NumericVector x_vec, NumericVector n_vec, NumericVector a_vec, IntegerVector n_gibbs, IntegerVector n_gibbs_burnin, IntegerVector IsExact, IntegerVector Verbose, IntegerVector L, IntegerVector InitGiven, NumericVector Init, IntegerVector Sample_Gamma_From_Bank, NumericMatrix Bank, IntegerVector P_k_i_is_given, NumericMatrix P_k_i_precomputed, NumericVector Pki_Integration_Stepsize, IntegerVector Prior_Type, IntegerVector Two_Layer_Dirichlet_I1);
+RcppExport SEXP _mcleod_rcpp_Gibbs_Prob_Results(SEXP x_vecSEXP, SEXP n_vecSEXP, SEXP a_vecSEXP, SEXP n_gibbsSEXP, SEXP n_gibbs_burninSEXP, SEXP IsExactSEXP, SEXP VerboseSEXP, SEXP LSEXP, SEXP InitGivenSEXP, SEXP InitSEXP, SEXP Sample_Gamma_From_BankSEXP, SEXP BankSEXP, SEXP P_k_i_is_givenSEXP, SEXP P_k_i_precomputedSEXP, SEXP Pki_Integration_StepsizeSEXP, SEXP Prior_TypeSEXP, SEXP Two_Layer_Dirichlet_I1SEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< NumericVector >::type x_vec(x_vecSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type n_vec(n_vecSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type a_vec(a_vecSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type theta(thetaSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type n_gibbs(n_gibbsSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type n_gibbs_burnin(n_gibbs_burninSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type IsExact(IsExactSEXP);
@@ -30,7 +29,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< NumericVector >::type Pki_Integration_Stepsize(Pki_Integration_StepsizeSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type Prior_Type(Prior_TypeSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type Two_Layer_Dirichlet_I1(Two_Layer_Dirichlet_I1SEXP);
-    rcpp_result_gen = Rcpp::wrap(rcpp_Gibbs_Prob_Results(x_vec, n_vec, a_vec, theta, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed, Pki_Integration_Stepsize, Prior_Type, Two_Layer_Dirichlet_I1));
+    rcpp_result_gen = Rcpp::wrap(rcpp_Gibbs_Prob_Results(x_vec, n_vec, a_vec, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed, Pki_Integration_Stepsize, Prior_Type, Two_Layer_Dirichlet_I1));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -79,7 +78,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_mcleod_rcpp_Gibbs_Prob_Results", (DL_FUNC) &_mcleod_rcpp_Gibbs_Prob_Results, 18},
+    {"_mcleod_rcpp_Gibbs_Prob_Results", (DL_FUNC) &_mcleod_rcpp_Gibbs_Prob_Results, 17},
     {"_mcleod_rcpp_Generate_Fast_Gamma_Bank", (DL_FUNC) &_mcleod_rcpp_Generate_Fast_Gamma_Bank, 1},
     {"_mcleod_rcpp_Generate_Gamma_from_Fast_Gamma_Bank", (DL_FUNC) &_mcleod_rcpp_Generate_Gamma_from_Fast_Gamma_Bank, 2},
     {"_mcleod_rcpp_hello_world", (DL_FUNC) &_mcleod_rcpp_hello_world, 0},
