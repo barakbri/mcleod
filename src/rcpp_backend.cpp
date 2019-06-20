@@ -24,12 +24,12 @@ using namespace Numer;
 class Fast_Gamma_Sampler{
   
   //Constants for the indices of different shapes in the bank
-  const int INDEX_0_1  = 0;
-  const int INDEX_1    = 1;
-  const int INDEX_10   = 2;
+  static const int INDEX_0_1  = 0;
+  static const int INDEX_1    = 1;
+  static const int INDEX_10   = 2;
   
   //Total number of bank columns
-  const int BANK_COLS  = 3;
+  static const int BANK_COLS  = 3;
   
   /**
    * Bank constructor, samples each of the columns. Receives as parameter the required bank size.
@@ -86,7 +86,7 @@ class Fast_Gamma_Sampler{
 // Constant used for finding the point on the array of a (intervals over theta space) that is the equivlant of zero.
 const double I0_PRECISION = 0.001;  // constant precision used to compute I0
 
-class NPCI_Gibbs_Sampler{
+class Gibbs_Sampler{
 
   // Should exact integration be used?
   bool ExactIntegration;
@@ -167,14 +167,14 @@ class NPCI_Gibbs_Sampler{
   Fast_Gamma_Sampler FGS;
   
   // stepsize for numeric intergration of P_k,i
-  double dbinom_integration_stepsize = 0.01;
+  double dbinom_integration_stepsize;
   
   public:  
     
   /*
    * Constructor for the Gibbs Sampler Class
    */
-  NPCI_Gibbs_Sampler(NumericVector x_vec_p,                  // x vector
+  Gibbs_Sampler(NumericVector x_vec_p,                       // x vector
                      NumericVector n_vec_p,                  // n vector
                      NumericVector a_vec_p,                  // Interval partition
                      NumericVector CDF_values_p,             // CDF value used for estimating the statistic
@@ -268,8 +268,6 @@ class NPCI_Gibbs_Sampler{
     
     end = clock();
     
-    
-    
     //to measure times:
     double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
     
@@ -349,7 +347,7 @@ class NPCI_Gibbs_Sampler{
   }
     
   /***********************************************************************
-   * Function performs the actual Gibbs sampling - for a Beta Heirarchical tree generating ps
+   * Function performs the actual Gibbs sampling - for a Beta Heirarchical tree generating prior
    ***********************************************************************/
   void perform_Gibbs_Sampling_BetaHeirarchical(){
     bool SHOW_DEBUG_MSGS = false;
@@ -370,8 +368,6 @@ class NPCI_Gibbs_Sampler{
     // If an init location for the sampler is given, we used it here.
     
     if(InitGiven){
-      //Rprintf("_init_state length: %d\n\r",_init_state.length());
-      //Rprintf("PredefinedInit length: %d\n\r",PredefinedInit.length());
       pi_smp(_,0) = PredefinedInit;  
     }
     
@@ -389,23 +385,6 @@ class NPCI_Gibbs_Sampler{
         Rprintf("Starting Gibbs Iter %d \n\r",gibbs_itr);
       
       // Gibbs step 1: for k = 1 ... K and l = 1 ... L, sample  delta.k[l] conditionally on delta.k[l], x.vec[k], pi.gbbs
-      // This section is the equivlant of 
-      /*
-       for(k in 1:K)
-       {	
-       node	<- 1
-       pst.vec	<- p.k.i.mat[k,] * pi.gbbs[g,]
-       
-       for(l in 1:L)
-       {
-       p.sum			<- sum(pst.vec[tree.a.ind.lst[[l]][[node]]$p.ind])
-       q.sum			<- sum(pst.vec[tree.a.ind.lst[[l]][[node]]$q.ind])
-       delta.k[l]		<- rbinom(1,1,q.sum / (p.sum + q.sum))
-       node			<- tree.child.node.lst[[l]][[node]] [delta.k[l] + 1]
-       }
-       nvec.gbbs[g,node]	<- nvec.gbbs[g,node] + 1
-       }
-       */
       
       for(int k=0 ; k<K ; k++){
         
@@ -417,8 +396,6 @@ class NPCI_Gibbs_Sampler{
         node_in_next_l = 0;
         
         _pst_vec = p_k_i(k,_) * pi_smp(_,gibbs_itr);
-        //for(int i=0; i< I ; i++)
-        //  _pst_vec(i) = p_k_i(k,i) * pi_smp(i,gibbs_itr);
         
         if(SHOW_DEBUG_MSGS && Verbose && k==0){
           Rprintf("Posterior computed, length: %d \n\r",_pst_vec.length());
@@ -428,7 +405,6 @@ class NPCI_Gibbs_Sampler{
         }
         
         
-        //_pst_vec_cumsum = CumSum_ZeroPrefix(_pst_vec);
         CumSum_ZeroPrefix(_pst_vec,_pst_vec_cumsum);
         
         if(SHOW_DEBUG_MSGS && Verbose  && k==0){
@@ -464,7 +440,7 @@ class NPCI_Gibbs_Sampler{
           
           q_sum = _pst_vec_cumsum( _place_r_e  + 1) -  _pst_vec_cumsum( _place_r_s);
           
-          //node_in_next_l = 2 * node_in_l + rbinom(1,1,q_sum/(q_sum + p_sum))(0);
+          
           node_in_next_l = 2 * node_in_l;
           if(unif_rand() <= q_sum/(q_sum + p_sum))
             node_in_next_l++;  
@@ -486,23 +462,7 @@ class NPCI_Gibbs_Sampler{
       
       
       // Gibbs step 2: for each node independently sample node-pi conditionally on n.vec and then hierarchically construct pi.smp
-      // equivlant of the following code:
-      /*
-       pp.vec		<- rep(NA,2^L-1)
-       node.ind	<- 1
-       
-       for(l in 1:L)
-       for(node in 1:(2^(l-1)))
-       {
-       n.p					<- sum(nvec.gbbs[g,tree.a.ind.lst[[l]][[node]]$p.ind])
-       n.q					<- sum(nvec.gbbs[g,tree.a.ind.lst[[l]][[node]]$q.ind])
-       pp.vec[node.ind]	<- rbeta(1,n.p+1,n.q+1)
-       node.ind			<- node.ind + 1	
-       }
-       pq.vec				<- c(pp.vec,1-pp.vec)
-       pq.mat				<- array( pq.vec[prod.ind.mat] , dim = c(L,I))
-       pi.gbbs[g+1,]		<- apply(pq.mat,2,prod)
-       */
+      
       
       if(gibbs_itr < n_gibbs - 1)
       {
@@ -531,8 +491,6 @@ class NPCI_Gibbs_Sampler{
               temp_beta = rbeta(1,p_sum + 1, q_sum + 1)[0];  
             }
             
-            //temp_beta = my_rbeta(p_sum + 1.0, q_sum + 1.0);
-            
             // place the results
             for(int p = _place_l_s ; p <= _place_l_e ; p++)
               pi_smp(p, gibbs_itr + 1) = pi_smp(p, gibbs_itr + 1) * temp_beta;
@@ -554,8 +512,6 @@ class NPCI_Gibbs_Sampler{
       } // end of check on final gibbs iteration
     } // end of for loop on gibbs iter
     
-    // compute statistic:
-    compute_Posterior_Statistic();
     return;
   }
     
@@ -564,7 +520,7 @@ class NPCI_Gibbs_Sampler{
     inline int two_layer_dirichlet_right_descendant_by_I1_index(int i1){return ((i1)*(TwoLayerDirichlet_I2) - 1);} 
     
   /***********************************************************************
-   * Function performs the actual Gibbs sampling - for a Beta Heirarchical tree generating ps
+   * Function performs the actual Gibbs sampling - for a 2-Layer dirichlet tree generating prior
    ***********************************************************************/
   void perform_Gibbs_Sampling_2_Layer_Dirichlet(){
     bool SHOW_DEBUG_MSGS = false;
@@ -695,42 +651,9 @@ class NPCI_Gibbs_Sampler{
         
       } // end of check on final gibbs iteration
     } // end of for loop on gibbs iter
-    compute_Posterior_Statistic();  
     return;
   }
-    
-  // Function for computing the test statistic: mean of posterior probabilites of the CDF to be smaller than a value, at all grid points
-  void compute_Posterior_Statistic(){
-    // compute statistic:
-    for(int a_i = 1; a_i< n_smp.nrow(); a_i ++){
-      NumericVector N0 = sum_matrix_over_rows( n_smp( seq(0,a_i) , _ ));
-      
-      double sum_alpha0_vec    = 2.0;
-      double sum_alpha0_vec_I0 = 1.0;
-      
-      NumericVector _gibbs_itr_repped_sum_alpha0_vec_I0 = NumericVector(n_gibbs,sum_alpha0_vec_I0);
-      NumericVector _gibbs_itr_repped_sum_alpha0_vec    = NumericVector(n_gibbs,sum_alpha0_vec);
-      
-      NumericVector a0_beta = _gibbs_itr_repped_sum_alpha0_vec_I0  + N0;
-      NumericVector b0_beta = _gibbs_itr_repped_sum_alpha0_vec - _gibbs_itr_repped_sum_alpha0_vec_I0 + NumericVector(n_gibbs,(double)K) - N0;
-      
-      double _cummulator_alpha0 = 0.0;
-      double _counts_cummulator = 0.0;
-      for(int j=0;j<CDF_values.length();j++){
-        _cummulator_alpha0 = 0.0;
-        _counts_cummulator = 0.0;
-        
-        for(int i = n_gibbs_burn_in; i < n_gibbs ; i++){
-          _cummulator_alpha0 += Rf_pbeta(CDF_values[j], a0_beta[i], b0_beta[i], 1, 0);  
-          _counts_cummulator += (double)(1.0);
-        }
-        // Test statistic:
-        Gibbs_Prob_results_mat(a_i-1,j) = (_cummulator_alpha0)/(_counts_cummulator);
-        if(a_i == I0)
-          Gibbs_Prob_results[j] = Gibbs_Prob_results_mat(a_i-1,j);
-      }
-    }
-  }
+  
   
   /*
   * Testing Function - Used For Debugging, mainly for the auxilary functions and parameters
@@ -884,19 +807,17 @@ class NPCI_Gibbs_Sampler{
 
   
   /*
-   * Function user for producing a single sample, of a dirichlet distribution, with probability x
+   * Function used for producing a single sample, of a dirichlet distribution, with alpha vector x
    */
   NumericVector rdirichlet(NumericVector x){
     NumericVector _ret = NumericVector(x.length());
     rdirichlet_no_generation(x,_ret);
-    /*for(int i=0;i<x.length();i++){
-      _ret(i) = (rgamma(1,x(i),1))(0);
-    } 
-    double _sum_ret = sum(_ret);
-    return(_ret/_sum_ret);*/
     return(_ret);
   }
   
+  /*
+   * Function used for producing a single sample, of a dirichlet distribution, with alpha vector x, using preallocated space 
+   */
   void rdirichlet_no_generation(NumericVector x,NumericVector ret){
     for(int i=0;i<x.length();i++){
       ret(i) = (rgamma(1,x(i),1))(0);
@@ -975,7 +896,7 @@ List rcpp_Gibbs_Prob_Results_BetaH(NumericVector x_vec,
                                    IntegerVector Prior_Type,
                                    IntegerVector Two_Layer_Dirichlet_I1){
   
-  NPCI_Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, CDF_value, theta, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1);
+  Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, CDF_value, theta, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1);
   
   List ret;
   ret["Gibbs_results"]     = _gibbs.get_Gibbs_results();
