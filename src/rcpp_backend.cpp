@@ -79,7 +79,6 @@ class Fast_Gamma_Sampler{
 //    by Barak Brill, based on an earlier R implementation by Pallavi Basu and Daniel Yekutieli.
 //    ---------------------------------------------------------------------------------------------
 //    This class is built and called from R. The test statistic is the posterior probability of a beta binomial tree, over a set of terminal nodes.
-//    The CDF values for which the posterior probability is computed are given by a the vector CDF_values_p. 
 //    See documentation in R and paper (link in R package) for full details about the method.
 // ###################################################################################################
 
@@ -119,8 +118,6 @@ class Gibbs_Sampler{
   int TwoLayerDirichlet_I1;
   int TwoLayerDirichlet_I2;
   
-  // CDF value for which to compute the Gibbs sampler statistic
-  NumericVector CDF_values;
   
   // Theta value for which to compute the Gibbs sampler statistic
   double theta;
@@ -171,7 +168,6 @@ class Gibbs_Sampler{
   Gibbs_Sampler(NumericVector x_vec_p,                       // x vector
                      NumericVector n_vec_p,                  // n vector
                      NumericVector a_vec_p,                  // Interval partition
-                     NumericVector CDF_values_p,             // CDF value used for estimating the statistic
                      NumericVector theta_p,                  // theta value used for estimating the statictic
                      IntegerVector n_gibbs_p,                // total number of gibs iterations
                      IntegerVector n_gibbs_burnin_p,         // number of gibbs iterations discarded - "burn in"
@@ -205,7 +201,6 @@ class Gibbs_Sampler{
     n_gibbs = n_gibbs_p(0);
     n_gibbs_burn_in = n_gibbs_burnin_p(0);
     
-    CDF_values = CDF_values_p;
     theta = theta_p(0);
     L = L_(0);
     I = std::pow(2,L); // removed +1
@@ -859,7 +854,6 @@ class Gibbs_Sampler{
 List rcpp_Gibbs_Prob_Results(NumericVector x_vec,
                                    NumericVector n_vec,
                                    NumericVector a_vec,
-                                   NumericVector CDF_value,
                                    NumericVector theta,
                                    IntegerVector n_gibbs,
                                    IntegerVector n_gibbs_burnin,
@@ -876,7 +870,7 @@ List rcpp_Gibbs_Prob_Results(NumericVector x_vec,
                                    IntegerVector Prior_Type,
                                    IntegerVector Two_Layer_Dirichlet_I1){
   
-  Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, CDF_value, theta, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1);
+  Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, theta, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1);
   
   List ret;
   ret["p_k_i"]           = _gibbs.get_p_k_i();

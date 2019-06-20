@@ -1,7 +1,6 @@
 Estimate_Latent_With_Covarites	<- function(
                                        x.smp,
                                        n.smp,
-                                       CDF.vec = c(0.25,0.5,0.75),
                                        theta.vec = seq(-4,4,1),
                                        a.max = 4,
                                        L = 4,
@@ -25,8 +24,6 @@ Estimate_Latent_With_Covarites	<- function(
   K			<- length(x.smp)
   
   theta.vec = sort(unique(theta.vec,-1*theta.vec)) 
-  CDF.vec = sort(unique(CDF.vec,1-CDF.vec)) # check that we have 1-x for every x
-  N.CDF		<- length(CDF.vec)
   N.theta		<- length(theta.vec)
   Fast.Gamma.Bank = matrix(1,nrow = 1)
   Fast.Gamma.Used.p = 0
@@ -49,7 +46,6 @@ Estimate_Latent_With_Covarites	<- function(
   res = Wrapper_rcpp_Gibbs(x.smp,
                            n.smp,
                            a.vec.used,
-                           CDF.vec,
                            0,
                            nr.gibbs,nr.gibbs.burnin,
                            as.integer(exact.numeric.integration),
@@ -68,7 +64,6 @@ Estimate_Latent_With_Covarites	<- function(
   
   ret$parameters_list = list(
     theta.vec = theta.vec,
-    CDF.vec = CDF.vec,
     a.vec = a.vec.used,
     nr.gibbs = nr.gibbs,
     nr.gibbs.burnin = nr.gibbs.burnin,
