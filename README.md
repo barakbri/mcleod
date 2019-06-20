@@ -2,13 +2,19 @@
 
 #todo
 
-- remove CDF
-- remove as parameter
-- turn theta to a vector
 
-- beta vector
+- function for folding theta from covariates
+- function for beta suggestion
+- function for computing likelihood from covariates
+- record approvals
 
-- simple integration constant as parameter
+
+- simple integration step constant as parameter
 - fast gamma also for 2-layer dirichlet
 - other noise mechanisms
 - quadrature integration
+
+
+- check inputs
+- unit test
+

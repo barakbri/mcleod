@@ -82,9 +82,6 @@ class Fast_Gamma_Sampler{
 //    See documentation in R and paper (link in R package) for full details about the method.
 // ###################################################################################################
 
-// Constant used for finding the point on the array of a (intervals over theta space) that is the equivlant of zero.
-const double I0_PRECISION = 0.001;  // constant precision used to compute I0
-
 class Gibbs_Sampler{
 
   // Should exact integration be used?
@@ -107,9 +104,6 @@ class Gibbs_Sampler{
   
   // sets the number of levels for the beta tree, irrelevant on dirichlet prior
   int L; 
-  
-  // marks the index which is the zero on the vec.
-  int I0; 
   
   // marks the type of prior to be used- 0= 2 Layer dirichlet, 1= L level beta tree
   int Prior_Type;
@@ -160,6 +154,18 @@ class Gibbs_Sampler{
   // stepsize for numeric intergration of P_k,i
   double dbinom_integration_stepsize;
   
+  bool covariates_given;
+  
+  NumericMatrix covariates;
+  
+  int Nr_covariates;
+  
+  NumericVector proposal_sd;
+  
+  NumericMatrix beta_smp;
+  
+  NumericVector beta;
+  
   public:  
     
   /*
@@ -181,7 +187,10 @@ class Gibbs_Sampler{
                      NumericMatrix P_k_i_precomputed,        // The precomputed matrix of P_k_i values
                      NumericVector integration_stepsize_p,   // Integration step size
                      IntegerVector Prior_Type_p,             // Type of prior used, 0 = 2 Layer dirichlet, 1 = L level binomial tree.
-                     IntegerVector Two_Layer_Dirichlet_I1_p  // Parameter I1 for 2-Layer_Dirichlet
+                     IntegerVector Two_Layer_Dirichlet_I1_p, // Parameter I1 for 2-Layer_Dirichlet
+                     IntegerVector covariates_given_p,
+                     NumericMatrix covariates_p,
+                     NumericVector proposal_sd_p
                      ){
     
     GetRNGstate(); // Take the seed
@@ -224,14 +233,13 @@ class Gibbs_Sampler{
     n_vec = n_vec_p;
     a_vec = a_vec_p;
     
-    //find I0
-    for(int i=1 ; i< a_vec.length() ; i ++){
-      double _delta = (a_vec(i) > 0.0) ? a_vec(i) : (-1.0*a_vec(i));
-      if(_delta <= I0_PRECISION ){
-        I0 = i-1;
-        break;
-      }
-    }
+    covariates_given = (covariates_given_p[0] == 1) ? true: false;
+    covariates = covariates_p;
+    proposal_sd = proposal_sd_p;
+    Nr_covariates = covariates.ncol();
+    beta_smp = NumericMatrix(Nr_covariates,n_gibbs);
+    beta = NumericVector(Nr_covariates);
+    
     
     begin = clock();  
     
@@ -278,6 +286,11 @@ class Gibbs_Sampler{
    * Function returns the matrix of sampled pi's - by the gibbs sampler
    */  
   NumericMatrix get_pi_smp(){return(pi_smp);}  
+    
+  /*
+   * Function returns the matrix of sampled beta's - by the gibbs sampler
+   */  
+  NumericMatrix get_beta_smp(){return(beta_smp);}  
   
   //***************************
   // Auxilary functions for the Beta Heirarchical case
@@ -358,6 +371,11 @@ class Gibbs_Sampler{
       
       if(SHOW_DEBUG_MSGS && Verbose)
         Rprintf("Starting Gibbs Iter %d \n\r",gibbs_itr);
+      
+      if(covariates_given){
+        // record the current beta
+        
+      }
       
       // Gibbs step 1: for k = 1 ... K and l = 1 ... L, sample  delta.k[l] conditionally on delta.k[l], x.vec[k], pi.gbbs
       
@@ -485,6 +503,23 @@ class Gibbs_Sampler{
         }
         
       } // end of check on final gibbs iteration
+      
+      if(covariates_given){
+        // generate a new proposal
+        
+        // compute likelihood of candidate
+        
+        // check for approval
+        
+        // if approved
+           // - replace likelihood
+           // - replace beta
+           // - replace pki
+      
+        // record approval
+        
+      }
+      
     } // end of for loop on gibbs iter
     
     return;
@@ -867,15 +902,18 @@ List rcpp_Gibbs_Prob_Results(NumericVector x_vec,
                                    NumericMatrix P_k_i_precomputed,
                                    NumericVector Pki_Integration_Stepsize,
                                    IntegerVector Prior_Type,
-                                   IntegerVector Two_Layer_Dirichlet_I1){
+                                   IntegerVector Two_Layer_Dirichlet_I1,
+                                   IntegerVector covariates_given,
+                                   NumericMatrix covariates,
+                                   NumericVector proposal_sd){
   
-  Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1);
+  Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1,covariates_given,covariates,proposal_sd);
   
   List ret;
   ret["p_k_i"]           = _gibbs.get_p_k_i();
   ret["n_smp"]           = _gibbs.get_n_smp();
   ret["pi_smp"]          = _gibbs.get_pi_smp();  
-  
+  ret["beta_smp"]        = _gibbs.get_beta_smp();
   return(ret);
 }
 

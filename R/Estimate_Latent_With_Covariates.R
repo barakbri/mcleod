@@ -122,6 +122,7 @@ if(F){
                                                      theta.vec = seq(-2,2,0.125), Prior_Type = 1
                                                      )
   plot.posterior(res)
+  res$additional$original_stat_res$beta_smp
   
 }
 
