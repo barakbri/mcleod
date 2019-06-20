@@ -55,7 +55,7 @@ Estimate_Latent_With_Covarites	<- function(
                            as.integer(exact.numeric.integration),
                            as.integer(0), #verbose - turned off
                            L,
-                           1, #should computations be returned - this is turned on, since we need the P_k_i's
+                           #1, #should computations be returned - this is turned on, since we need the P_k_i's
                            Fast.Gamma.Used.p,
                            Fast.Gamma.Bank,
                            PriorType = Prior_Type,

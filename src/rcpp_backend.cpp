@@ -143,12 +143,6 @@ class Gibbs_Sampler{
   // Gibbs sampler state array, for n (number of observations in each a interval)
   NumericMatrix n_smp;
   
-  // Final result from sampling
-  NumericVector Gibbs_Prob_results;
-  
-  // Matrix for results of Beta-H Gibbs
-  NumericMatrix Gibbs_Prob_results_mat;
-  
   // Variables used for setting the initial conditions for the Gibbs sampler
   bool InitGiven;
   NumericVector PredefinedInit;
@@ -256,8 +250,6 @@ class Gibbs_Sampler{
       p_k_i = compute_p_k_i(x_vec,n_vec,theta,a_vec);  
     }
     
-    Gibbs_Prob_results = NumericVector(CDF_values.length());
-    Gibbs_Prob_results_mat = NumericMatrix(a_vec.length(),CDF_values.length());
     
     //call the Gibbs sampler:
     if(Prior_Type == 0)
@@ -282,17 +274,6 @@ class Gibbs_Sampler{
    * Function returns the p_k_i matrix computed for this class
    */
   NumericMatrix get_p_k_i(){return (p_k_i);}
-  
-  /*
-   * Function returns the statistic result from the Gibbs sampler
-   */  
-  NumericVector get_Gibbs_results(){return(Gibbs_Prob_results);}
-    
-    
-  /*
-   * Function returns the statistic result from the Gibbs sampler
-   */  
-  NumericMatrix get_Gibbs_results_mat(){return(Gibbs_Prob_results_mat);}
   
   /*
    * Function returns the matrix of sampled observations - by the gibbs sampler
@@ -875,7 +856,7 @@ class Gibbs_Sampler{
 // #################################################################
 
 // [[Rcpp::export]]
-List rcpp_Gibbs_Prob_Results_BetaH(NumericVector x_vec,
+List rcpp_Gibbs_Prob_Results(NumericVector x_vec,
                                    NumericVector n_vec,
                                    NumericVector a_vec,
                                    NumericVector CDF_value,
@@ -885,7 +866,6 @@ List rcpp_Gibbs_Prob_Results_BetaH(NumericVector x_vec,
                                    IntegerVector IsExact,
                                    IntegerVector Verbose,
                                    IntegerVector L,
-                                   IntegerVector ReturnComputations,
                                    IntegerVector InitGiven,
                                    NumericVector Init,
                                    IntegerVector Sample_Gamma_From_Bank,
@@ -899,13 +879,10 @@ List rcpp_Gibbs_Prob_Results_BetaH(NumericVector x_vec,
   Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, CDF_value, theta, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1);
   
   List ret;
-  ret["Gibbs_results"]     = _gibbs.get_Gibbs_results();
-  ret["Gibbs_results_mat"] = _gibbs.get_Gibbs_results_mat();
-  if(ReturnComputations(0) == 1){
-    ret["p_k_i"]           = _gibbs.get_p_k_i();
-    ret["n_smp"]           = _gibbs.get_n_smp();
-    ret["pi_smp"]          = _gibbs.get_pi_smp();  
-  }
+  ret["p_k_i"]           = _gibbs.get_p_k_i();
+  ret["n_smp"]           = _gibbs.get_n_smp();
+  ret["pi_smp"]          = _gibbs.get_pi_smp();  
+  
   return(ret);
 }
 
