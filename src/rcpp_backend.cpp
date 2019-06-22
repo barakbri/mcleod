@@ -162,6 +162,8 @@ class Gibbs_Sampler{
   
   NumericVector proposal_sd;
   
+  NumericVector beta_prior_sd;
+  
   NumericMatrix beta_smp;
   
   NumericVector beta;
@@ -190,7 +192,8 @@ class Gibbs_Sampler{
                      IntegerVector Two_Layer_Dirichlet_I1_p, // Parameter I1 for 2-Layer_Dirichlet
                      IntegerVector covariates_given_p,
                      NumericMatrix covariates_p,
-                     NumericVector proposal_sd_p
+                     NumericVector proposal_sd_p,
+                     NumericVector beta_prior_sd_p
                      ){
     
     GetRNGstate(); // Take the seed
@@ -237,6 +240,7 @@ class Gibbs_Sampler{
     covariates = covariates_p;
     proposal_sd = proposal_sd_p;
     Nr_covariates = covariates.ncol();
+    beta_prior_sd = beta_prior_sd;
     beta_smp = NumericMatrix(Nr_covariates,n_gibbs);
     beta = NumericVector(Nr_covariates);
     
@@ -905,9 +909,10 @@ List rcpp_Gibbs_Prob_Results(NumericVector x_vec,
                                    IntegerVector Two_Layer_Dirichlet_I1,
                                    IntegerVector covariates_given,
                                    NumericMatrix covariates,
-                                   NumericVector proposal_sd){
+                                   NumericVector proposal_sd,
+                                   NumericVector beta_prior_sd){
   
-  Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1,covariates_given,covariates,proposal_sd);
+  Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1,covariates_given,covariates,proposal_sd,beta_prior_sd);
   
   List ret;
   ret["p_k_i"]           = _gibbs.get_p_k_i();

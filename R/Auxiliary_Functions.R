@@ -22,7 +22,8 @@ Wrapper_rcpp_Gibbs = function(x.vec,
                               I1 = length(a.vec)-1,
                               covariates_given = 0,
                               covariates = matrix(c(1),nrow = 1),
-                              proposal_sd = c(1)){ 
+                              proposal_sd = c(1),
+                              beta_prior_sd = c(1)){ 
   
     return(
       rcpp_Gibbs_Prob_Results(x.vec,
@@ -44,7 +45,8 @@ Wrapper_rcpp_Gibbs = function(x.vec,
                                     I1,
                                     covariates_given,
                                     covariates,
-                                    proposal_sd) 
+                                    proposal_sd,
+                                    beta_prior_sd) 
     )
 }
 

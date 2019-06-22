@@ -6,6 +6,7 @@
 - function for folding theta from covariates
 - function for beta suggestion
 - function for computing likelihood from covariates
+- evaluate approval
 - record approvals
 
 
