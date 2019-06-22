@@ -1,7 +1,6 @@
-Estimate_Latent_With_Covarites	<- function(
+Estimate_Latent_With_Covariates	<- function(
                                        x.smp,
                                        n.smp,
-                                       theta.vec = seq(-4,4,1),
                                        a.max = 4,
                                        L = 4,
                                        I1 = 4,
@@ -11,7 +10,12 @@ Estimate_Latent_With_Covarites	<- function(
                                        Fast.Gamma.Bank.Size = 1000L,
                                        VERBOSE = F,
                                        Prior_Type = 0,
-                                       I_specificy_parameter = NULL
+                                       I_specificy_parameter = NULL,
+                                       covariates_given = 0,
+                                       covariates = matrix(c(1),nrow = 1),
+                                       proposal_sd = c(1),
+                                       beta_prior_sd = c(1),
+                                       beta_init = c(1)
                                        )
 {
   exact.numeric.integration = TRUE # We force exact numeric integration over dbinom for computation of P_k_i. Normal approximation is not sufficiant.
@@ -23,8 +27,7 @@ Estimate_Latent_With_Covarites	<- function(
   a.min = -1* (a.max)
   K			<- length(x.smp)
   
-  theta.vec = sort(unique(theta.vec,-1*theta.vec)) 
-  N.theta		<- length(theta.vec)
+  
   Fast.Gamma.Bank = matrix(1,nrow = 1)
   Fast.Gamma.Used.p = 0
   if(Fast.Gamma.Used){
@@ -54,7 +57,17 @@ Estimate_Latent_With_Covarites	<- function(
                            Fast.Gamma.Used.p,
                            Fast.Gamma.Bank,
                            PriorType = Prior_Type,
-                           I1 = I1)  
+                           I1 = I1,
+                           covariates_given = covariates_given,
+                           covariates = covariates,
+                           proposal_sd = proposal_sd,
+                           beta_prior_sd = beta_prior_sd,
+                           beta_init = beta_init
+                           )  
+  #covariates_given,
+  #covariates,
+  #proposal_sd,
+  #beta_prior_sd
   
 
   
@@ -62,7 +75,6 @@ Estimate_Latent_With_Covarites	<- function(
   class(ret) = 'NPCI.Object'
   
   ret$parameters_list = list(
-    theta.vec = theta.vec,
     a.vec = a.vec.used,
     nr.gibbs = nr.gibbs,
     nr.gibbs.burnin = nr.gibbs.burnin,
@@ -109,20 +121,39 @@ plot.posterior	<- function(NPCI.obj)
 
 
 if(F){
-  N = 200
+  N = 20
   K = 200
-  set.seed(1)
-  x = rbinom(K,size = N,prob = NPCI:::inv.log.odds(rnorm(K,0,sd = 1)))
+  set.seed(2)
+  covariates = matrix(rnorm(K),nrow = K)
+  real_beta = -1.5
+  x = rbinom(K,size = N,prob = NPCI:::inv.log.odds(rnorm(K,0,sd = 1) + real_beta*covariates))
   n = rep(N,K)
+  model_dt = data.frame(c = x,nc = n-x)
+  model_dt = cbind(model_dt,covariates)
+  model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
+  model$coefficients[-1]
   
-  res = Estimate_Latent_With_Covarites(x, n, L = 6,
+  res = Estimate_Latent_With_Covariates(x, n, L = 4,
                                                      I1=8,
                                                      VERBOSE = T,
                                                      a.max = 4,
-                                                     theta.vec = seq(-2,2,0.125), Prior_Type = 1
+                                                     Prior_Type = 1,covariates_given = 1,covariates = covariates,
+                                                     nr.gibbs = 300,nr.gibbs.burnin = 100,
+                                                     beta_prior_sd = c(5),
+                                                     proposal_sd = c(0.1),
+                                                     beta_init = (model$coefficients[-1])
                                                      )
-  plot.posterior(res)
-  res$additional$original_stat_res$beta_smp
+  hist(res$additional$original_stat_res$beta_smp)
+  plot(res$additional$original_stat_res$beta_smp[1,])
+  mean(res$additional$original_stat_res$beta_smp[1,])
+  median(res$additional$original_stat_res$beta_smp[1,])
+  
+  #plot.posterior(res)
+  plot(res$additional$original_stat_res$proposal_approved)
+  mean(res$additional$original_stat_res$proposal_approved)
+  plot(res$additional$original_stat_res$beta_suggestion[1,],col = res$additional$original_stat_res$proposal_approved+1,pch= 20)
+  res$parameters_list$a.vec
   
 }
 
+#covariates_given = 0

@@ -166,6 +166,10 @@ class Gibbs_Sampler{
   
   NumericMatrix beta_smp;
   
+  NumericMatrix beta_suggestion;
+  
+  NumericVector proposal_approved;
+  
   NumericVector beta;
   
   public:  
@@ -193,7 +197,8 @@ class Gibbs_Sampler{
                      IntegerVector covariates_given_p,
                      NumericMatrix covariates_p,
                      NumericVector proposal_sd_p,
-                     NumericVector beta_prior_sd_p
+                     NumericVector beta_prior_sd_p,
+                     NumericVector beta_init
                      ){
     
     GetRNGstate(); // Take the seed
@@ -235,15 +240,22 @@ class Gibbs_Sampler{
     x_vec = x_vec_p;
     n_vec = n_vec_p;
     a_vec = a_vec_p;
-    
     covariates_given = (covariates_given_p[0] == 1) ? true: false;
     covariates = covariates_p;
     proposal_sd = proposal_sd_p;
     Nr_covariates = covariates.ncol();
-    beta_prior_sd = beta_prior_sd;
+    beta_prior_sd = beta_prior_sd_p;
     beta_smp = NumericMatrix(Nr_covariates,n_gibbs);
-    beta = NumericVector(Nr_covariates);
+    if(covariates_given){
+      beta = beta_init;
+      compute_theta_vec(beta,theta);
+    }else{
+      beta = NumericVector(Nr_covariates);
+    }
+      
     
+    beta_suggestion = NumericMatrix(Nr_covariates,n_gibbs);
+    proposal_approved = NumericVector(n_gibbs);
     
     begin = clock();  
     
@@ -295,6 +307,66 @@ class Gibbs_Sampler{
    * Function returns the matrix of sampled beta's - by the gibbs sampler
    */  
   NumericMatrix get_beta_smp(){return(beta_smp);}  
+    
+  NumericMatrix get_beta_suggestion(){return(beta_suggestion);}  
+    
+  NumericVector get_proposal_approved(){return(proposal_approved);}  
+    
+    
+  //***************************
+  // Function for handling covariates
+  //***************************
+  
+  //function for folding theta from covariates
+  void compute_theta_vec(NumericVector beta_candidate, NumericVector theta_output){
+    double _cummulator = 0;
+    int i;
+    int j;
+    for(i=0;i<theta_output.length();i++){
+      _cummulator = 0;
+      for(j=0;j<beta_candidate.length();j++){
+        _cummulator += beta_candidate(j) * covariates(i,j);
+      }
+      theta_output(i) = _cummulator;
+    }
+  }
+    
+  //function for beta suggestion
+  void generate_Beta_suggestion(NumericVector current_beta, NumericVector beta_suggestion_out){
+    for(int i=0;i<current_beta.length();i++){
+      beta_suggestion_out(i) = current_beta(i) + rnorm(1,0,proposal_sd(i))(0);
+    }
+  }
+  
+  
+  //function for computing log likelihood from for a solution
+  double compute_loglikelihood(NumericMatrix current_P_k_i, NumericVector current_pi, NumericVector current_beta, double _ll_term_added_for_pi){
+    double _ret_ll = 0;
+    double _current_sample_prob = 0;
+    
+    //iterate over observations:
+    for(int i=0;i<K;i++){
+      _current_sample_prob = 0;
+      
+      for(int j=0;j<current_pi.length();j++){
+        _current_sample_prob += current_P_k_i(i,j)*current_pi(j);  
+      }
+      _ret_ll += log(_current_sample_prob);
+    }
+    
+    
+    //handle term added for pi:
+    for(int j=0;j<current_beta.length();j++){
+      _ret_ll += log(
+                    R::dnorm( current_beta(j), 0.0, beta_prior_sd(j),0) //should change to 1 and check - maybe their log is better...
+                    );
+    }
+    
+    // handle prior for beta:
+    _ret_ll += _ll_term_added_for_pi;
+    
+    return(_ret_ll);
+  }
   
   //***************************
   // Auxilary functions for the Beta Heirarchical case
@@ -352,6 +424,14 @@ class Gibbs_Sampler{
     
     NumericVector _n_vec_cum_sum(I+1);
     
+    //for beta sampling
+    double _ll_current_solution;
+    double _ll_suggestion;
+    NumericVector _beta_candidate_placeholder(beta.length());
+    NumericVector _theta_candidate_placeholder(K);
+    NumericMatrix _pki_candidate_placeholder(K,I);
+    
+    
     // We initialize the state. This is actually done using a dirichlet prior
     NumericVector _init_state = sum_matrix_over_rows(p_k_i);
     _init_state = 10.0/((double) K) * _init_state + NumericVector(I,1.0);
@@ -362,6 +442,7 @@ class Gibbs_Sampler{
     if(InitGiven){
       pi_smp(_,0) = PredefinedInit;  
     }
+    
     
     // used to iterate over the tree, when sampling a node from a heirarchical beta
     int node_in_l = 0; 
@@ -378,7 +459,8 @@ class Gibbs_Sampler{
       
       if(covariates_given){
         // record the current beta
-        
+        for(int q=0;q < beta.length();q++)
+          beta_smp(q,gibbs_itr) = beta(q);    
       }
       
       // Gibbs step 1: for k = 1 ... K and l = 1 ... L, sample  delta.k[l] conditionally on delta.k[l], x.vec[k], pi.gbbs
@@ -509,18 +591,45 @@ class Gibbs_Sampler{
       } // end of check on final gibbs iteration
       
       if(covariates_given){
+        
+        //compute likelihood of current solution:
+        _ll_current_solution =  compute_loglikelihood(p_k_i, pi_smp(_,gibbs_itr), beta, 0.0); // it is assumed we dont need to compute the ll term for the prior, because we will be using the MH rule
+        
         // generate a new proposal
+        generate_Beta_suggestion(beta, _beta_candidate_placeholder);
+        beta_suggestion(_,gibbs_itr) = _beta_candidate_placeholder;
+        
+        // generate theta for the new beta candidate:
+        compute_theta_vec(_beta_candidate_placeholder, _theta_candidate_placeholder);
+        
+        //generate Pki for solution:
+        _pki_candidate_placeholder = compute_p_k_i(x_vec,n_vec,_theta_candidate_placeholder,a_vec);  
         
         // compute likelihood of candidate
+        _ll_suggestion = compute_loglikelihood(_pki_candidate_placeholder, pi_smp(_,gibbs_itr), _beta_candidate_placeholder, 0.0); // it is assumed we dont need to compute the ll term for the prior, because we will be using the MH rule
         
         // check for approval
-        
+        double u = Rf_runif(0, 1);
         // if approved
-           // - replace likelihood
-           // - replace beta
-           // - replace pki
-      
-        // record approval
+        if(u<= exp(_ll_suggestion)/exp(_ll_current_solution)){
+          // - replace beta
+          std::copy( _beta_candidate_placeholder.begin(), _beta_candidate_placeholder.end(), beta.begin() ) ;
+          
+          // - replace theta
+          std::copy( _theta_candidate_placeholder.begin(), _theta_candidate_placeholder.end(), theta.begin() ) ;
+          
+          // - replace pki
+          p_k_i = _pki_candidate_placeholder;
+            
+          // record approval
+          proposal_approved(gibbs_itr) = 1;
+          
+        }else{
+          
+          // record disapprobal 
+          proposal_approved(gibbs_itr) = 0;
+          
+        }
         
       }
       
@@ -530,8 +639,8 @@ class Gibbs_Sampler{
   }
     
     
-    inline int two_layer_dirichlet_left_descendant_by_I1_index(int i1){return ((i1-1)*(TwoLayerDirichlet_I2));} 
-    inline int two_layer_dirichlet_right_descendant_by_I1_index(int i1){return ((i1)*(TwoLayerDirichlet_I2) - 1);} 
+  inline int two_layer_dirichlet_left_descendant_by_I1_index(int i1){return ((i1-1)*(TwoLayerDirichlet_I2));} 
+  inline int two_layer_dirichlet_right_descendant_by_I1_index(int i1){return ((i1)*(TwoLayerDirichlet_I2) - 1);} 
     
   /***********************************************************************
    * Function performs the actual Gibbs sampling - for a 2-Layer dirichlet tree generating prior
@@ -755,10 +864,12 @@ class Gibbs_Sampler{
    */
   NumericMatrix compute_p_k_i(NumericVector x_v, NumericVector n_v,NumericVector theta, NumericVector a_v){
     NumericMatrix p_mat(K,I);
-    NumericVector a_v_plus_theta = a_v;
+    NumericVector a_v_plus_theta(a_v.length());
     for(int k = 0; k < K ; k++)
     {
-      a_v_plus_theta = a_v +theta(k);
+      for(int j=0;j<a_v_plus_theta.length();j++)
+        a_v_plus_theta(j) = a_v(j) +theta(k);
+      
       p_mat(k,_) = compute_p_k_i_vec( x_v(k), n_v(k), a_v_plus_theta );
     }
     return(p_mat);
@@ -910,15 +1021,18 @@ List rcpp_Gibbs_Prob_Results(NumericVector x_vec,
                                    IntegerVector covariates_given,
                                    NumericMatrix covariates,
                                    NumericVector proposal_sd,
-                                   NumericVector beta_prior_sd){
+                                   NumericVector beta_prior_sd,
+                                   NumericVector beta_init){
   
-  Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1,covariates_given,covariates,proposal_sd,beta_prior_sd);
+  Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1,covariates_given,covariates,proposal_sd,beta_prior_sd,beta_init);
   
   List ret;
-  ret["p_k_i"]           = _gibbs.get_p_k_i();
-  ret["n_smp"]           = _gibbs.get_n_smp();
-  ret["pi_smp"]          = _gibbs.get_pi_smp();  
-  ret["beta_smp"]        = _gibbs.get_beta_smp();
+  ret["p_k_i"]             = _gibbs.get_p_k_i();
+  ret["n_smp"]             = _gibbs.get_n_smp();
+  ret["pi_smp"]            = _gibbs.get_pi_smp();  
+  ret["beta_smp"]          = _gibbs.get_beta_smp();
+  ret["beta_suggestion"]   = _gibbs.get_beta_suggestion();
+  ret["proposal_approved"] = _gibbs.get_proposal_approved();
   return(ret);
 }
 
@@ -952,6 +1066,7 @@ List rcpp_hello_world() {
 }
 
 
+//this section is an example for the quadrature based integration - need to incorporate into the code...
 // P(0.3 < X < 0.8), X ~ Beta(a, b)
 class BetaPDF: public Func
 {
