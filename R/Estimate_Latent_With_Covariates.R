@@ -122,17 +122,17 @@ plot.posterior	<- function(NPCI.obj)
 
 if(F){
   N = 20
-  K = 200
+  K = 1000
   set.seed(2)
   covariates = matrix(rnorm(K),nrow = K)
-  real_beta = -1.5
+  real_beta = -0.5
   x = rbinom(K,size = N,prob = NPCI:::inv.log.odds(rnorm(K,0,sd = 1) + real_beta*covariates))
   n = rep(N,K)
   model_dt = data.frame(c = x,nc = n-x)
   model_dt = cbind(model_dt,covariates)
   model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
   model$coefficients[-1]
-  
+  start = Sys.time()
   res = Estimate_Latent_With_Covariates(x, n, L = 4,
                                                      I1=8,
                                                      VERBOSE = T,
@@ -143,17 +143,65 @@ if(F){
                                                      proposal_sd = c(0.1),
                                                      beta_init = (model$coefficients[-1])
                                                      )
+  end = Sys.time()
+  res$additional$original_stat_res$elapsed_secs
+  end - start
+  
   hist(res$additional$original_stat_res$beta_smp)
   plot(res$additional$original_stat_res$beta_smp[1,])
   mean(res$additional$original_stat_res$beta_smp[1,])
   median(res$additional$original_stat_res$beta_smp[1,])
-  
+  res$additional$original_stat_res$beta_smp
   #plot.posterior(res)
   plot(res$additional$original_stat_res$proposal_approved)
   mean(res$additional$original_stat_res$proposal_approved)
   plot(res$additional$original_stat_res$beta_suggestion[1,],col = res$additional$original_stat_res$proposal_approved+1,pch= 20)
-  res$parameters_list$a.vec
+  
   
 }
 
-#covariates_given = 0
+
+
+
+if(F){
+  N = 50
+  K = 200
+  set.seed(1)
+  covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K)
+  real_beta_1 = -1
+  real_beta_2 = 1
+  x = rbinom(K,size = N,prob = NPCI:::inv.log.odds(rnorm(K,0,sd = 1) + real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
+  n = rep(N,K)
+  model_dt = data.frame(c = x,nc = n-x)
+  model_dt = cbind(model_dt,covariates)
+  model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
+  model$coefficients[-1]
+  
+  res = Estimate_Latent_With_Covariates(x, n, L = 6,
+                                        I1=8,
+                                        VERBOSE = T,
+                                        a.max = 4,
+                                        Prior_Type = 1,covariates_given = 1,covariates = covariates,
+                                        nr.gibbs = 300,nr.gibbs.burnin = 100,
+                                        beta_prior_sd = c(5,5),
+                                        proposal_sd = c(0.2,0.2),
+                                        beta_init = (model$coefficients[-1])
+  )
+  hist(res$additional$original_stat_res$beta_smp[1,])
+  hist(res$additional$original_stat_res$beta_smp[2,])
+  plot(res$additional$original_stat_res$beta_smp[1,])
+  plot(res$additional$original_stat_res$beta_smp[2,])
+  mean(res$additional$original_stat_res$beta_smp[1,])
+  mean(res$additional$original_stat_res$beta_smp[2,])
+  median(res$additional$original_stat_res$beta_smp[1,])
+  median(res$additional$original_stat_res$beta_smp[2,])
+  
+  #plot.posterior(res)
+  
+  plot(res$additional$original_stat_res$proposal_approved)
+  mean(res$additional$original_stat_res$proposal_approved)
+  par(mfrow=c(2,1))
+  plot(res$additional$original_stat_res$beta_suggestion[1,],col = res$additional$original_stat_res$proposal_approved+1,pch= 20,ylab = 'beta1 - proposal',xlab = 'Iteration')
+  plot(res$additional$original_stat_res$beta_suggestion[2,],col = res$additional$original_stat_res$proposal_approved+1,pch= 20,ylab = 'beta2 - proposal',xlab = 'Iteration')
+  par(mfrow=c(1,1))
+}

@@ -172,6 +172,8 @@ class Gibbs_Sampler{
   
   NumericVector beta;
   
+  double elapsed_secs;
+  
   public:  
     
   /*
@@ -278,8 +280,8 @@ class Gibbs_Sampler{
     
     end = clock();
     
-    //to measure times:
-    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+    //measure times:
+    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
     
     if(Verbose)
       Rprintf("\n\r Elapsed time for Gibbs sampler (s) : %lf \n\r",elapsed_secs);
@@ -311,6 +313,8 @@ class Gibbs_Sampler{
   NumericMatrix get_beta_suggestion(){return(beta_suggestion);}  
     
   NumericVector get_proposal_approved(){return(proposal_approved);}  
+    
+  double get_elapsed_secs(){return(elapsed_secs);}
     
     
   //***************************
@@ -590,10 +594,10 @@ class Gibbs_Sampler{
         
       } // end of check on final gibbs iteration
       
-      if(covariates_given){
+      if(covariates_given && gibbs_itr < n_gibbs - 1){
         
         //compute likelihood of current solution:
-        _ll_current_solution =  compute_loglikelihood(p_k_i, pi_smp(_,gibbs_itr), beta, 0.0); // it is assumed we dont need to compute the ll term for the prior, because we will be using the MH rule
+        _ll_current_solution =  compute_loglikelihood(p_k_i, pi_smp(_,gibbs_itr+1), beta, 0.0); // it is assumed we dont need to compute the ll term for the prior, because we will be using the MH rule
         
         // generate a new proposal
         generate_Beta_suggestion(beta, _beta_candidate_placeholder);
@@ -606,12 +610,12 @@ class Gibbs_Sampler{
         _pki_candidate_placeholder = compute_p_k_i(x_vec,n_vec,_theta_candidate_placeholder,a_vec);  
         
         // compute likelihood of candidate
-        _ll_suggestion = compute_loglikelihood(_pki_candidate_placeholder, pi_smp(_,gibbs_itr), _beta_candidate_placeholder, 0.0); // it is assumed we dont need to compute the ll term for the prior, because we will be using the MH rule
+        _ll_suggestion = compute_loglikelihood(_pki_candidate_placeholder, pi_smp(_,gibbs_itr+1), _beta_candidate_placeholder, 0.0); // it is assumed we dont need to compute the ll term for the prior, because we will be using the MH rule
         
         // check for approval
         double u = Rf_runif(0, 1);
         // if approved
-        if(u<= exp(_ll_suggestion)/exp(_ll_current_solution)){
+        if(u<= exp(_ll_suggestion - _ll_current_solution)){
           // - replace beta
           std::copy( _beta_candidate_placeholder.begin(), _beta_candidate_placeholder.end(), beta.begin() ) ;
           
@@ -1033,6 +1037,7 @@ List rcpp_Gibbs_Prob_Results(NumericVector x_vec,
   ret["beta_smp"]          = _gibbs.get_beta_smp();
   ret["beta_suggestion"]   = _gibbs.get_beta_suggestion();
   ret["proposal_approved"] = _gibbs.get_proposal_approved();
+  ret["elapsed_secs"]      = _gibbs.get_elapsed_secs();
   return(ret);
 }
 
