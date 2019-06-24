@@ -2,8 +2,6 @@
 
 #todo
 Monday
-X p_k_i - memoization for integration values? - idea failed
-- beta parameters also for two layer dirichlet - try to make as concise as possible
 
 Tuesday-Wednesday
 - simple integration step constant as parameter

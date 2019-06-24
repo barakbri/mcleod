@@ -139,7 +139,7 @@ if(F){
                                                      I1=8,
                                                      VERBOSE = T,
                                                      a.max = 4,
-                                                     Prior_Type = 1,covariates_given = 1,covariates = covariates,
+                                                     Prior_Type = 0,covariates_given = 1,covariates = covariates,
                                                      nr.gibbs = 300,nr.gibbs.burnin = 100,
                                                      beta_prior_sd = c(5),
                                                      proposal_sd = c(0.05),
@@ -166,7 +166,7 @@ if(F){
 
 
 if(F){
-  N = 10
+  N = 20
   K = 200
   set.seed(1)
   covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K)
@@ -183,7 +183,7 @@ if(F){
                                         I1=8,
                                         VERBOSE = T,
                                         a.max = 4,
-                                        Prior_Type = 1,covariates_given = 1,covariates = covariates,
+                                        Prior_Type = 0,covariates_given = 1,covariates = covariates,
                                         nr.gibbs = 300,nr.gibbs.burnin = 100,
                                         beta_prior_sd = c(5,5),
                                         proposal_sd = c(0.2,0.2),

@@ -460,14 +460,6 @@ class Gibbs_Sampler{
     
     NumericVector _n_vec_cum_sum(I+1);
     
-    //for beta sampling
-    double _ll_current_solution;
-    double _ll_suggestion;
-    NumericVector _beta_candidate_placeholder(beta.length());
-    NumericVector _theta_candidate_placeholder(K);
-    //NumericMatrix _pki_candidate_placeholder(K,I);
-    
-    
     // We initialize the state. This is actually done using a dirichlet prior
     NumericVector _init_state = sum_matrix_over_rows(p_k_i);
     _init_state = 10.0/((double) K) * _init_state + NumericVector(I,1.0);
@@ -487,7 +479,6 @@ class Gibbs_Sampler{
     double q_sum;
     double temp_beta;
     int _place_l_s, _place_l_e, _place_r_s, _place_r_e;
-    double _u; // used for checking MH approval
     
     for(int gibbs_itr = 0 ; gibbs_itr < n_gibbs ; gibbs_itr++){
       
@@ -628,53 +619,57 @@ class Gibbs_Sampler{
       } // end of check on final gibbs iteration
       
       if(covariates_given && gibbs_itr < n_gibbs - 1){
-        
-        //compute likelihood of current solution:
-        _ll_current_solution =  compute_loglikelihood(p_k_i, pi_smp(_,gibbs_itr+1), beta, 0.0); // it is assumed we dont need to compute the ll term for the prior, because we will be using the MH rule
-        
-        // generate a new proposal
-        generate_Beta_suggestion(beta, _beta_candidate_placeholder);
-        beta_suggestion(_,gibbs_itr) = _beta_candidate_placeholder;
-        
-        // generate theta for the new beta candidate:
-        compute_theta_vec(_beta_candidate_placeholder, _theta_candidate_placeholder);
-        
-        //generate Pki for solution:
-        compute_p_k_i(x_vec,n_vec,_theta_candidate_placeholder,a_vec, p_k_i_suggestion);  
-        
-        // compute likelihood of candidate
-        _ll_suggestion = compute_loglikelihood(p_k_i_suggestion, pi_smp(_,gibbs_itr+1), _beta_candidate_placeholder, 0.0); // it is assumed we dont need to compute the ll term for the prior, because we will be using the MH rule
-        
-        // check for approval
-        _u = Rf_runif(0, 1);
-        // if approved
-        if(_u<= exp(_ll_suggestion - _ll_current_solution)){
-          // - replace beta
-          std::copy( _beta_candidate_placeholder.begin(), _beta_candidate_placeholder.end(), beta.begin() ) ;
-          
-          // - replace theta
-          std::copy( _theta_candidate_placeholder.begin(), _theta_candidate_placeholder.end(), theta.begin() ) ;
-          
-          // - replace pki - will be used in the next iteration
-          p_k_i = p_k_i_suggestion;
-            
-          // record approval
-          proposal_approved(gibbs_itr) = 1;
-          
-        }else{
-          
-          // record disapprobal 
-          proposal_approved(gibbs_itr) = 0;
-          
-        }
-        
+        handle_MH_step(gibbs_itr);
       }
       
     } // end of for loop on gibbs iter
     
     return;
   }
+  
+  void handle_MH_step(int gibbs_itr){
+    //for beta sampling - this allocation takes place only once per iteration, effectively nothing.
+    NumericVector _beta_candidate_placeholder(beta.length());
+    NumericVector _theta_candidate_placeholder(K);
     
+    //compute likelihood of current solution:
+    double _ll_current_solution =  compute_loglikelihood(p_k_i, pi_smp(_,gibbs_itr+1), beta, 0.0); // it is assumed we dont need to compute the ll term for the prior, because we will be using the MH rule
+    
+    // generate a new proposal
+    generate_Beta_suggestion(beta, _beta_candidate_placeholder);
+    beta_suggestion(_,gibbs_itr) = _beta_candidate_placeholder;
+    
+    // generate theta for the new beta candidate:
+    compute_theta_vec(_beta_candidate_placeholder, _theta_candidate_placeholder);
+    
+    //generate Pki for solution:
+    compute_p_k_i(x_vec,n_vec,_theta_candidate_placeholder,a_vec, p_k_i_suggestion);  
+    
+    // compute likelihood of candidate
+    double _ll_suggestion = compute_loglikelihood(p_k_i_suggestion, pi_smp(_,gibbs_itr+1), _beta_candidate_placeholder, 0.0); // it is assumed we dont need to compute the ll term for the prior, because we will be using the MH rule
+    
+    // check for approval
+    double _u = Rf_runif(0, 1);
+    // if approved
+    if(_u<= exp(_ll_suggestion - _ll_current_solution)){
+      // - replace beta
+      std::copy( _beta_candidate_placeholder.begin(), _beta_candidate_placeholder.end(), beta.begin() ) ;
+      
+      // - replace theta
+      std::copy( _theta_candidate_placeholder.begin(), _theta_candidate_placeholder.end(), theta.begin() ) ;
+      
+      // - replace pki - will be used in the next iteration
+      p_k_i = p_k_i_suggestion;
+      
+      // record approval
+      proposal_approved(gibbs_itr) = 1;
+      
+    }else{
+      // record disapprobal 
+      proposal_approved(gibbs_itr) = 0;
+      
+    }
+  }
     
   inline int two_layer_dirichlet_left_descendant_by_I1_index(int i1){return ((i1-1)*(TwoLayerDirichlet_I2));} 
   inline int two_layer_dirichlet_right_descendant_by_I1_index(int i1){return ((i1)*(TwoLayerDirichlet_I2) - 1);} 
@@ -724,6 +719,12 @@ class Gibbs_Sampler{
       
       if(SHOW_DEBUG_MSGS && Verbose )
         Rprintf("Starting Gibbs Iter %d \n\r",gibbs_itr);
+      
+      if(covariates_given){
+        // record the current beta
+        for(int q=0;q < beta.length();q++)
+          beta_smp(q,gibbs_itr) = beta(q);    
+      }
       
       // Gibbs step 1: for k = 1 ... K and l = 1 ... L, sample  delta.k[l] conditionally on delta.k[l], x.vec[k], pi.gbbs
       
@@ -810,6 +811,13 @@ class Gibbs_Sampler{
       
         
       } // end of check on final gibbs iteration
+      
+      
+      if(covariates_given && gibbs_itr < n_gibbs - 1){
+        handle_MH_step(gibbs_itr);
+      }
+      
+      
     } // end of for loop on gibbs iter
     return;
   }
