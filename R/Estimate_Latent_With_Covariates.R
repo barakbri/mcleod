@@ -15,7 +15,8 @@ Estimate_Latent_With_Covariates	<- function(
                                        covariates = matrix(c(1),nrow = 1),
                                        proposal_sd = c(1),
                                        beta_prior_sd = c(1),
-                                       beta_init = c(1)
+                                       beta_init = c(1),
+                                       integtation_step_size = 0.01
                                        )
 {
   exact.numeric.integration = TRUE # We force exact numeric integration over dbinom for computation of P_k_i. Normal approximation is not sufficiant.
@@ -53,7 +54,6 @@ Estimate_Latent_With_Covariates	<- function(
                            as.integer(exact.numeric.integration),
                            as.integer(0), #verbose - turned off
                            L,
-                           #1, #should computations be returned - this is turned on, since we need the P_k_i's
                            Fast.Gamma.Used.p,
                            Fast.Gamma.Bank,
                            PriorType = Prior_Type,
@@ -62,7 +62,8 @@ Estimate_Latent_With_Covariates	<- function(
                            covariates = covariates,
                            proposal_sd = proposal_sd,
                            beta_prior_sd = beta_prior_sd,
-                           beta_init = beta_init
+                           beta_init = beta_init,
+                           integtation_step_size = integtation_step_size
                            )  
   #covariates_given,
   #covariates,
@@ -121,7 +122,7 @@ plot.posterior	<- function(NPCI.obj)
 
 
 if(F){
-  N = 20
+  N = 10
   K = 1000
   set.seed(2)
   covariates = matrix(rnorm(K),nrow = K)
@@ -134,16 +135,19 @@ if(F){
   model_dt = cbind(model_dt,covariates)
   model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
   model$coefficients[-1]
+  #plot(ecdf(x/n))
+  
   start = Sys.time()
+  
   res = Estimate_Latent_With_Covariates(x, n, L = 6,
                                                      I1=8,
                                                      VERBOSE = T,
                                                      a.max = 4,
-                                                     Prior_Type = 0,covariates_given = 1,covariates = covariates,
+                                                     Prior_Type = 1,covariates_given = 1,covariates = covariates,
                                                      nr.gibbs = 300,nr.gibbs.burnin = 100,
                                                      beta_prior_sd = c(5),
                                                      proposal_sd = c(0.05),
-                                                     beta_init = (model$coefficients[-1])
+                                                     beta_init = (model$coefficients[-1]),integtation_step_size = 0.01
                                                      )
   end = Sys.time()
   res$additional$original_stat_res$elapsed_secs
@@ -183,11 +187,11 @@ if(F){
                                         I1=8,
                                         VERBOSE = T,
                                         a.max = 4,
-                                        Prior_Type = 0,covariates_given = 1,covariates = covariates,
+                                        Prior_Type = 1,covariates_given = 1,covariates = covariates,
                                         nr.gibbs = 300,nr.gibbs.burnin = 100,
                                         beta_prior_sd = c(5,5),
                                         proposal_sd = c(0.2,0.2),
-                                        beta_init = (model$coefficients[-1])
+                                        beta_init = (model$coefficients[-1]),integtation_step_size = 0.01
   )
   res$additional$original_stat_res$elapsed_secs
   
