@@ -166,7 +166,7 @@ if(F){
 
 
 if(F){
-  N = 50
+  N = 20
   K = 200
   set.seed(1)
   covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K)

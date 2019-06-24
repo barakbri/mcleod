@@ -840,11 +840,10 @@ class Gibbs_Sampler{
     double _integral_h = dbinom_integration_stepsize;
     double _integral_p = 0.0;
     double _integral_sum = 0.0;
+    
+    double _this_density = -1;
+    double _last_density = -1;
     for(int i=0;i < I; i++){
-      _temp_p_nrm_ul = Rf_pnorm5(a_v(i+1) , theta_hat, theta_se, 1, 0); 
-      _temp_p_nrm_ll = Rf_pnorm5(a_v(i)   , theta_hat, theta_se, 1, 0); 
-      _temp = (_temp_p_nrm_ul - _temp_p_nrm_ll) / ( (a_v(i+1)) - a_v(i) );
-      
       //Check if Exact Numerical Integration is needed
       if(ExactIntegration &&
          -4.0 <= ((a_v(i) - theta_hat) / theta_se) &&
@@ -853,11 +852,21 @@ class Gibbs_Sampler{
          //do integration
          _integral = 0.0;
          _integral_p = a_v(i);
-         while(_integral_p <= a_v(i+1)){
-           _integral +=   Rf_dbinom(x,n,inv_log_odds(_integral_p),0) * _integral_h;
+         while(_integral_p +_integral_h <= a_v(i+1)){
+           if(_last_density == -1){ // this rule is activated only on the first iteration, since we don't have a density computed from the last step
+             _last_density = Rf_dbinom(x,n,inv_log_odds(_integral_p),0);
+           }
+           _this_density = Rf_dbinom(x,n,inv_log_odds(_integral_p +_integral_h),0);
+           _integral   +=   (_last_density + _this_density) * _integral_h / 2.0;
+           //_integral   +=   Rf_dbinom(x,n,inv_log_odds(_integral_p),0) * _integral_h;
            _integral_p += _integral_h;
+           _last_density = _this_density;
          }
          _temp = _integral;
+      }else{
+        _temp_p_nrm_ul = Rf_pnorm5(a_v(i+1) , theta_hat, theta_se, 1, 0); 
+        _temp_p_nrm_ll = Rf_pnorm5(a_v(i)   , theta_hat, theta_se, 1, 0); 
+        _temp = (_temp_p_nrm_ul - _temp_p_nrm_ll) / ( (a_v(i+1)) - a_v(i) );
       }
       
       p_k_i_vec_computation_result(i) = _temp;

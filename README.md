@@ -2,8 +2,7 @@
 
 #todo
 Monday
-- compute p_k_i without allocation - requires rewriting a 1-piece instead of a twopiece function...
-- trapezoid rule/simpsons rule?
+V trapezoid rule/simpsons rule?
 - beta parameters also for two layer dirichlet - try to make as concise as possible
 
 Tuesday-Wednesday
