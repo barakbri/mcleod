@@ -172,6 +172,12 @@ class Gibbs_Sampler{
   
   NumericVector beta;
   
+  NumericMatrix p_k_i_suggestion;
+  
+  NumericVector a_v_plus_theta;
+  
+  NumericVector p_k_i_vec_computation_result;
+  
   double elapsed_secs;
   
   public:  
@@ -223,7 +229,6 @@ class Gibbs_Sampler{
     L = L_(0);
     I = std::pow(2,L); // removed +1
     
-    
     Prior_Type = Prior_Type_p(0);
     
     if(Prior_Type == 0){
@@ -242,6 +247,7 @@ class Gibbs_Sampler{
     x_vec = x_vec_p;
     n_vec = n_vec_p;
     a_vec = a_vec_p;
+    a_v_plus_theta = NumericVector(a_vec.length()); // preallocated, used for computing the rows of p_k_i
     covariates_given = (covariates_given_p[0] == 1) ? true: false;
     covariates = covariates_p;
     proposal_sd = proposal_sd_p;
@@ -258,16 +264,19 @@ class Gibbs_Sampler{
     
     beta_suggestion = NumericMatrix(Nr_covariates,n_gibbs);
     proposal_approved = NumericVector(n_gibbs);
-    
+    p_k_i_vec_computation_result = NumericVector(I);
+    p_k_i_suggestion = NumericMatrix(K,I);  
     begin = clock();  
     
     ///////////////////compute p_k_i
     
     //handling precomputation of P_k_i
     if(P_k_i_is_given[0] == 1){
+      p_k_i = NumericMatrix(K,I);  
       p_k_i = P_k_i_precomputed;
     }else{
-      p_k_i = compute_p_k_i(x_vec,n_vec,theta,a_vec);  
+      p_k_i = NumericMatrix(K,I);  
+      compute_p_k_i(x_vec,n_vec,theta,a_vec,p_k_i);  
     }
     
     
@@ -433,7 +442,7 @@ class Gibbs_Sampler{
     double _ll_suggestion;
     NumericVector _beta_candidate_placeholder(beta.length());
     NumericVector _theta_candidate_placeholder(K);
-    NumericMatrix _pki_candidate_placeholder(K,I);
+    //NumericMatrix _pki_candidate_placeholder(K,I);
     
     
     // We initialize the state. This is actually done using a dirichlet prior
@@ -455,6 +464,7 @@ class Gibbs_Sampler{
     double q_sum;
     double temp_beta;
     int _place_l_s, _place_l_e, _place_r_s, _place_r_e;
+    double _u; // used for checking MH approval
     
     for(int gibbs_itr = 0 ; gibbs_itr < n_gibbs ; gibbs_itr++){
       
@@ -607,23 +617,23 @@ class Gibbs_Sampler{
         compute_theta_vec(_beta_candidate_placeholder, _theta_candidate_placeholder);
         
         //generate Pki for solution:
-        _pki_candidate_placeholder = compute_p_k_i(x_vec,n_vec,_theta_candidate_placeholder,a_vec);  
+        compute_p_k_i(x_vec,n_vec,_theta_candidate_placeholder,a_vec, p_k_i_suggestion);  
         
         // compute likelihood of candidate
-        _ll_suggestion = compute_loglikelihood(_pki_candidate_placeholder, pi_smp(_,gibbs_itr+1), _beta_candidate_placeholder, 0.0); // it is assumed we dont need to compute the ll term for the prior, because we will be using the MH rule
+        _ll_suggestion = compute_loglikelihood(p_k_i_suggestion, pi_smp(_,gibbs_itr+1), _beta_candidate_placeholder, 0.0); // it is assumed we dont need to compute the ll term for the prior, because we will be using the MH rule
         
         // check for approval
-        double u = Rf_runif(0, 1);
+        _u = Rf_runif(0, 1);
         // if approved
-        if(u<= exp(_ll_suggestion - _ll_current_solution)){
+        if(_u<= exp(_ll_suggestion - _ll_current_solution)){
           // - replace beta
           std::copy( _beta_candidate_placeholder.begin(), _beta_candidate_placeholder.end(), beta.begin() ) ;
           
           // - replace theta
           std::copy( _theta_candidate_placeholder.begin(), _theta_candidate_placeholder.end(), theta.begin() ) ;
           
-          // - replace pki
-          p_k_i = _pki_candidate_placeholder;
+          // - replace pki - will be used in the next iteration
+          p_k_i = p_k_i_suggestion;
             
           // record approval
           proposal_approved(gibbs_itr) = 1;
@@ -812,8 +822,11 @@ class Gibbs_Sampler{
    * be received from a value of p, coming from each of the segments of a_v, assuming uniform distribution in each section.
    * the value of ExactIntegration for the class sets whether exact numeric integration over dbinom is done,
    * instead of a normal approximation.
+   * 
+   * results returned in object p_k_i_vec_computation_result
+   * 
    */
-  NumericVector compute_p_k_i_vec(double x, double n, NumericVector a_v){
+  void compute_p_k_i_vec(double x, double n, NumericVector a_v){
     
     double p_hat	= ( (double)(x + (double)0.5) ) / ( (double)( n + (double)1.0 ));
     
@@ -821,14 +834,12 @@ class Gibbs_Sampler{
     
     double theta_se	= sqrt(((double)1.0) / ((double)(n * p_hat * (1.0 - p_hat) )) );
     
-    NumericVector p_tmp(I);
-    
     double _temp_p_nrm_ul, _temp_p_nrm_ll;
     double _temp;
     double _integral = 0.0;
     double _integral_h = dbinom_integration_stepsize;
     double _integral_p = 0.0;
-    
+    double _integral_sum = 0.0;
     for(int i=0;i < I; i++){
       _temp_p_nrm_ul = Rf_pnorm5(a_v(i+1) , theta_hat, theta_se, 1, 0); 
       _temp_p_nrm_ll = Rf_pnorm5(a_v(i)   , theta_hat, theta_se, 1, 0); 
@@ -849,34 +860,39 @@ class Gibbs_Sampler{
          _temp = _integral;
       }
       
-      p_tmp(i) = _temp;
-      
+      p_k_i_vec_computation_result(i) = _temp;
+      _integral_sum += _temp;
     }
     
     
     //normalize:
-    p_tmp = p_tmp / sum(p_tmp);
-    
-    return(p_tmp);
-    
+    for(int i=0; i< I;i++){
+      p_k_i_vec_computation_result(i) = p_k_i_vec_computation_result(i)/_integral_sum;
+    }
   }
     
   
   /*
    * compute P_k_i matrix, row by row (row = observation).
    * P_k_i gives the posterior probability of the kth obervation to be received from a p coming from the ith interval of the a grid
+   * 
+   * results returned in p_mat - must be of dimensions K X I
    */
-  NumericMatrix compute_p_k_i(NumericVector x_v, NumericVector n_v,NumericVector theta, NumericVector a_v){
-    NumericMatrix p_mat(K,I);
-    NumericVector a_v_plus_theta(a_v.length());
+  void compute_p_k_i(NumericVector x_v, NumericVector n_v,NumericVector theta, NumericVector a_v,NumericMatrix p_mat){
+    
+    //NumericVector a_v_plus_theta(a_v.length());
     for(int k = 0; k < K ; k++)
     {
-      for(int j=0;j<a_v_plus_theta.length();j++)
+      for(int j=0;j<a_v_plus_theta.length();j++){
         a_v_plus_theta(j) = a_v(j) +theta(k);
+      }
       
-      p_mat(k,_) = compute_p_k_i_vec( x_v(k), n_v(k), a_v_plus_theta );
+      compute_p_k_i_vec( x_v(k), n_v(k), a_v_plus_theta );
+      
+      for(int j=0;j<I;j++){ // need to benchmark against memcopy - however this requires a row object - not sure how it will work...
+        p_mat(k,j) =  p_k_i_vec_computation_result(j);
+      }
     }
-    return(p_mat);
   }
     
   /*

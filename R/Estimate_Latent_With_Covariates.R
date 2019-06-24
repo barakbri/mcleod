@@ -126,21 +126,23 @@ if(F){
   set.seed(2)
   covariates = matrix(rnorm(K),nrow = K)
   real_beta = -0.5
-  x = rbinom(K,size = N,prob = NPCI:::inv.log.odds(rnorm(K,0,sd = 1) + real_beta*covariates))
+  u = sample(c(0,1),size = K,replace = T)
+  x = rbinom(K,size = N,prob = NPCI:::inv.log.odds(rnorm(K,-1+3*u,sd = 0.3) + real_beta*covariates))
   n = rep(N,K)
+  hist(x/n)
   model_dt = data.frame(c = x,nc = n-x)
   model_dt = cbind(model_dt,covariates)
   model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
   model$coefficients[-1]
   start = Sys.time()
-  res = Estimate_Latent_With_Covariates(x, n, L = 4,
+  res = Estimate_Latent_With_Covariates(x, n, L = 6,
                                                      I1=8,
                                                      VERBOSE = T,
                                                      a.max = 4,
                                                      Prior_Type = 1,covariates_given = 1,covariates = covariates,
                                                      nr.gibbs = 300,nr.gibbs.burnin = 100,
                                                      beta_prior_sd = c(5),
-                                                     proposal_sd = c(0.1),
+                                                     proposal_sd = c(0.05),
                                                      beta_init = (model$coefficients[-1])
                                                      )
   end = Sys.time()
@@ -187,6 +189,8 @@ if(F){
                                         proposal_sd = c(0.2,0.2),
                                         beta_init = (model$coefficients[-1])
   )
+  res$additional$original_stat_res$elapsed_secs
+  
   hist(res$additional$original_stat_res$beta_smp[1,])
   hist(res$additional$original_stat_res$beta_smp[2,])
   plot(res$additional$original_stat_res$beta_smp[1,])
