@@ -2,7 +2,7 @@
 
 #todo
 Monday
-V trapezoid rule/simpsons rule?
+X p_k_i - memoization for integration values? - idea failed
 - beta parameters also for two layer dirichlet - try to make as concise as possible
 
 Tuesday-Wednesday
@@ -20,5 +20,5 @@ Thursday
 
 
 - quadrature integration
-- p_k_i - memoization for integration values?
+
 

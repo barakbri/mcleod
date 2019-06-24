@@ -7,6 +7,9 @@
 #include <Rmath.h>
 #include <ctime>
 
+#include <sstream>
+
+
 
 
 using namespace Rcpp;
@@ -324,7 +327,27 @@ class Gibbs_Sampler{
   NumericVector get_proposal_approved(){return(proposal_approved);}  
     
   double get_elapsed_secs(){return(elapsed_secs);}
-    
+  
+  //***************************
+  // dbinom memoization layer - deprecated -remove from code
+  //***************************
+  
+  std::map< std::vector<double>, double > dbinom_map;
+  int memoization_precision_multiplier = 100; // equivlant to 0.01 resolution on the P's
+  double dbinom_memoization_wrapper(double x, double n, double p){
+    double keys[] = {x,
+                     n,
+                     floor(memoization_precision_multiplier * p + 0.5) / memoization_precision_multiplier};
+    std::vector<double> _key (keys, keys + sizeof(keys) / sizeof(int) );
+    double _ret = 0;
+    if( dbinom_map.count(_key)>0 ){
+      _ret = dbinom_map[_key];
+    }else{
+      _ret = Rf_dbinom(x,n,p,0);
+      dbinom_map[_key] = _ret;
+    }  
+    return(_ret);
+  }
     
   //***************************
   // Function for handling covariates
