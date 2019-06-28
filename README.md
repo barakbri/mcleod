@@ -3,8 +3,7 @@
 #todo
 
 Thursday
-- simple integration step constant as parameter
-- other noise mechanisms
+- other noise mechanisms (Poisson)
 - check inputs
 - split to two functions - with and without covariates
 - unit test

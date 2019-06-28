@@ -25,7 +25,8 @@ Wrapper_rcpp_Gibbs = function(x.vec,
                               proposal_sd = c(1),
                               beta_prior_sd = c(1),
                               beta_init = c(1),
-                              integtation_step_size = 0.01){ 
+                              integtation_step_size = 0.01,
+                              Noise_Type = c(0L)){ 
   
     return(
       rcpp_Gibbs_Prob_Results(x.vec,
@@ -49,7 +50,8 @@ Wrapper_rcpp_Gibbs = function(x.vec,
                                     covariates,
                                     proposal_sd,
                                     beta_prior_sd,
-                                    beta_init) 
+                                    beta_init,
+                                    Noise_Type) 
     )
 }
 

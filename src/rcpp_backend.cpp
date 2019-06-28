@@ -183,6 +183,8 @@ class Gibbs_Sampler{
   
   double elapsed_secs;
   
+  int Noise_Type;
+  
   public:  
     
   /*
@@ -209,7 +211,8 @@ class Gibbs_Sampler{
                      NumericMatrix covariates_p,
                      NumericVector proposal_sd_p,
                      NumericVector beta_prior_sd_p,
-                     NumericVector beta_init
+                     NumericVector beta_init,
+                     IntegerVector noise_type              // 0 = binomial, 1 = poisson
                      ){
     
     GetRNGstate(); // Take the seed
@@ -241,6 +244,8 @@ class Gibbs_Sampler{
       
     
     dbinom_integration_stepsize = integration_stepsize_p(0);
+    
+    Noise_Type = noise_type(0);
     
     //handling of fast gamma sample for BetaH
     Fast_Sample_Gamma =  (Fast_Gamma_Sample_p[0] == 1) ? true: false;
@@ -859,11 +864,19 @@ class Gibbs_Sampler{
    */
   void compute_p_k_i_vec(double x, double n, NumericVector a_v){
     
-    double p_hat	= ( (double)(x + (double)0.5) ) / ( (double)( n + (double)1.0 ));
+    double p_hat	= -1;
+    double theta_hat = - 1;
+    double theta_se = -1;
     
-    double theta_hat = log_odds(p_hat);
-    
-    double theta_se	= sqrt(((double)1.0) / ((double)(n * p_hat * (1.0 - p_hat) )) );
+    if(Noise_Type == 0){
+      p_hat = ( (double)(x + (double)0.5) ) / ( (double)( n + (double)1.0 )); 
+      theta_hat = log_odds(p_hat);
+      theta_se	= sqrt(((double)1.0) / ((double)(n * p_hat * (1.0 - p_hat) )) );
+    }else if (Noise_Type == 1){
+      p_hat = ( (double)(x)); 
+      theta_hat = log(p_hat);
+      theta_se	= sqrt(((double)1.0) / ((double)( p_hat )) );
+    }
     
     double _temp_p_nrm_ul, _temp_p_nrm_ll;
     double _temp;
@@ -885,11 +898,10 @@ class Gibbs_Sampler{
          _integral_p = a_v(i);
          while(_integral_p +_integral_h <= a_v(i+1)){
            if(_last_density == -1){ // this rule is activated only on the first iteration, since we don't have a density computed from the last step
-             _last_density = Rf_dbinom(x,n,inv_log_odds(_integral_p),0);
+             _last_density = density_wrapper(x,n,(_integral_p)); //Rf_dbinom(x,n,inv_log_odds(_integral_p),0);
            }
-           _this_density = Rf_dbinom(x,n,inv_log_odds(_integral_p +_integral_h),0);
+           _this_density = density_wrapper(x,n,(_integral_p + _integral_h)); //Rf_dbinom(x,n,inv_log_odds(_integral_p +_integral_h),0);
            _integral   +=   (_last_density + _this_density) * _integral_h / 2.0;
-           //_integral   +=   Rf_dbinom(x,n,inv_log_odds(_integral_p),0) * _integral_h;
            _integral_p += _integral_h;
            _last_density = _this_density;
          }
@@ -904,13 +916,19 @@ class Gibbs_Sampler{
       _integral_sum += _temp;
     }
     
-    
     //normalize:
     for(int i=0; i< I;i++){
       p_k_i_vec_computation_result(i) = p_k_i_vec_computation_result(i)/_integral_sum;
     }
   }
-    
+  
+  double density_wrapper(double x,double n, double theta){
+    if(Noise_Type == 0){
+      return(Rf_dbinom(x,n,inv_log_odds(theta),0));
+    }else if (Noise_Type == 1){
+      return(Rf_dpois(x,exp(theta),0));
+    }
+  }
   
   /*
    * compute P_k_i matrix, row by row (row = observation).
@@ -1082,9 +1100,10 @@ List rcpp_Gibbs_Prob_Results(NumericVector x_vec,
                                    NumericMatrix covariates,
                                    NumericVector proposal_sd,
                                    NumericVector beta_prior_sd,
-                                   NumericVector beta_init){
+                                   NumericVector beta_init,
+                                   IntegerVector Noise_Type){
   
-  Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1,covariates_given,covariates,proposal_sd,beta_prior_sd,beta_init);
+  Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1,covariates_given,covariates,proposal_sd,beta_prior_sd,beta_init,Noise_Type);
   
   List ret;
   ret["p_k_i"]             = _gibbs.get_p_k_i();

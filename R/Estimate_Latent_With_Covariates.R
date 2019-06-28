@@ -16,7 +16,9 @@ Estimate_Latent_With_Covariates	<- function(
                                        proposal_sd = c(1),
                                        beta_prior_sd = c(1),
                                        beta_init = c(1),
-                                       integtation_step_size = 0.01
+                                       integtation_step_size = 0.01,
+                                       Noise_Type = c(0),
+                                       a.limits.explicit = c(0.5,10)
                                        )
 {
   exact.numeric.integration = TRUE # We force exact numeric integration over dbinom for computation of P_k_i. Normal approximation is not sufficiant.
@@ -44,8 +46,12 @@ Estimate_Latent_With_Covariates	<- function(
      stop('I/I1 not an integer!') 
     }
   }
+  if(Noise_Type == 0){
+    a.vec.used		<- seq(a.min,a.max,length = I+1)  
+  }else if(Noise_Type == 1){
+    a.vec.used  = seq(a.limits.explicit[1],a.limits.explicit[2],length = I+1)  
+  }
   
-  a.vec.used		<- seq(a.min,a.max,length = I+1)
   
   res = Wrapper_rcpp_Gibbs(x.smp,
                            n.smp,
@@ -63,7 +69,8 @@ Estimate_Latent_With_Covariates	<- function(
                            proposal_sd = proposal_sd,
                            beta_prior_sd = beta_prior_sd,
                            beta_init = beta_init,
-                           integtation_step_size = integtation_step_size
+                           integtation_step_size = integtation_step_size,
+                           Noise_Type = Noise_Type
                            )  
   #covariates_given,
   #covariates,
@@ -120,57 +127,8 @@ plot.posterior	<- function(NPCI.obj)
 }
 
 
-
 if(F){
-  N = 10
-  K = 1000
-  set.seed(2)
-  covariates = matrix(rnorm(K),nrow = K)
-  real_beta = -0.5
-  u = sample(c(0,1),size = K,replace = T)
-  x = rbinom(K,size = N,prob = NPCI:::inv.log.odds(rnorm(K,-1+3*u,sd = 0.3) + real_beta*covariates))
-  n = rep(N,K)
-  hist(x/n)
-  model_dt = data.frame(c = x,nc = n-x)
-  model_dt = cbind(model_dt,covariates)
-  model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
-  model$coefficients[-1]
-  #plot(ecdf(x/n))
-  
-  start = Sys.time()
-  
-  res = Estimate_Latent_With_Covariates(x, n, L = 6,
-                                                     I1=8,
-                                                     VERBOSE = T,
-                                                     a.max = 4,
-                                                     Prior_Type = 1,covariates_given = 1,covariates = covariates,
-                                                     nr.gibbs = 300,nr.gibbs.burnin = 100,
-                                                     beta_prior_sd = c(5),
-                                                     proposal_sd = c(0.05),
-                                                     beta_init = (model$coefficients[-1]),integtation_step_size = 0.01
-                                                     )
-  end = Sys.time()
-  res$additional$original_stat_res$elapsed_secs
-  end - start
-  
-  hist(res$additional$original_stat_res$beta_smp)
-  plot(res$additional$original_stat_res$beta_smp[1,])
-  mean(res$additional$original_stat_res$beta_smp[1,])
-  median(res$additional$original_stat_res$beta_smp[1,])
-  res$additional$original_stat_res$beta_smp
-  #plot.posterior(res)
-  plot(res$additional$original_stat_res$proposal_approved)
-  mean(res$additional$original_stat_res$proposal_approved)
-  plot(res$additional$original_stat_res$beta_suggestion[1,],col = res$additional$original_stat_res$proposal_approved+1,pch= 20)
-  
-  
-}
-
-
-
-
-if(F){
-  N = 20
+  N = 30
   K = 200
   set.seed(1)
   covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K)
@@ -213,3 +171,117 @@ if(F){
   plot(res$additional$original_stat_res$beta_suggestion[2,],col = res$additional$original_stat_res$proposal_approved+1,pch= 20,ylab = 'beta2 - proposal',xlab = 'Iteration')
   par(mfrow=c(1,1))
 }
+
+
+
+
+
+if(F){
+  N = 20
+  K = 500
+  set.seed(2)
+  covariates = matrix(rexp(K),nrow = K)
+  real_beta = -0.5
+  u = sample(c(0,1),size = K,replace = T)
+  x = rbinom(K,size = N,prob = NPCI:::inv.log.odds(rnorm(K,-1+3*u,sd = 0.3) + real_beta*covariates))
+  n = rep(N,K)
+  hist(x/n)
+  plot(ecdf(x/n))
+  model_dt = data.frame(c = x,nc = n-x)
+  model_dt = cbind(model_dt,covariates)
+  model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
+  model$coefficients[-1]
+  #
+  
+  start = Sys.time()
+  
+  res = Estimate_Latent_With_Covariates(x, n, L = 6,
+                                        I1=8,
+                                        VERBOSE = T,
+                                        a.max = 4,
+                                        Prior_Type = 1,covariates_given = 1,covariates = covariates,
+                                        nr.gibbs = 300,nr.gibbs.burnin = 100,
+                                        beta_prior_sd = c(5),
+                                        proposal_sd = c(0.05),
+                                        beta_init = (model$coefficients[-1]),integtation_step_size = 0.01
+  )
+  end = Sys.time()
+  res$additional$original_stat_res$elapsed_secs
+  end - start
+  
+  hist(res$additional$original_stat_res$beta_smp)
+  plot(res$additional$original_stat_res$beta_smp[1,])
+  mean(res$additional$original_stat_res$beta_smp[1,])
+  median(res$additional$original_stat_res$beta_smp[1,])
+  res$additional$original_stat_res$beta_smp
+  #plot.posterior(res)
+  plot(res$additional$original_stat_res$proposal_approved)
+  mean(res$additional$original_stat_res$proposal_approved)
+  plot(res$additional$original_stat_res$beta_suggestion[1,],col = res$additional$original_stat_res$proposal_approved+1,pch= 20)
+  
+  res_2 = Estimate_Latent_With_Covariates(x, n, L = 6,
+                                        I1=8,
+                                        VERBOSE = T,
+                                        a.max = 4,
+                                        Prior_Type = 1,covariates_given = 0,covariates = covariates,
+                                        nr.gibbs = 300,nr.gibbs.burnin = 100,
+                                        beta_prior_sd = c(5),
+                                        proposal_sd = c(0.05),
+                                        beta_init = (model$coefficients[-1]),integtation_step_size = 0.01
+  )
+  
+  plot.posterior(res_2)
+  
+}
+
+#Poisson example
+if(F){
+  
+  K = 200
+  set.seed(2)
+  covariates = matrix(rexp(K,rate = 2),nrow = K)
+  real_beta = 0.5
+  u = sample(c(0,1),size = K,replace = T)
+  x = rpois(K,lambda = exp(rnorm(K,2 + 3*u,0.5) + real_beta* covariates) )
+  n = x
+  hist(log(x+1),breaks = 20 )
+  #plot(ecdf(x))
+  # model_dt = data.frame(c = x,nc = n-x)
+  # model_dt = cbind(model_dt,covariates)
+  # model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
+  # model$coefficients[-1]
+  #
+  
+  start = Sys.time()
+  
+  res = Estimate_Latent_With_Covariates(x, n, L = 6,
+                                        I1=8,
+                                        VERBOSE = T,
+                                        a.max = 4,
+                                        Prior_Type = 1,
+                                        covariates_given = 1,
+                                        covariates = covariates,
+                                        nr.gibbs = 1000,nr.gibbs.burnin = 300,
+                                        beta_prior_sd = c(5),
+                                        proposal_sd = c(0.05),
+                                        beta_init = 0,
+                                        #integtation_step_size = 0.01,
+                                        Noise_Type = c(1),
+                                        a.limits.explicit = c(-2,8)
+                                        )
+  end = Sys.time()
+  res$additional$original_stat_res$elapsed_secs
+  
+  
+  hist(res$additional$original_stat_res$beta_smp)
+  plot(res$additional$original_stat_res$beta_smp[1,])
+  mean(res$additional$original_stat_res$beta_smp[1,])
+  median(res$additional$original_stat_res$beta_smp[1,])
+  #plot.posterior(res)
+  
+  mean(res$additional$original_stat_res$proposal_approved)
+  plot(res$additional$original_stat_res$beta_suggestion[1,],col = res$additional$original_stat_res$proposal_approved+1,pch= 20)
+  
+  
+}
+
