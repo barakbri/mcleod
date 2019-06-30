@@ -504,70 +504,10 @@ class Gibbs_Sampler{
         if(SHOW_DEBUG_MSGS && Verbose  && k==0)
           Rprintf("Computing tree note for k = %d \n\r",k);
         
-        node_in_l = 0;
-        node_in_next_l = 0;
-        
         _pst_vec = p_k_i(k,_) * pi_smp(_,gibbs_itr);
-        
-        if(SHOW_DEBUG_MSGS && Verbose && k==0){
-          Rprintf("Posterior computed, length: %d \n\r",_pst_vec.length());
-          for( int i=0;i< _pst_vec.length();i++)
-            Rprintf("%lf ",_pst_vec(i));
-          Rprintf("\n\r");
-        }
-        
-        
-        CumSum_ZeroPrefix(_pst_vec,_pst_vec_cumsum);
-        
-        if(SHOW_DEBUG_MSGS && Verbose  && k==0){
-          Rprintf("CumSum Posterior computed, length: %d \n\r",_pst_vec_cumsum.length());
-          for( int i=0;i< _pst_vec_cumsum.length();i++)
-            Rprintf("%lf ",_pst_vec_cumsum(i));
-          Rprintf("\n\r");
-        }
-        
-        for(int l = 1 ; l <= L; l++){
-          
-          
-          if(SHOW_DEBUG_MSGS && Verbose  && k==0){
-            Rprintf("l: %d , node: %d, ", l, node_in_l);
-          }
-          
-          _place_l_e = right_bottom_descendant( l , index_of_left_child_next_level(node_in_l) ); 
-          _place_l_s = left_bottom_descendant(  l ,index_of_left_child_next_level(node_in_l) );
-          
-          
-          if(SHOW_DEBUG_MSGS && Verbose  && k==0){
-            Rprintf("ind left child: %d, _place_l_s: %d ,  _place_l_e: %d, ",  index_of_left_child_next_level(node_in_l),  _place_l_s, _place_l_e);
-          }
-          
-          p_sum = _pst_vec_cumsum( _place_l_e  + 1 ) - _pst_vec_cumsum( _place_l_s);
-          
-          _place_r_e = right_bottom_descendant(  l , index_of_right_child_next_level(node_in_l) );
-          _place_r_s = left_bottom_descendant(   l ,index_of_right_child_next_level(node_in_l) );
-          
-          if(SHOW_DEBUG_MSGS && Verbose  && k==0){
-            Rprintf("ind right child: %d, _place_r_s: %d , _place_r_e:%d, ", index_of_right_child_next_level(node_in_l),  _place_r_s, _place_r_e );
-          }
-          
-          q_sum = _pst_vec_cumsum( _place_r_e  + 1) -  _pst_vec_cumsum( _place_r_s);
-          
-          
-          node_in_next_l = 2 * node_in_l;
-          if(unif_rand() <= q_sum/(q_sum + p_sum))
-            node_in_next_l++;  
-          
-          if(SHOW_DEBUG_MSGS && Verbose  && k==0){
-            Rprintf(" node_in_next_l: %d \n\r", node_in_next_l);
-          }
-          
-          node_in_l = node_in_next_l;
-        }
-        
-        if(SHOW_DEBUG_MSGS && Verbose  && k==0){
-          Rprintf(" Selected node: %d \n\r", node_in_l);
-        }
-        
+        _pst_vec = _pst_vec / sum(_pst_vec);
+        // sample an index in the subvect, find the relevant segment in the total vector:.
+        node_in_l = sample_ind_with_weights(_pst_vec);
         n_smp(node_in_l, gibbs_itr)++;
       }
       
@@ -741,37 +681,10 @@ class Gibbs_Sampler{
         
         
         _pst_vec = p_k_i(k,_) * pi_smp(_,gibbs_itr);
-        
-        CumSum_ZeroPrefix(_pst_vec,_pst_vec_cumsum);
-        
-        
-        // compute sums of posteriors on I1 dirichlet items in the top level
-        for(int i1=1;i1<=TwoLayerDirichlet_I1;i1++){
-          if(false && gibbs_itr ==0 && k==0)
-            Rprintf("DEBUG i1 %d access: [%d,%d] ",i1, two_layer_dirichlet_left_descendant_by_I1_index(i1), two_layer_dirichlet_right_descendant_by_I1_index(i1) + 1);
-          
-          _sum_of_pst_over_first_layer[i1 - 1] =  _pst_vec_cumsum( two_layer_dirichlet_right_descendant_by_I1_index(i1) + 1 ) -
-                                          _pst_vec_cumsum( two_layer_dirichlet_left_descendant_by_I1_index(i1));
-          if(false && gibbs_itr ==0 && k==0)
-            Rprintf(" value =  %lf \n\r",_sum_of_pst_over_first_layer[i1 - 1]);
-        }
-        
-        _sum_of_pst_over_first_layer = _sum_of_pst_over_first_layer/ sum(_sum_of_pst_over_first_layer);
-        
-        // sample an an index i1
-        _sampled_i1 = sample_ind_with_weights(_sum_of_pst_over_first_layer); // note that this number is zero based
-          
-        // get posteriror for the relevant sub-vector on level 2, with I2 items.
-        for(int i2=1;i2<=TwoLayerDirichlet_I2;i2++){
-          _pst_sub_vector[i2-1] = _pst_vec( (_sampled_i1) * TwoLayerDirichlet_I2 + i2 - 1);  
-        }
-        _pst_sub_vector = _pst_sub_vector/sum(_pst_sub_vector);
-          
+        _pst_vec = _pst_vec / sum(_pst_vec);
         // sample an index in the subvect, find the relevant segment in the total vector:.
-        _sampled_segment = _sampled_i1 * TwoLayerDirichlet_I2 + sample_ind_with_weights(_pst_sub_vector);
-        
+        _sampled_segment = sample_ind_with_weights(_pst_vec);
         // update N_smp
-        
         n_smp(_sampled_segment, gibbs_itr) = n_smp(_sampled_segment, gibbs_itr) + 1.0;
         
       }
