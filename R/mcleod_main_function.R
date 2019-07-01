@@ -224,9 +224,13 @@ mcleod	<- function( x.smp,
     a.vec = a.vec.used,
     nr.gibbs = nr.gibbs,
     nr.gibbs.burnin = nr.gibbs.burnin,
-    L = L,
-    Fast.Gamma.Used = Fast.Gamma.Used,
-    Fast.Gamma.Bank.Size = Fast.Gamma.Bank.Size
+    prior_parameters = prior_parameters,
+    computational_parameters = computational_parameters,
+    covariates_estimation_parameters = covariates_estimation_parameters,
+    covariates = covariates,
+    x.smp = x.smp,
+    n.smp = n.smp,
+    Noise_Type = Noise_Type
   )
   
   ret$additional = list(original_stat_res = res)
