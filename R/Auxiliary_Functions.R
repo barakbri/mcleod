@@ -24,7 +24,7 @@ Wrapper_rcpp_Gibbs = function(x.vec,
                               proposal_sd = c(1),
                               beta_prior_sd = c(1),
                               beta_init = c(1),
-                              integtation_step_size = 0.01,
+                              integration_step_size = 0.01,
                               Noise_Type = c(0L)){ 
   
     return(
@@ -42,7 +42,7 @@ Wrapper_rcpp_Gibbs = function(x.vec,
                                     FastGammaBank,
                                     P_k_i_is_given,
                                     P_k_i_precomputed,
-                                    integtation_step_size, #Integration step size
+                                    integration_step_size, 
                                     PriorType,
                                     I1,
                                     covariates_given,

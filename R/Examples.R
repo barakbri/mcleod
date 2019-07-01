@@ -13,15 +13,11 @@ if(F){
   model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
   model$coefficients[-1]
   
-  res = mcleod(x, n, L = 6,
-                                        I1=8,
-                                        VERBOSE = T,
+  res = mcleod(x, n, prior_parameters = mcleod.prior.parameters(),
                                         a.limits = c(-4,4),
-                                        Prior_Type = 1,covariates_given = 1,covariates = covariates,
-                                        nr.gibbs = 300,nr.gibbs.burnin = 100,
-                                        beta_prior_sd = c(5,5),
-                                        proposal_sd = c(0.2,0.2),
-                                        beta_init = (model$coefficients[-1]),integtation_step_size = 0.01
+                                        covariates = covariates,
+                                        computational_parameters = mcleod.computational.parameters(nr.gibbs = 500),
+                                        covariates_estimation_parameters = mcleod.covariates.estimation.parameters(beta_init = model$coefficients[-1])
   )
   res$additional$original_stat_res$elapsed_secs
   
@@ -68,15 +64,11 @@ if(F){
   
   start = Sys.time()
   
-  res = mcleod(x, n, L = 6,
-                                        I1=8,
-                                        VERBOSE = T,
+  res = mcleod(x, n, prior_parameters = mcleod.prior.parameters(),
+                                        
                                         a.limits = c(-4,4),
-                                        Prior_Type = 1,covariates_given = 1,covariates = covariates,
-                                        nr.gibbs = 300,nr.gibbs.burnin = 100,
-                                        beta_prior_sd = c(5),
-                                        proposal_sd = c(0.05),
-                                        beta_init = (model$coefficients[-1]),integtation_step_size = 0.01
+                                        covariates = covariates,
+                                        computational_parameters = mcleod.computational.parameters(nr.gibbs = 500)
   )
   end = Sys.time()
   res$additional$original_stat_res$elapsed_secs
@@ -91,19 +83,6 @@ if(F){
   plot(res$additional$original_stat_res$proposal_approved)
   mean(res$additional$original_stat_res$proposal_approved)
   plot(res$additional$original_stat_res$beta_suggestion[1,],col = res$additional$original_stat_res$proposal_approved+1,pch= 20)
-  
-  res_2 = mcleod(x, n, L = 6,
-                                          I1=8,
-                                          VERBOSE = T,
-                                          a.limits = c(-4,4),
-                                          Prior_Type = 1,covariates_given = 0,covariates = covariates,
-                                          nr.gibbs = 300,nr.gibbs.burnin = 100,
-                                          beta_prior_sd = c(5),
-                                          proposal_sd = c(0.05),
-                                          beta_init = (model$coefficients[-1]),integtation_step_size = 0.01
-  )
-  
-  plot.posterior(res_2)
   
 }
 
@@ -127,19 +106,13 @@ if(F){
   
   start = Sys.time()
   
-  res = mcleod(x, n, L = 6,
-                                        I1=8,
-                                        VERBOSE = T,
-                                        a.limits = c(-2,8),
-                                        Prior_Type = 1,
-                                        covariates_given = 1,
+  res = mcleod(x, n,
+               prior_parameters = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
+                                                          Two.Layer.Dirichlet.Nodes.in.First.Layer = 16),
+                                                                                a.limits = c(-2,8),
+               computational_parameters = mcleod.computational.parameters(nr.gibbs = 500),
                                         covariates = covariates,
-                                        nr.gibbs = 1000,nr.gibbs.burnin = 300,
-                                        beta_prior_sd = c(5),
-                                        proposal_sd = c(0.05),
-                                        beta_init = 0,
-                                        #integtation_step_size = 0.01,
-                                        Noise_Type = c(1)
+                                        Noise_Type = MCLEOD.POISSON.ERRORS
   )
   end = Sys.time()
   res$additional$original_stat_res$elapsed_secs
@@ -153,6 +126,6 @@ if(F){
   
   mean(res$additional$original_stat_res$proposal_approved)
   plot(res$additional$original_stat_res$beta_suggestion[1,],col = res$additional$original_stat_res$proposal_approved+1,pch= 20)
-  
+   
   
 }

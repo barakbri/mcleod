@@ -43,20 +43,20 @@ mcleod.prior.parameters = function(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHI
   return(ret)
 }
 
-mcleod.covariates.estimation.parameters = function(nr.gibbs = 500,
+mcleod.computational.parameters = function(nr.gibbs = 500,
                                                    nr.gibbs.burnin = 250,
-                                                   integtation_step_size = 0.01,
+                                                   integration_step_size = 0.01,
                                                    Fast.Gamma.Used = F,
                                                    Fast.Gamma.Bank.Size = 1000L){
-  
+  #checks:
   #nr.gibbs > nr.gibbs burnin
   #warnings nr.gibbs and burnins
-  #warning on integtation_step_size
+  #warning on integration_step_size
   
   ret = list()
   ret$nr.gibbs = nr.gibbs
   ret$nr.gibbs.burnin = nr.gibbs.burnin
-  ret$integtation_step_size = integtation_step_size
+  ret$integration_step_size = integration_step_size
   ret$Fast.Gamma.Used = Fast.Gamma.Used
   ret$Fast.Gamma.Bank.Size = Fast.Gamma.Bank.Size
   class(ret) = CLASS.NAME.COVARIATES.ESTIMATION.PARAMETERS.DEFINITION
@@ -64,9 +64,12 @@ mcleod.covariates.estimation.parameters = function(nr.gibbs = 500,
 }
 
 
-mcleod.computational.parameters = function(proposal_sd = c(0.05),
-                                           beta_prior_sd = c(0),
+mcleod.covariates.estimation.parameters = function(proposal_sd = c(0.05),
+                                           beta_prior_sd = c(5),
                                            beta_init = c(0)){
+  
+  #checks:
+  
   ret = list()
   ret$proposal_sd = proposal_sd
   ret$beta_prior_sd = beta_prior_sd
@@ -83,31 +86,90 @@ mcleod.computational.parameters = function(proposal_sd = c(0.05),
 mcleod	<- function( x.smp,
                      n.smp,
                      a.limits = c(-4,4),
-                     L = 4,
-                     I1 = 4,
-                     nr.gibbs = 200,
-                     nr.gibbs.burnin = min(nr.gibbs / 2 , 100),
-                     Fast.Gamma.Used = F,
-                     Fast.Gamma.Bank.Size = 1000L,
-                     VERBOSE = F,
-                     Prior_Type = 0,
-                     I_specificy_parameter = NULL,
-                     covariates_given = 0,
-                     covariates = matrix(c(1),nrow = 1),
-                     proposal_sd = c(1),
-                     beta_prior_sd = c(1),
-                     beta_init = c(1),
-                     integtation_step_size = 0.01,
-                     Noise_Type = c(0)
+                     Noise_Type = MCLEOD.BINOMIAL.ERRORS,
+                     covariates = NULL,
+                     prior_parameters = NULL,
+                     computational_parameters = NULL,
+                     covariates_estimation_parameters = NULL
                      )
 {
+  
   exact.numeric.integration = TRUE # We force exact numeric integration over dbinom for computation of P_k_i. Normal approximation is not sufficiant.
   
-  #	Function settings
+  
+  #%%% Retreive prior parameters
+  
+  
+  if(is.null(prior_parameters)){
+    prior_parameters = mcleod.prior.parameters()
+  }
+  #check object type
+  L = prior_parameters$Beta.Heirarchical.Levels
+  I1 = prior_parameters$Two.Layer.Dirichlet.Nodes.in.First.Layer
+  Prior_Type = prior_parameters$prior.type
+  I_specificy_parameter = prior_parameters$Two.Layer.Dirichlet.Intervals
+  
+  #%%% Retreive computational parameters
+  if(is.null(computational_parameters)){
+    computational_parameters = mcleod.computational.parameters()
+  }
+  #check object type
+  nr.gibbs = computational_parameters$nr.gibbs
+  nr.gibbs.burnin = computational_parameters$nr.gibbs.burnin
+  integration_step_size = computational_parameters$integration_step_size
+  Fast.Gamma.Used = computational_parameters$Fast.Gamma.Used
+  Fast.Gamma.Bank.Size = computational_parameters$Fast.Gamma.Bank.Size
+  
+  #%%% Retreive covariate estimation parameters
+  if(is.null(covariates_estimation_parameters)){
+    covariates_estimation_parameters = mcleod.covariates.estimation.parameters()
+  }
+  #check object type
+  proposal_sd = covariates_estimation_parameters$proposal_sd
+  beta_prior_sd = covariates_estimation_parameters$beta_prior_sd
+  beta_init = covariates_estimation_parameters$beta_init
+  
+  #%%% Retreive covariates:
+  if(is.null(covariates)){
+    covariates = matrix(c(1),nrow = 1)
+    covariates_given = 0
+  }else{
+    covariates_given = 1
+  }
+  
+  # adjust length of covariate estimation parameters, if they are given as a single value. Else, throw an error
+  if(length(proposal_sd) != ncol(covariates)){
+    if(length(proposal_sd) == 1)
+      proposal_sd = rep(proposal_sd,ncol(covariates))
+    else
+      stop('proposal_sd must be of length ncol(covariates)')
+  }
+  if(length(beta_prior_sd) != ncol(covariates)){
+    if(length(beta_prior_sd) == 1)
+      beta_prior_sd = rep(beta_prior_sd,ncol(covariates))
+    else
+      stop('beta_prior_sd must be of length ncol(covariates)')
+  }
+  if(length(beta_init) != ncol(covariates)){
+    if(length(beta_init) == 1)
+      beta_init = rep(beta_init,ncol(covariates))
+    else
+      stop('beta_init must be of length ncol(covariates)')
+  }
+  
+  #%%% Function settings
+  
+  
+  #checks
+  #x.smp, n.smp lengths match
+  #a.limits in the correct order
+  #Noise type legal
+  #for poisson - check if a.limits are in appropriate
+  
+  
   a.max = a.limits[2]
   a.min = a.limits[1]
   K			<- length(x.smp)
-  
   
   Fast.Gamma.Bank = matrix(1,nrow = 1)
   Fast.Gamma.Used.p = 0
@@ -117,7 +179,7 @@ mcleod	<- function( x.smp,
   }
   
   I = 2^(L)
-  if(Prior_Type == 0){
+  if(Prior_Type == MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET){
     if(!is.null(I_specificy_parameter))
         I = I_specificy_parameter
     if(I/I1 != as.integer(I/I1)){
@@ -127,7 +189,12 @@ mcleod	<- function( x.smp,
   
   a.vec.used		<- seq(a.min,a.max,length = I+1)  
   
+  #check precomputed P_k_i is same size as a.vec - this can be done in Wrapper_rcpp_Gibbs
+  #check that if Precomputed P_k_i - there are no covariates given!
+    
   
+  
+  #%%% call Rcpp wrapper
   res = Wrapper_rcpp_Gibbs(x.smp,
                            n.smp,
                            a.vec.used,
@@ -144,15 +211,11 @@ mcleod	<- function( x.smp,
                            proposal_sd = proposal_sd,
                            beta_prior_sd = beta_prior_sd,
                            beta_init = beta_init,
-                           integtation_step_size = integtation_step_size,
+                           integration_step_size = integration_step_size,
                            Noise_Type = Noise_Type
-                           )  
-  #covariates_given,
-  #covariates,
-  #proposal_sd,
-  #beta_prior_sd
+                           )
   
-
+  #%%% Wrap results
   
   ret = list()
   class(ret) = CLASS.NAME.MCLEOD
@@ -200,7 +263,7 @@ plot.posterior	<- function(mcleod.obj)
   }
   gg_obj = ggplot(dt_gibbs_cloud)  + ylim(c(0,1)) +
     geom_line(aes(x = a.vec,y = means_vec),colour = 'red',data = dt_mean_line) +
-    geom_point(aes(x = a.point,y = CDF.value),alpha = 0.25,colour = 'gray',data = dt_gibbs_cloud,size = 0.8, shape = 18)
+    geom_point(aes(x = a.point,y = CDF.value),alpha = 0.25,colour = 'gray',data = dt_gibbs_cloud,size = 0.8, shape = 18)+ xlab('theta')+ylab('CDF')
   return(gg_obj)
 
 }
