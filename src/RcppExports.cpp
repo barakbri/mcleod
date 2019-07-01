@@ -62,16 +62,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// rcpp_hello_world
-List rcpp_hello_world();
-RcppExport SEXP _mcleod_rcpp_hello_world() {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    rcpp_result_gen = Rcpp::wrap(rcpp_hello_world());
-    return rcpp_result_gen;
-END_RCPP
-}
 // integrate_test
 Rcpp::List integrate_test();
 RcppExport SEXP _mcleod_integrate_test() {
@@ -87,7 +77,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"_mcleod_rcpp_Gibbs_Prob_Results", (DL_FUNC) &_mcleod_rcpp_Gibbs_Prob_Results, 23},
     {"_mcleod_rcpp_Generate_Fast_Gamma_Bank", (DL_FUNC) &_mcleod_rcpp_Generate_Fast_Gamma_Bank, 1},
     {"_mcleod_rcpp_Generate_Gamma_from_Fast_Gamma_Bank", (DL_FUNC) &_mcleod_rcpp_Generate_Gamma_from_Fast_Gamma_Bank, 2},
-    {"_mcleod_rcpp_hello_world", (DL_FUNC) &_mcleod_rcpp_hello_world, 0},
     {"_mcleod_integrate_test", (DL_FUNC) &_mcleod_integrate_test, 0},
     {NULL, NULL, 0}
 };

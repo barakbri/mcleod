@@ -20,9 +20,11 @@ using namespace Numer;
 
 
 /**
- * Class is used to sample faster from a gamma random variable. \
+ * Class is used to sample faster from a gamma random variable. 
  * This is done by pre-sampling gamma random variables with different rates and recombining them when needed.
  * The bank itself is represented as a matrix, so it could be wrapped and parsed back to R.
+ * 
+ * The Fast_Gamma_Sampler should be efficient for large sample sizes and long gibbs runs >>1000. Other than that - it is not very usefull 
  */
 class Fast_Gamma_Sampler{
   
@@ -78,20 +80,23 @@ class Fast_Gamma_Sampler{
  
 
 // ###################################################################################################
-//    Class for Gibbs sampling based estimation of ECDF, for noisy random variables.
+//    Class for Non-Parametric estimation of ECDF based on Gibbs sampler, when measurements are given with noise (Binomial, Poisson)
 //    by Barak Brill, based on an earlier R implementation by Pallavi Basu and Daniel Yekutieli.
 //    ---------------------------------------------------------------------------------------------
-//    This class is built and called from R. The test statistic is the posterior probability of a beta binomial tree, over a set of terminal nodes.
+//    This class is built and called from R. The clss returns posterior probability of a beta binomial tree, over a set of terminal nodes.
 //    See documentation in R and paper (link in R package) for full details about the method.
 // ###################################################################################################
 
 class Gibbs_Sampler{
-
-  // Should exact integration be used?
-  bool ExactIntegration;
   
-  // Should the code be verbose, and show messages.
-  bool Verbose;
+  //################################
+  // Section 1 : Fields and constructor
+  //################################
+  
+  //*** FIELDS THAT REGARD DATA AND PRIOR DEFINITIONS:
+  
+  // 0 for binomial, 1 for poisson
+  int Noise_Type;
   
   // Number of intervals in theta space (partition size of a)
   int I;
@@ -99,13 +104,7 @@ class Gibbs_Sampler{
   // Number of samples
   int K;
   
-  // Number of Gibbs iterations
-  int n_gibbs;
-  
-  // Number of Gibbs iterations to be removed, when computing test statistic
-  int n_gibbs_burn_in;
-  
-  // sets the number of levels for the beta tree, irrelevant on dirichlet prior
+    // sets the number of levels for the beta tree, irrelevant on dirichlet prior
   int L; 
   
   // marks the type of prior to be used- 0= 2 Layer dirichlet, 1= L level beta tree
@@ -114,7 +113,6 @@ class Gibbs_Sampler{
   // Parameters I1,I2 for Two Layer Dirichlet
   int TwoLayerDirichlet_I1;
   int TwoLayerDirichlet_I2;
-  
   
   // Theta value for which to compute the Gibbs sampler statistic
   NumericVector theta;
@@ -130,6 +128,20 @@ class Gibbs_Sampler{
   
   // p_k_i of posterior probabilities
   NumericMatrix p_k_i;
+  
+  //*** FIELDS THAT ARE COMPUTATIONAL PRECISION AND CONTROL VARIABLES
+  
+  // Should exact integration be used?
+  bool ExactIntegration;
+  
+  // Should the code be verbose, and show messages.
+  bool Verbose;
+  
+  // Number of Gibbs iterations
+  int n_gibbs;
+  
+  // Number of Gibbs iterations to be removed, when computing test statistic
+  int n_gibbs_burn_in;
   
   // Gibbs sampler state array, for pi (prior distribution for p's)
   NumericMatrix pi_smp;
@@ -157,33 +169,49 @@ class Gibbs_Sampler{
   // stepsize for numeric intergration of P_k,i
   double dbinom_integration_stepsize;
   
-  bool covariates_given;
-  
-  NumericMatrix covariates;
-  
-  int Nr_covariates;
-  
-  NumericVector proposal_sd;
-  
-  NumericVector beta_prior_sd;
-  
-  NumericMatrix beta_smp;
-  
-  NumericMatrix beta_suggestion;
-  
-  NumericVector proposal_approved;
-  
-  NumericVector beta;
-  
-  NumericMatrix p_k_i_suggestion;
-  
-  NumericVector a_v_plus_theta;
-  
-  NumericVector p_k_i_vec_computation_result;
-  
+  // will be used to store the number of seconds the procedure was run
   double elapsed_secs;
   
-  int Noise_Type;
+  //*** FIELDS THAT ARE USED AS COMPUTATIONAL STEPS AND ARE PREALLOCATED BEFORE COMPUTATION STARTS
+  
+  // shifted a_vec, for a given set a theta values
+  NumericVector a_v_plus_theta;
+  
+  // a row, computed for P_k_i (k fixed, across i)
+  NumericVector p_k_i_vec_computation_result;
+  
+  //*** FIELDS THAT ARE USED FOR THE MH-BETA ESTIMATION ALGORITHM
+  
+  // have the covariates been given
+  bool covariates_given;
+  
+  // matrix of givesn covariates
+  NumericMatrix covariates;
+  
+  // will store the number of covariates given, after constructor is run
+  int Nr_covariates;
+  
+  //sd of proposal generating function
+  NumericVector proposal_sd;
+  
+  //sd of beta prior
+  NumericVector beta_prior_sd;
+  
+  // will contain the sampled values of beta
+  NumericMatrix beta_smp;
+  
+  // will contain the list of beta suggestions, by iteration
+  NumericMatrix beta_suggestion;
+  
+  // a vector with a value of 1 if a proposal has been accepted, 0 otherwise
+  NumericVector proposal_approved;
+  
+  // current values of beta, used for computation
+  NumericVector beta;
+  
+  // holds the suggestion of the next p_k_i
+  NumericMatrix p_k_i_suggestion;
+  
   
   public:  
     
@@ -207,13 +235,15 @@ class Gibbs_Sampler{
                      NumericVector integration_stepsize_p,   // Integration step size
                      IntegerVector Prior_Type_p,             // Type of prior used, 0 = 2 Layer dirichlet, 1 = L level binomial tree.
                      IntegerVector Two_Layer_Dirichlet_I1_p, // Parameter I1 for 2-Layer_Dirichlet
-                     IntegerVector covariates_given_p,
-                     NumericMatrix covariates_p,
-                     NumericVector proposal_sd_p,
-                     NumericVector beta_prior_sd_p,
-                     NumericVector beta_init,
-                     IntegerVector noise_type              // 0 = binomial, 1 = poisson
+                     IntegerVector covariates_given_p,       // single integer, if 1 - indicates covari
+                     NumericMatrix covariates_p,             // matrix of covariates given as argument
+                     NumericVector proposal_sd_p,            // the sd for the proposal density, by beta parameter
+                     NumericVector beta_prior_sd_p,          // sd for the prior over beta, by beta parameter
+                     NumericVector beta_init,                // init value for beta
+                     IntegerVector noise_type                // 0 = binomial, 1 = poisson
                      ){
+    
+    begin = clock();  
     
     GetRNGstate(); // Take the seed
     
@@ -274,7 +304,7 @@ class Gibbs_Sampler{
     proposal_approved = NumericVector(n_gibbs);
     p_k_i_vec_computation_result = NumericVector(I);
     p_k_i_suggestion = NumericMatrix(K,I);  
-    begin = clock();  
+    
     
     ///////////////////compute p_k_i
     
@@ -307,6 +337,12 @@ class Gibbs_Sampler{
     PutRNGstate();
   }
     
+    
+    
+  //################################
+  // Section 2 : Getters
+  //################################
+    
   /*
    * Function returns the p_k_i matrix computed for this class
    */
@@ -325,38 +361,26 @@ class Gibbs_Sampler{
   /*
    * Function returns the matrix of sampled beta's - by the gibbs sampler
    */  
-  NumericMatrix get_beta_smp(){return(beta_smp);}  
+  NumericMatrix get_beta_smp(){return(beta_smp);}
     
+  /*
+   * Function returns the matrix of suggested beta vectors, by iteration
+   */  
   NumericMatrix get_beta_suggestion(){return(beta_suggestion);}  
-    
+  
+  /*
+   * Function returns a vector of 0s and 1s, if proposal have been approved.
+   */
   NumericVector get_proposal_approved(){return(proposal_approved);}  
     
+  /*
+   * Function returns the total running time in seconds
+   */
   double get_elapsed_secs(){return(elapsed_secs);}
-  
-  //***************************
-  // dbinom memoization layer - deprecated -remove from code
-  //***************************
-  
-  std::map< std::vector<double>, double > dbinom_map;
-  int memoization_precision_multiplier = 100; // equivlant to 0.01 resolution on the P's
-  double dbinom_memoization_wrapper(double x, double n, double p){
-    double keys[] = {x,
-                     n,
-                     floor(memoization_precision_multiplier * p + 0.5) / memoization_precision_multiplier};
-    std::vector<double> _key (keys, keys + sizeof(keys) / sizeof(int) );
-    double _ret = 0;
-    if( dbinom_map.count(_key)>0 ){
-      _ret = dbinom_map[_key];
-    }else{
-      _ret = Rf_dbinom(x,n,p,0);
-      dbinom_map[_key] = _ret;
-    }  
-    return(_ret);
-  }
     
-  //***************************
-  // Function for handling covariates
-  //***************************
+  //################################
+  // Section 3 : Functions for handling covariates
+  //################################
   
   //function for folding theta from covariates
   void compute_theta_vec(NumericVector beta_candidate, NumericVector theta_output){
@@ -378,7 +402,6 @@ class Gibbs_Sampler{
       beta_suggestion_out(i) = current_beta(i) + rnorm(1,0,proposal_sd(i))(0);
     }
   }
-  
   
   //function for computing log likelihood from for a solution
   double compute_loglikelihood(NumericMatrix current_P_k_i, NumericVector current_pi, NumericVector current_beta, double _ll_term_added_for_pi){
@@ -409,169 +432,9 @@ class Gibbs_Sampler{
     return(_ret_ll);
   }
   
-  //***************************
-  // Auxilary functions for the Beta Heirarchical case
-  //***************************
-  inline int left_descendant(int l,int i, int l2){return i * pow(2, l2 - l);} // the index in layer l2, of the left most descendent of the ith node on the lth layer
-  inline int right_descendant(int l,int i, int l2){return (i + 1 ) * pow(2, l2 - l) - 1;} // the index in layer l2, of the right most descendent of the ith node on the lth layer
-  inline int left_bottom_descendant(int l,int i){return left_descendant(l,i,L);} // the index in layer L, of the left most descendent of the ith node on the lth layer
-  inline int right_bottom_descendant(int l,int i){return right_descendant(l,i,L);} // the index in layer L, of the right most descendent of the ith node on the lth layer
-  inline int index_of_left_child_next_level(int i){return 2*i;} // the index of the left son, on the l+1 layer, of the ith node on the ith layer
-  inline int index_of_right_child_next_level(int i){return (2*i + 1);} // the index of the right son, on the l+1 layer, of the ith node on the ith layer
-  
-  
-  /**
-   * Specific verison of cumsum, that adds a value of zero before.
-   */
-  void CumSum_ZeroPrefix(NumericVector x,NumericVector res){ 
-    res(0) = 0.0;
-    for(int i=1;i<res.length();i++){
-      res(i) = res(i-1) + x(i-1);
-    }
-  }
-  
-  
-  /**
-   * Function for summing over a vector - from starting index, to ending index, inclusive
-   */
-  double SumOverVector(NumericVector x, int starting_ind, int ending_ind_inclusive){
-    double ret =0;
-    for(int i = starting_ind ; i <= ending_ind_inclusive  ; i++){
-      ret += x[i];
-    }
-    return(ret);
-  }  
-  
-  /**
-   * Inline function for sampling a beta random variable, using the FGS object
-   */
-  inline double my_rbeta(double p,double q){
-    double gamma_p = FGS.sample_Gamma_from_Bank(p,Fast_Sample_Gamma_Bank);
-    double gamma_q = FGS.sample_Gamma_from_Bank(q,Fast_Sample_Gamma_Bank);
-    return(gamma_p/(gamma_p + gamma_q));
-  }
-    
-  /***********************************************************************
-   * Function performs the actual Gibbs sampling - for a Beta Heirarchical tree generating prior
-   ***********************************************************************/
-  void perform_Gibbs_Sampling_BetaHeirarchical(){
-    bool SHOW_DEBUG_MSGS = false;
-    
-    pi_smp = NumericMatrix(I,n_gibbs); // gibbs samples of the pis generated for each node of the tree.
-    n_smp  = NumericMatrix(I,n_gibbs); // gibbs samples of the number of P's sampled, in each iteration, for each node of the tree.
-    
-    NumericVector _pst_vec(I); // used for the posterior distribuion, for each of the K observations
-    NumericVector _pst_vec_cumsum(I+1);// cumulative distribution of the above variable
-    
-    NumericVector _n_vec_cum_sum(I+1);
-    
-    // We initialize the state. This is actually done using a dirichlet prior
-    NumericVector _init_state = sum_matrix_over_rows(p_k_i);
-    _init_state = 10.0/((double) K) * _init_state + NumericVector(I,1.0);
-    pi_smp(_,0) = rdirichlet(_init_state);
-    
-    // If an init location for the sampler is given, we used it here.
-    
-    if(InitGiven){
-      pi_smp(_,0) = PredefinedInit;  
-    }
-    
-    
-    // used to iterate over the tree, when sampling a node from a heirarchical beta
-    int node_in_l = 0; 
-    int node_in_next_l = 0;
-    double p_sum;
-    double q_sum;
-    double temp_beta;
-    int _place_l_s, _place_l_e, _place_r_s, _place_r_e;
-    
-    for(int gibbs_itr = 0 ; gibbs_itr < n_gibbs ; gibbs_itr++){
-      
-      if(SHOW_DEBUG_MSGS && Verbose)
-        Rprintf("Starting Gibbs Iter %d \n\r",gibbs_itr);
-      
-      if(covariates_given){
-        // record the current beta
-        for(int q=0;q < beta.length();q++)
-          beta_smp(q,gibbs_itr) = beta(q);    
-      }
-      
-      // Gibbs step 1: for k = 1 ... K and l = 1 ... L, sample  delta.k[l] conditionally on delta.k[l], x.vec[k], pi.gbbs
-      
-      for(int k=0 ; k<K ; k++){
-        
-        
-        if(SHOW_DEBUG_MSGS && Verbose  && k==0)
-          Rprintf("Computing tree note for k = %d \n\r",k);
-        
-        _pst_vec = p_k_i(k,_) * pi_smp(_,gibbs_itr);
-        _pst_vec = _pst_vec / sum(_pst_vec);
-        // sample an index in the subvect, find the relevant segment in the total vector:.
-        node_in_l = sample_ind_with_weights(_pst_vec);
-        n_smp(node_in_l, gibbs_itr)++;
-      }
-      
-      
-      
-      // Gibbs step 2: for each node independently sample node-pi conditionally on n.vec and then hierarchically construct pi.smp
-      
-      
-      if(gibbs_itr < n_gibbs - 1)
-      {
-        
-        //_n_vec_cum_sum = CumSum_ZeroPrefix(n_smp(_,gibbs_itr) );
-        CumSum_ZeroPrefix(n_smp(_,gibbs_itr),_n_vec_cum_sum );
-        
-        for(int i=0;i<I;i++)
-          pi_smp(i,gibbs_itr + 1) = 1.0;
-        
-        for(int l=1;l<=L;l++){
-          for(int i=0;i< pow(2,l-1);i++){ 
-            _place_l_e = right_bottom_descendant( l , index_of_left_child_next_level(i) ); 
-            _place_l_s = left_bottom_descendant(  l ,index_of_left_child_next_level(i) ); 
-            
-            p_sum = _n_vec_cum_sum( _place_l_e + 1) - _n_vec_cum_sum( _place_l_s );
-            
-            _place_r_e = right_bottom_descendant( l , index_of_right_child_next_level(i) ); 
-            _place_r_s = left_bottom_descendant(  l , index_of_right_child_next_level(i) ); 
-            
-            q_sum = _n_vec_cum_sum( _place_r_e + 1) - _n_vec_cum_sum( _place_r_s );
-            
-            if(Fast_Sample_Gamma){
-              temp_beta = my_rbeta(p_sum + 1, q_sum + 1);
-            }else{
-              temp_beta = rbeta(1,p_sum + 1, q_sum + 1)[0];  
-            }
-            
-            // place the results
-            for(int p = _place_l_s ; p <= _place_l_e ; p++)
-              pi_smp(p, gibbs_itr + 1) = pi_smp(p, gibbs_itr + 1) * temp_beta;
-            
-            for(int p = _place_r_s ; p <= _place_r_e ; p++)
-              pi_smp(p, gibbs_itr + 1) = pi_smp(p, gibbs_itr + 1) * (1.0 - temp_beta) ;
-            
-            if((SHOW_DEBUG_MSGS && Verbose)){
-              Rprintf("Recompiling pi, p_sum = %lf, q_aum = %lf, beta = %lf \n\r",p_sum, q_sum, temp_beta);
-              for(int p = _place_l_s ; p <= _place_r_e ; p++)
-                Rprintf( "%lf ", pi_smp(p,gibbs_itr + 1) );
-              
-              Rprintf("\n\r");
-            }
-            
-          }
-        }
-        
-      } // end of check on final gibbs iteration
-      
-      if(covariates_given && gibbs_itr < n_gibbs - 1){
-        handle_MH_step(gibbs_itr);
-      }
-      
-    } // end of for loop on gibbs iter
-    
-    return;
-  }
-  
+  // this is the main function for handling covariates
+  // function for handling the MH step at the end of a gibbs sampler iteration.
+  // Called by the gibbs samplers only if a set of covariates is given
   void handle_MH_step(int gibbs_itr){
     //for beta sampling - this allocation takes place only once per iteration, effectively nothing.
     NumericVector _beta_candidate_placeholder(beta.length());
@@ -610,171 +473,26 @@ class Gibbs_Sampler{
       proposal_approved(gibbs_itr) = 1;
       
     }else{
-      // record disapprobal 
+      // record disapproval 
       proposal_approved(gibbs_itr) = 0;
       
     }
   }
     
-  inline int two_layer_dirichlet_left_descendant_by_I1_index(int i1){return ((i1-1)*(TwoLayerDirichlet_I2));} 
-  inline int two_layer_dirichlet_right_descendant_by_I1_index(int i1){return ((i1)*(TwoLayerDirichlet_I2) - 1);} 
     
-  /***********************************************************************
-   * Function performs the actual Gibbs sampling - for a 2-Layer dirichlet tree generating prior
-   ***********************************************************************/
-  void perform_Gibbs_Sampling_2_Layer_Dirichlet(){
-    bool SHOW_DEBUG_MSGS = false;
-    
-    if(SHOW_DEBUG_MSGS){
-      Rprintf("Entered  perform_Gibbs_Sampling_2_Layer_Dirichlet \n\r");
-      Rprintf("I1 %d  I2 %d\n\r",TwoLayerDirichlet_I1,TwoLayerDirichlet_I2);  
-    }
-    
-    
-    
-    pi_smp = NumericMatrix(I,n_gibbs); // gibbs samples of the pis generated for each node of the tree.
-    n_smp  = NumericMatrix(I,n_gibbs); // gibbs samples of the number of P's sampled, in each iteration, for each node of the tree.
-    
-    NumericVector _pst_vec(I); // used for the posterior distribuion, for each of the K observations
-    NumericVector _pst_vec_cumsum(I+1);// cumulative distribution of the above variable
-    
-    NumericVector _n_vec_cum_sum(I+1);
-    
-    // We initialize the state. This is actually done using a dirichlet prior
-    NumericVector _init_state = sum_matrix_over_rows(p_k_i);
-    _init_state = 10.0/((double) K) * _init_state + NumericVector(I,1.0);
-    pi_smp(_,0) = rdirichlet(_init_state);
-    
-    // If an init location for the sampler is given, we used it here.
-    if(InitGiven){
-      pi_smp(_,0) = PredefinedInit;  
-    }
-    
-    // used to iterate over the tree, when sampling a node from a heirarchical beta
-    NumericVector _sum_of_pst_over_first_layer(TwoLayerDirichlet_I1);
-    int _sampled_i1;
-    int _sampled_segment;
-    NumericVector _pst_sub_vector(TwoLayerDirichlet_I2);
-    NumericVector _dirichlet_parameters_first_layer(TwoLayerDirichlet_I1);
-    NumericVector _dirichlet_parameters_second_layer(TwoLayerDirichlet_I2);
-    NumericVector _dirichlet_sampled_first_layer(TwoLayerDirichlet_I1);
-    NumericVector _dirichlet_sampled_second_layer(TwoLayerDirichlet_I2);
-    
-    for(int gibbs_itr = 0 ; gibbs_itr < n_gibbs ; gibbs_itr++){
-      
-      if(SHOW_DEBUG_MSGS && Verbose )
-        Rprintf("Starting Gibbs Iter %d \n\r",gibbs_itr);
-      
-      if(covariates_given){
-        // record the current beta
-        for(int q=0;q < beta.length();q++)
-          beta_smp(q,gibbs_itr) = beta(q);    
-      }
-      
-      // Gibbs step 1: for k = 1 ... K and l = 1 ... L, sample  delta.k[l] conditionally on delta.k[l], x.vec[k], pi.gbbs
-      
-      for(int k=0 ; k<K ; k++){
-        
-        
-        if(SHOW_DEBUG_MSGS && Verbose  && k==0)
-          Rprintf("Computing gibbs sample for k = %d \n\r",k);
-        
-        
-        _pst_vec = p_k_i(k,_) * pi_smp(_,gibbs_itr);
-        _pst_vec = _pst_vec / sum(_pst_vec);
-        // sample an index in the subvect, find the relevant segment in the total vector:.
-        _sampled_segment = sample_ind_with_weights(_pst_vec);
-        // update N_smp
-        n_smp(_sampled_segment, gibbs_itr) = n_smp(_sampled_segment, gibbs_itr) + 1.0;
-        
-      }
-      
-      // Gibbs step 2: for each node independently sample node-pi conditionally on n.vec and then hierarchically construct pi.smp
-     
-      if(gibbs_itr < n_gibbs - 1)
-      {
-        
-        CumSum_ZeroPrefix(n_smp(_,gibbs_itr),_n_vec_cum_sum);
-        
-        for(int i=0;i<I;i++)
-          pi_smp(i,gibbs_itr + 1) = 1.0;
-        
-        //sample dirichlet vector for level 1, size is I1, based on the sums of n_smp in the relevant subvectors.
-        //    compute sums:
-        for(int i1=1;i1<=TwoLayerDirichlet_I1;i1++){
-          _dirichlet_parameters_first_layer(i1-1) = _n_vec_cum_sum( two_layer_dirichlet_right_descendant_by_I1_index(i1) + 1) -
-                                                  _n_vec_cum_sum( two_layer_dirichlet_left_descendant_by_I1_index(i1)) +
-                                                  1.0;
-        }
-
-        //    sample:
-        rdirichlet_no_generation(_dirichlet_parameters_first_layer, _dirichlet_sampled_first_layer);
-        
-        //iterate over I1 subvectors
-        for(int i1=1;i1<=TwoLayerDirichlet_I1;i1++){
-          //for each subvector of size i1, sample a subvector based on the entries of n_smp in the relevant subvector.
-          //   collect parameters:
-          for(int i2 = 1;i2<= TwoLayerDirichlet_I2;i2++){
-            _dirichlet_parameters_second_layer(i2 - 1) = n_smp(two_layer_dirichlet_left_descendant_by_I1_index(i1) + i2 - 1 , gibbs_itr) + 1.0;
-          }
-          
-          //    sample:
-          rdirichlet_no_generation(_dirichlet_parameters_second_layer,_dirichlet_sampled_second_layer);
-          
-          //multiply by the relevant entry in I1, and place the result in pi_smp
-          for(int i2 = 1;i2<= TwoLayerDirichlet_I2;i2++){
-            pi_smp(two_layer_dirichlet_left_descendant_by_I1_index(i1) + i2 - 1, gibbs_itr + 1) = _dirichlet_sampled_first_layer(i1-1) * _dirichlet_sampled_second_layer(i2-1);
-          }
-        }//end of iterate over I1 subvectors
-      
-        
-      } // end of check on final gibbs iteration
-      
-      
-      if(covariates_given && gibbs_itr < n_gibbs - 1){
-        handle_MH_step(gibbs_itr);
-      }
-      
-      
-    } // end of for loop on gibbs iter
-    return;
-  }
-  
+  //################################
+  // Section 4 : Computation of P_k_i, for the different noise types
+  //################################
   
   /*
-  * Testing Function - Used For Debugging, mainly for the auxilary functions and parameters
+  * compute.p.k.i.vec - computes the posterior probability of a measurement to 
+  * be received from a value of p, coming from each of the segments of a_v, assuming uniform distribution in each section.
+  * the value of ExactIntegration for the class sets whether exact numeric integration over dbinom is done,
+  * instead of a normal approximation.
+  * 
+  * results returned in object p_k_i_vec_computation_result
+  * 
   */
-  void DebugPrint(){
-    if(ExactIntegration)
-      Rprintf("Performing Exact Integration \n\r");
-    else
-      Rprintf("Performing Appoximate Integration \n\r");
-    
-    Rprintf("log odds 0.5: \n\r");
-    Rprintf("%lf \n\r",log_odds(0.5));
-    Rprintf("checking inv log odds:\n\r");
-    Rprintf("%lf \n\r",inv_log_odds(log_odds(0.5)));
-    
-    Rprintf("checking dbinom:\n\r");
-    Rprintf("%lf \n\r",integrand(log_odds(0.5),1,1));
-    
-    NumericVector a = NumericVector::create(1.0,1.0,1.0);
-    NumericVector n = NumericVector::create(1.0,1.0,1.0);
-    
-    Rprintf("checking log_d_Dir_Mult:\n\r");
-    Rprintf("%lf \n\r",log_d_Dir_Mult(n,a)); //  to be checked against R...
-    
-  }
-    
-  /*
-   * compute.p.k.i.vec - computes the posterior probability of a measurement to 
-   * be received from a value of p, coming from each of the segments of a_v, assuming uniform distribution in each section.
-   * the value of ExactIntegration for the class sets whether exact numeric integration over dbinom is done,
-   * instead of a normal approximation.
-   * 
-   * results returned in object p_k_i_vec_computation_result
-   * 
-   */
   void compute_p_k_i_vec(double x, double n, NumericVector a_v){
     
     double p_hat	= -1;
@@ -805,20 +523,20 @@ class Gibbs_Sampler{
       if(ExactIntegration &&
          -4.0 <= ((a_v(i) - theta_hat) / theta_se) &&
          ((a_v(i+1) - theta_hat) / theta_se) <= 4.0){
-         
-         //do integration
-         _integral = 0.0;
-         _integral_p = a_v(i);
-         while(_integral_p +_integral_h <= a_v(i+1)){
-           if(_last_density == -1){ // this rule is activated only on the first iteration, since we don't have a density computed from the last step
-             _last_density = density_wrapper(x,n,(_integral_p)); //Rf_dbinom(x,n,inv_log_odds(_integral_p),0);
-           }
-           _this_density = density_wrapper(x,n,(_integral_p + _integral_h)); //Rf_dbinom(x,n,inv_log_odds(_integral_p +_integral_h),0);
-           _integral   +=   (_last_density + _this_density) * _integral_h / 2.0;
-           _integral_p += _integral_h;
-           _last_density = _this_density;
-         }
-         _temp = _integral;
+        
+        //do integration
+        _integral = 0.0;
+        _integral_p = a_v(i);
+        while(_integral_p +_integral_h <= a_v(i+1)){
+          if(_last_density == -1){ // this rule is activated only on the first iteration, since we don't have a density computed from the last step
+            _last_density = density_wrapper(x,n,(_integral_p)); 
+          }
+          _this_density = density_wrapper(x,n,(_integral_p + _integral_h));
+          _integral   +=   (_last_density + _this_density) * _integral_h / 2.0;
+          _integral_p += _integral_h;
+          _last_density = _this_density;
+        }
+        _temp = _integral;
       }else{
         _temp_p_nrm_ul = Rf_pnorm5(a_v(i+1) , theta_hat, theta_se, 1, 0); 
         _temp_p_nrm_ll = Rf_pnorm5(a_v(i)   , theta_hat, theta_se, 1, 0); 
@@ -835,23 +553,26 @@ class Gibbs_Sampler{
     }
   }
   
+  // wrapper for the current density to integrate over, by noise type
   double density_wrapper(double x,double n, double theta){
     if(Noise_Type == 0){
       return(Rf_dbinom(x,n,inv_log_odds(theta),0));
     }else if (Noise_Type == 1){
       return(Rf_dpois(x,exp(theta),0));
+    }else{
+      // we shouldn't be getting here
+      return(0);
     }
   }
   
   /*
-   * compute P_k_i matrix, row by row (row = observation).
-   * P_k_i gives the posterior probability of the kth obervation to be received from a p coming from the ith interval of the a grid
-   * 
-   * results returned in p_mat - must be of dimensions K X I
-   */
+  * compute P_k_i matrix, row by row (row = observation).
+  * P_k_i gives the posterior probability of the kth obervation to be received from a p coming from the ith interval of the a grid
+  * 
+  * results returned in p_mat - must be of dimensions K X I
+  */
   void compute_p_k_i(NumericVector x_v, NumericVector n_v,NumericVector theta, NumericVector a_v,NumericMatrix p_mat){
-    
-    //NumericVector a_v_plus_theta(a_v.length());
+
     for(int k = 0; k < K ; k++)
     {
       for(int j=0;j<a_v_plus_theta.length();j++){
@@ -864,14 +585,304 @@ class Gibbs_Sampler{
         p_mat(k,j) =  p_k_i_vec_computation_result(j);
       }
     }
+    
+  }
+  
+    
+  //################################
+  // Section 5 : Gibbs sampler for the Beta Heirarchical case
+  //################################
+    
+  //*** Auxilary functions for the Beta Heirarchical case
+  
+  inline int left_descendant(int l,int i, int l2){return i * pow(2, l2 - l);} // the index in layer l2, of the left most descendent of the ith node on the lth layer
+  inline int right_descendant(int l,int i, int l2){return (i + 1 ) * pow(2, l2 - l) - 1;} // the index in layer l2, of the right most descendent of the ith node on the lth layer
+  inline int left_bottom_descendant(int l,int i){return left_descendant(l,i,L);} // the index in layer L, of the left most descendent of the ith node on the lth layer
+  inline int right_bottom_descendant(int l,int i){return right_descendant(l,i,L);} // the index in layer L, of the right most descendent of the ith node on the lth layer
+  inline int index_of_left_child_next_level(int i){return 2*i;} // the index of the left son, on the l+1 layer, of the ith node on the ith layer
+  inline int index_of_right_child_next_level(int i){return (2*i + 1);} // the index of the right son, on the l+1 layer, of the ith node on the ith layer
+  
+  /* 
+   * Function performs the actual Gibbs sampling - for a Beta Heirarchical tree generating prior
+   */
+  void perform_Gibbs_Sampling_BetaHeirarchical(){
+    bool SHOW_DEBUG_MSGS = false;
+    
+    pi_smp = NumericMatrix(I,n_gibbs); // gibbs samples of the pis generated for each node of the tree.
+    n_smp  = NumericMatrix(I,n_gibbs); // gibbs samples of the number of P's sampled, in each iteration, for each node of the tree.
+    
+    NumericVector _pst_vec(I); // used for the posterior distribuion, for each of the K observations
+    NumericVector _pst_vec_cumsum(I+1);// cumulative distribution of the above variable
+    
+    NumericVector _n_vec_cum_sum(I+1);
+    
+    // We initialize the state. This is actually done using a dirichlet prior
+    NumericVector _init_state = sum_matrix_over_rows(p_k_i);
+    _init_state = 10.0/((double) K) * _init_state + NumericVector(I,1.0);
+    pi_smp(_,0) = rdirichlet(_init_state);
+    
+    // If an init location for the sampler is given, we used it here.
+    
+    if(InitGiven){
+      pi_smp(_,0) = PredefinedInit;  
+    }
+
+    // used to iterate over the tree, when sampling a node from a heirarchical beta
+    int node_in_l = 0; 
+    double p_sum;
+    double q_sum;
+    double temp_beta;
+    int _place_l_s, _place_l_e, _place_r_s, _place_r_e;
+    
+    for(int gibbs_itr = 0 ; gibbs_itr < n_gibbs ; gibbs_itr++){
+      
+      if(SHOW_DEBUG_MSGS && Verbose)
+        Rprintf("Starting Gibbs Iter %d \n\r",gibbs_itr);
+      
+      if(covariates_given){
+        // record the current beta
+        for(int q=0;q < beta.length();q++)
+          beta_smp(q,gibbs_itr) = beta(q);    
+      }
+      
+      // Gibbs step 1: for k = 1 ... K and l = 1 ... L, sample  delta.k[l] conditionally on delta.k[l], x.vec[k], pi.gbbs
+      
+      for(int k=0 ; k<K ; k++){
+        
+        
+        if(SHOW_DEBUG_MSGS && Verbose  && k==0)
+          Rprintf("Computing tree note for k = %d \n\r",k);
+        
+        _pst_vec = p_k_i(k,_) * pi_smp(_,gibbs_itr);
+        _pst_vec = _pst_vec / sum(_pst_vec);
+        
+        // sample an index in the subvect, find the relevant segment in the total vector:.
+        node_in_l = sample_ind_with_weights(_pst_vec);
+        n_smp(node_in_l, gibbs_itr)++;
+      }
+      
+      
+      
+      // Gibbs step 2: for each node independently sample node-pi conditionally on n.vec and then hierarchically construct pi.smp
+      
+      
+      if(gibbs_itr < n_gibbs - 1)
+      {
+        
+        CumSum_ZeroPrefix(n_smp(_,gibbs_itr),_n_vec_cum_sum );
+        
+        for(int i=0;i<I;i++)
+          pi_smp(i,gibbs_itr + 1) = 1.0;
+        
+        for(int l=1;l<=L;l++){
+          for(int i=0;i< pow(2,l-1);i++){ 
+            _place_l_e = right_bottom_descendant( l , index_of_left_child_next_level(i) ); 
+            _place_l_s = left_bottom_descendant(  l ,index_of_left_child_next_level(i) ); 
+            
+            p_sum = _n_vec_cum_sum( _place_l_e + 1) - _n_vec_cum_sum( _place_l_s );
+            
+            _place_r_e = right_bottom_descendant( l , index_of_right_child_next_level(i) ); 
+            _place_r_s = left_bottom_descendant(  l , index_of_right_child_next_level(i) ); 
+            
+            q_sum = _n_vec_cum_sum( _place_r_e + 1) - _n_vec_cum_sum( _place_r_s );
+            
+            if(Fast_Sample_Gamma){
+              temp_beta = FGS_rbeta(p_sum + 1, q_sum + 1);
+            }else{
+              temp_beta = rbeta(1,p_sum + 1, q_sum + 1)[0];  
+            }
+            
+            // place the results
+            for(int p = _place_l_s ; p <= _place_l_e ; p++)
+              pi_smp(p, gibbs_itr + 1) = pi_smp(p, gibbs_itr + 1) * temp_beta;
+            
+            for(int p = _place_r_s ; p <= _place_r_e ; p++)
+              pi_smp(p, gibbs_itr + 1) = pi_smp(p, gibbs_itr + 1) * (1.0 - temp_beta) ;
+            
+            if((SHOW_DEBUG_MSGS && Verbose)){
+              Rprintf("Recompiling pi, p_sum = %lf, q_aum = %lf, beta = %lf \n\r",p_sum, q_sum, temp_beta);
+              for(int p = _place_l_s ; p <= _place_r_e ; p++)
+                Rprintf( "%lf ", pi_smp(p,gibbs_itr + 1) );
+              
+              Rprintf("\n\r");
+            }
+            
+          }
+        }
+        
+      } // end of check on final gibbs iteration
+      
+      // handle covariates, if they are given
+      if(covariates_given && gibbs_itr < n_gibbs - 1){
+        handle_MH_step(gibbs_itr);
+      }
+      
+    } // end of for loop on gibbs iter
+    
+    return;
+  }
+  
+  //################################
+  // Section 6 : Gibbs sampler for the 2 layer Dirichlet case
+  //################################
+  
+  
+  inline int two_layer_dirichlet_left_descendant_by_I1_index(int i1){return ((i1-1)*(TwoLayerDirichlet_I2));} 
+  inline int two_layer_dirichlet_right_descendant_by_I1_index(int i1){return ((i1)*(TwoLayerDirichlet_I2) - 1);} 
+  
+  /*
+   * Function performs the actual Gibbs sampling - for a 2-Layer dirichlet tree generating prior
+   */
+  void perform_Gibbs_Sampling_2_Layer_Dirichlet(){
+    bool SHOW_DEBUG_MSGS = false;
+    
+    if(SHOW_DEBUG_MSGS){
+      Rprintf("Entered  perform_Gibbs_Sampling_2_Layer_Dirichlet \n\r");
+      Rprintf("I1 %d  I2 %d\n\r",TwoLayerDirichlet_I1,TwoLayerDirichlet_I2);  
+    }
+    
+    
+    
+    pi_smp = NumericMatrix(I,n_gibbs); // gibbs samples of the pis generated for each node of the tree.
+    n_smp  = NumericMatrix(I,n_gibbs); // gibbs samples of the number of P's sampled, in each iteration, for each node of the tree.
+    
+    NumericVector _pst_vec(I); // used for the posterior distribuion, for each of the K observations
+    NumericVector _pst_vec_cumsum(I+1);// cumulative distribution of the above variable
+    
+    NumericVector _n_vec_cum_sum(I+1);
+    
+    // We initialize the state. This is actually done using a dirichlet prior
+    NumericVector _init_state = sum_matrix_over_rows(p_k_i);
+    _init_state = 10.0/((double) K) * _init_state + NumericVector(I,1.0);
+    pi_smp(_,0) = rdirichlet(_init_state);
+    
+    // If an init location for the sampler is given, we used it here.
+    if(InitGiven){
+      pi_smp(_,0) = PredefinedInit;  
+    }
+    
+    // variables used for sampling:
+    int _sampled_segment; // sampling of delta, in first phase of iteration
+    
+    //used for updating the tree, in the second part of the iteration:
+    NumericVector _dirichlet_parameters_first_layer(TwoLayerDirichlet_I1);
+    NumericVector _dirichlet_parameters_second_layer(TwoLayerDirichlet_I2);
+    NumericVector _dirichlet_sampled_first_layer(TwoLayerDirichlet_I1);
+    NumericVector _dirichlet_sampled_second_layer(TwoLayerDirichlet_I2);
+    
+    for(int gibbs_itr = 0 ; gibbs_itr < n_gibbs ; gibbs_itr++){
+      
+      if(SHOW_DEBUG_MSGS && Verbose )
+        Rprintf("Starting Gibbs Iter %d \n\r",gibbs_itr);
+      
+      if(covariates_given){
+        // record the current beta
+        for(int q=0;q < beta.length();q++)
+          beta_smp(q,gibbs_itr) = beta(q);    
+      }
+      
+      // Gibbs step 1: for k = 1 ... K and l = 1 ... L, sample  delta.k[l] conditionally on delta.k[l], x.vec[k], pi.gbbs
+      
+      for(int k=0 ; k<K ; k++){
+        
+        if(SHOW_DEBUG_MSGS && Verbose  && k==0)
+          Rprintf("Computing gibbs sample for k = %d \n\r",k);
+        
+        
+        _pst_vec = p_k_i(k,_) * pi_smp(_,gibbs_itr);
+        _pst_vec = _pst_vec / sum(_pst_vec);
+        // sample an index in the subvect, find the relevant segment in the total vector:.
+        _sampled_segment = sample_ind_with_weights(_pst_vec);
+        // update N_smp
+        n_smp(_sampled_segment, gibbs_itr) = n_smp(_sampled_segment, gibbs_itr) + 1.0;
+        
+      }
+      
+      // Gibbs step 2: for each node independently sample node-pi conditionally on n.vec and then hierarchically construct pi.smp
+      
+      if(gibbs_itr < n_gibbs - 1)
+      {
+        
+        CumSum_ZeroPrefix(n_smp(_,gibbs_itr),_n_vec_cum_sum);
+        
+        for(int i=0;i<I;i++)
+          pi_smp(i,gibbs_itr + 1) = 1.0;
+        
+        //sample dirichlet vector for level 1, size is I1, based on the sums of n_smp in the relevant subvectors.
+        //    compute sums:
+        for(int i1=1;i1<=TwoLayerDirichlet_I1;i1++){
+          _dirichlet_parameters_first_layer(i1-1) = _n_vec_cum_sum( two_layer_dirichlet_right_descendant_by_I1_index(i1) + 1) -
+            _n_vec_cum_sum( two_layer_dirichlet_left_descendant_by_I1_index(i1)) +
+            1.0;
+        }
+        
+        //    sample:
+        rdirichlet_no_generation(_dirichlet_parameters_first_layer, _dirichlet_sampled_first_layer);
+        
+        //iterate over I1 subvectors
+        for(int i1=1;i1<=TwoLayerDirichlet_I1;i1++){
+          //for each subvector of size i1, sample a subvector based on the entries of n_smp in the relevant subvector.
+          //   collect parameters:
+          for(int i2 = 1;i2<= TwoLayerDirichlet_I2;i2++){
+            _dirichlet_parameters_second_layer(i2 - 1) = n_smp(two_layer_dirichlet_left_descendant_by_I1_index(i1) + i2 - 1 , gibbs_itr) + 1.0;
+          }
+          
+          //    sample:
+          rdirichlet_no_generation(_dirichlet_parameters_second_layer,_dirichlet_sampled_second_layer);
+          
+          //multiply by the relevant entry in I1, and place the result in pi_smp
+          for(int i2 = 1;i2<= TwoLayerDirichlet_I2;i2++){
+            pi_smp(two_layer_dirichlet_left_descendant_by_I1_index(i1) + i2 - 1, gibbs_itr + 1) = _dirichlet_sampled_first_layer(i1-1) * _dirichlet_sampled_second_layer(i2-1);
+          }
+        }//end of iterate over I1 subvectors
+        
+        
+      } // end of check on final gibbs iteration
+      
+      // handle covariates, if they are given
+      if(covariates_given && gibbs_itr < n_gibbs - 1){
+        handle_MH_step(gibbs_itr);
+      }
+      
+      
+    } // end of for loop on gibbs iter
+    return;
+  }
+  
+  //################################
+  // Section 7 : Auxilary Functions
+  //################################
+  
+  /**
+   * Specific verison of cumsum, that adds a value of zero before.
+   */
+  void CumSum_ZeroPrefix(NumericVector x,NumericVector res){ 
+    res(0) = 0.0;
+    for(int i=1;i<res.length();i++){
+      res(i) = res(i-1) + x(i-1);
+    }
   }
     
-  /*
-   * ################################
-   * Auxilary Functions:
-   * ##############################
+    
+  /**
+   * Function for summing over a vector - from starting index, to ending index, inclusive
    */
+  double SumOverVector(NumericVector x, int starting_ind, int ending_ind_inclusive){
+    double ret =0;
+    for(int i = starting_ind ; i <= ending_ind_inclusive  ; i++){
+      ret += x[i];
+    }
+    return(ret);
+  }  
   
+  /**
+   * Inline function for sampling a beta random variable, using the FGS object
+   */
+  inline double FGS_rbeta(double p,double q){
+    double gamma_p = FGS.sample_Gamma_from_Bank(p,Fast_Sample_Gamma_Bank);
+    double gamma_q = FGS.sample_Gamma_from_Bank(q,Fast_Sample_Gamma_Bank);
+    return(gamma_p/(gamma_p + gamma_q));
+  }
   
   /*
    * Function for log odds, given by the original R definition of: log.odds			<- function(p) 		log(p / (1-p))
@@ -971,8 +982,6 @@ class Gibbs_Sampler{
    */
   int sample_ind_with_weights(NumericVector w){
     
-    // time it over 100 - the elapsed time inside this function is zero when timed with the clock
-    
     double u = Rf_runif(0, 1);
     double _cummulator = 0;
     for(int i=0;i<w.length();i++){
@@ -1048,16 +1057,10 @@ NumericVector rcpp_Generate_Gamma_from_Fast_Gamma_Bank(NumericVector x,NumericMa
   return(_res);
 }
 
-// [[Rcpp::export]]
-List rcpp_hello_world() {
 
-    CharacterVector x = CharacterVector::create( "foo", "bar" )  ;
-    NumericVector y   = NumericVector::create( 0.0, 1.0 ) ;
-    List z            = List::create( x, y ) ;
-
-    return z ;
-}
-
+//######################
+//Numeric itegration example - need to incorporate later
+//######################
 
 //this section is an example for the quadrature based integration - need to incorporate into the code...
 // P(0.3 < X < 0.8), X ~ Beta(a, b)
