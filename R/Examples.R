@@ -13,10 +13,10 @@ if(F){
   model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
   model$coefficients[-1]
   
-  res = Estimate_Latent_With_Covariates(x, n, L = 6,
+  res = mcleod(x, n, L = 6,
                                         I1=8,
                                         VERBOSE = T,
-                                        a.max = 4,
+                                        a.limits = c(-4,4),
                                         Prior_Type = 1,covariates_given = 1,covariates = covariates,
                                         nr.gibbs = 300,nr.gibbs.burnin = 100,
                                         beta_prior_sd = c(5,5),
@@ -50,9 +50,10 @@ if(F){
 
 if(F){
   N = 20
-  K = 500
+  K = 200
   set.seed(2)
   covariates = matrix(rexp(K),nrow = K)
+  hist(covariates[,1])
   real_beta = -0.5
   u = sample(c(0,1),size = K,replace = T)
   x = rbinom(K,size = N,prob = NPCI:::inv.log.odds(rnorm(K,-1+3*u,sd = 0.3) + real_beta*covariates))
@@ -67,10 +68,10 @@ if(F){
   
   start = Sys.time()
   
-  res = Estimate_Latent_With_Covariates(x, n, L = 6,
+  res = mcleod(x, n, L = 6,
                                         I1=8,
                                         VERBOSE = T,
-                                        a.max = 4,
+                                        a.limits = c(-4,4),
                                         Prior_Type = 1,covariates_given = 1,covariates = covariates,
                                         nr.gibbs = 300,nr.gibbs.burnin = 100,
                                         beta_prior_sd = c(5),
@@ -91,10 +92,10 @@ if(F){
   mean(res$additional$original_stat_res$proposal_approved)
   plot(res$additional$original_stat_res$beta_suggestion[1,],col = res$additional$original_stat_res$proposal_approved+1,pch= 20)
   
-  res_2 = Estimate_Latent_With_Covariates(x, n, L = 6,
+  res_2 = mcleod(x, n, L = 6,
                                           I1=8,
                                           VERBOSE = T,
-                                          a.max = 4,
+                                          a.limits = c(-4,4),
                                           Prior_Type = 1,covariates_given = 0,covariates = covariates,
                                           nr.gibbs = 300,nr.gibbs.burnin = 100,
                                           beta_prior_sd = c(5),
@@ -117,7 +118,7 @@ if(F){
   x = rpois(K,lambda = exp(rnorm(K,2 + 3*u,0.5) + real_beta* covariates) )
   n = x
   hist(log(x+1),breaks = 20 )
-  #plot(ecdf(x))
+  #plot(ecdf(log(x+1)))
   # model_dt = data.frame(c = x,nc = n-x)
   # model_dt = cbind(model_dt,covariates)
   # model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
@@ -126,10 +127,10 @@ if(F){
   
   start = Sys.time()
   
-  res = Estimate_Latent_With_Covariates(x, n, L = 6,
+  res = mcleod(x, n, L = 6,
                                         I1=8,
                                         VERBOSE = T,
-                                        a.max = 4,
+                                        a.limits = c(-2,8),
                                         Prior_Type = 1,
                                         covariates_given = 1,
                                         covariates = covariates,
@@ -138,8 +139,7 @@ if(F){
                                         proposal_sd = c(0.05),
                                         beta_init = 0,
                                         #integtation_step_size = 0.01,
-                                        Noise_Type = c(1),
-                                        a.limits.explicit = c(-2,8)
+                                        Noise_Type = c(1)
   )
   end = Sys.time()
   res$additional$original_stat_res$elapsed_secs

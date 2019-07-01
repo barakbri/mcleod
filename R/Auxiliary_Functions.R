@@ -3,7 +3,6 @@
 
 log.odds			<- function(p) 		log(p / (1-p))
 inv.log.odds		<- function(theta)	exp(theta) / (1 +exp(theta))
-revert.location = function(i,n){rev(1:n)[i]}
 
 #wrapper for the CPP function
 Wrapper_rcpp_Gibbs = function(x.vec,
