@@ -306,7 +306,8 @@ mcleod	<- function( x.smp,
     covariates = covariates,
     x.smp = x.smp,
     n.smp = n.smp,
-    Noise_Type = Noise_Type
+    Noise_Type = Noise_Type,
+    covariates_given = covariates_given
   )
   
   ret$additional = list(original_stat_res = res)
@@ -319,6 +320,7 @@ mcleod	<- function( x.smp,
 
 plot.posterior	<- function(mcleod.obj)
 {
+  library(ggplot2)
  if(class(mcleod.obj) != CLASS.NAME.MCLEOD){
    stop('input argument for plot.posterior must be an object returned from function mcleod')
  }
@@ -349,3 +351,42 @@ plot.posterior	<- function(mcleod.obj)
 }
 
 
+results.covariate.coefficients.posterior = function(mcleod.obj, plot.posterior = T, plot.MH.proposal.by.iteration = F){
+
+  if(class(mcleod.obj) != CLASS.NAME.MCLEOD){
+    stop('input argument for plot.covariate.coefficients.posterior must be an object returned from function mcleod')
+  }
+  if(mcleod.obj$parameters_list$covariates_given != 1L){
+    stop('covariates were not given, no coefficients estimated')
+  }
+  
+  burnin = mcleod.obj$parameters_list$nr.gibbs.burnin
+  nr.covariates = ncol(covariates)
+  mean_vec = rep(NA,nr.covariates)
+  
+  if(plot.posterior){
+    col_vec = rep(1,mcleod.obj$parameters_list$nr.gibbs)
+    col_vec[1:burnin] = 2
+    par(mfrow=c(nr.covariates,1))  
+    for(i in 1:nr.covariates){
+      plot(mcleod.obj$additional$original_stat_res$beta_smp[i,],col = col_vec,pch= 20,main = paste0('Coefficient for covariate ',i),xlab = 'Iteration',ylab = 'Coefficient')
+    }  
+    par(mfrow=c(1,1))
+  }
+  
+  posterior_mean_vec = apply(mcleod.obj$additional$original_stat_res$beta_smp[,-c(1:burnin),drop=F],1,mean)
+  
+  if(plot.MH.proposal.by.iteration){
+    par(mfrow=c(nr.covariates,1))  
+    for(i in 1:nr.covariates){
+      #plot, remove proposal for the last iteration
+      plot(mcleod.obj$additional$original_stat_res$beta_suggestion[i, -mcleod.obj$parameters_list$nr.gibbs ],col = res$additional$original_stat_res$proposal_approved+1,pch= 20,main = paste0('beta',i,' - proposal'),xlab = 'Iteration',ylab = 'Coefficient')    
+    }
+    par(mfrow=c(1,1))
+  }
+  
+  ret = list()
+  ret$posterior.means = posterior_mean_vec
+  ret$acceptance.rate = mean(mcleod.obj$additional$original_stat_res$proposal_approved)
+  return(ret)
+}

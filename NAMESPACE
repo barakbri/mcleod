@@ -1,4 +1,4 @@
-import(Rcpp,RcppEigen)
+import(Rcpp)
 useDynLib(mcleod, .registration=TRUE)
 exportPattern("^[[:alpha:]]+")
 

@@ -1,4 +1,5 @@
 
+#simple example, two covariates
 if(F){
   N = 30
   K = 200
@@ -21,32 +22,18 @@ if(F){
   )
   res$additional$original_stat_res$elapsed_secs
   
-  hist(res$additional$original_stat_res$beta_smp[1,])
-  hist(res$additional$original_stat_res$beta_smp[2,])
-  plot(res$additional$original_stat_res$beta_smp[1,])
-  plot(res$additional$original_stat_res$beta_smp[2,])
-  mean(res$additional$original_stat_res$beta_smp[1,])
-  mean(res$additional$original_stat_res$beta_smp[2,])
-  median(res$additional$original_stat_res$beta_smp[1,])
-  median(res$additional$original_stat_res$beta_smp[2,])
+  mcleod::results.covariate.coefficients.posterior(res,plot.MH.proposal.by.iteration = T)
   
-  #plot.posterior(res)
-  
-  plot(res$additional$original_stat_res$proposal_approved)
-  mean(res$additional$original_stat_res$proposal_approved)
-  par(mfrow=c(2,1))
-  plot(res$additional$original_stat_res$beta_suggestion[1,],col = res$additional$original_stat_res$proposal_approved+1,pch= 20,ylab = 'beta1 - proposal',xlab = 'Iteration')
-  plot(res$additional$original_stat_res$beta_suggestion[2,],col = res$additional$original_stat_res$proposal_approved+1,pch= 20,ylab = 'beta2 - proposal',xlab = 'Iteration')
-  par(mfrow=c(1,1))
+  plot.posterior(res)
 }
 
 
 
 
-
+# bimodal over-dispersion, exp covariates
 if(F){
-  N = 20
-  K = 200
+  N = 30
+  K = 300
   set.seed(2)
   covariates = matrix(rexp(K),nrow = K)
   hist(covariates[,1])
@@ -60,30 +47,19 @@ if(F){
   model_dt = cbind(model_dt,covariates)
   model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
   model$coefficients[-1]
-  #
-  
-  start = Sys.time()
   
   res = mcleod(x, n, prior_parameters = mcleod.prior.parameters(),
-                                        
                                         a.limits = c(-4,4),
                                         covariates = covariates,
-                                        computational_parameters = mcleod.computational.parameters(nr.gibbs = 500)
+                                        computational_parameters = mcleod.computational.parameters(nr.gibbs = 500,nr.gibbs.burnin = 250),
+                                        covariates_estimation_parameters = mcleod.covariates.estimation.parameters(beta_init = model$coefficients[-1])
   )
-  end = Sys.time()
+  
   res$additional$original_stat_res$elapsed_secs
-  end - start
   
-  hist(res$additional$original_stat_res$beta_smp)
-  plot(res$additional$original_stat_res$beta_smp[1,])
-  mean(res$additional$original_stat_res$beta_smp[1,])
-  median(res$additional$original_stat_res$beta_smp[1,])
-  res$additional$original_stat_res$beta_smp
-  #plot.posterior(res)
-  plot(res$additional$original_stat_res$proposal_approved)
-  mean(res$additional$original_stat_res$proposal_approved)
-  plot(res$additional$original_stat_res$beta_suggestion[1,],col = res$additional$original_stat_res$proposal_approved+1,pch= 20)
+  mcleod::results.covariate.coefficients.posterior(res,plot.MH.proposal.by.iteration = T)
   
+  plot.posterior(res)
 }
 
 #Poisson example
@@ -95,37 +71,21 @@ if(F){
   real_beta = 0.5
   u = sample(c(0,1),size = K,replace = T)
   x = rpois(K,lambda = exp(rnorm(K,2 + 3*u,0.5) + real_beta* covariates) )
-  n = x
-  hist(log(x+1),breaks = 20 )
-  #plot(ecdf(log(x+1)))
-  # model_dt = data.frame(c = x,nc = n-x)
-  # model_dt = cbind(model_dt,covariates)
-  # model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
-  # model$coefficients[-1]
-  #
-  
-  start = Sys.time()
   
   res = mcleod(x, n.smp = NULL,
                prior_parameters = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
                                                           Two.Layer.Dirichlet.Nodes.in.First.Layer = 16),
                                                                                 a.limits = c(-2,8),
-               computational_parameters = mcleod.computational.parameters(nr.gibbs = 500),
+               computational_parameters = mcleod.computational.parameters(nr.gibbs = 1000,nr.gibbs.burnin = 500),
                                         covariates = covariates,
                                         Noise_Type = MCLEOD.POISSON.ERRORS
   )
-  end = Sys.time()
+  
   res$additional$original_stat_res$elapsed_secs
   
+  mcleod::results.covariate.coefficients.posterior(res,plot.MH.proposal.by.iteration = T)
   
-  hist(res$additional$original_stat_res$beta_smp)
-  plot(res$additional$original_stat_res$beta_smp[1,])
-  mean(res$additional$original_stat_res$beta_smp[1,])
-  median(res$additional$original_stat_res$beta_smp[1,])
-  #plot.posterior(res)
-  
-  mean(res$additional$original_stat_res$proposal_approved)
-  plot(res$additional$original_stat_res$beta_suggestion[1,],col = res$additional$original_stat_res$proposal_approved+1,pch= 20)
+  plot.posterior(res)
    
   
 }
