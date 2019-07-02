@@ -2,7 +2,8 @@
 
 #todo
 
-- check inputs on auxiliary constructors and main function
+V check inputs on auxiliary constructors and main function
+
 - function for plotting betas
 - function for plotting approvals and suggestion (plus printing the approval rate)
 

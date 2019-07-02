@@ -6,7 +6,7 @@ if(F){
   covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K)
   real_beta_1 = -1
   real_beta_2 = 1
-  x = rbinom(K,size = N,prob = NPCI:::inv.log.odds(rnorm(K,0,sd = 1) + real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
+  x = rbinom(K,size = N,prob = inv.log.odds(rnorm(K,0,sd = 1) + real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
   n = rep(N,K)
   model_dt = data.frame(c = x,nc = n-x)
   model_dt = cbind(model_dt,covariates)
@@ -52,7 +52,7 @@ if(F){
   hist(covariates[,1])
   real_beta = -0.5
   u = sample(c(0,1),size = K,replace = T)
-  x = rbinom(K,size = N,prob = NPCI:::inv.log.odds(rnorm(K,-1+3*u,sd = 0.3) + real_beta*covariates))
+  x = rbinom(K,size = N,prob =inv.log.odds(rnorm(K,-1+3*u,sd = 0.3) + real_beta*covariates))
   n = rep(N,K)
   hist(x/n)
   plot(ecdf(x/n))
@@ -106,7 +106,7 @@ if(F){
   
   start = Sys.time()
   
-  res = mcleod(x, n,
+  res = mcleod(x, n.smp = NULL,
                prior_parameters = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
                                                           Two.Layer.Dirichlet.Nodes.in.First.Layer = 16),
                                                                                 a.limits = c(-2,8),
