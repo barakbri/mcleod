@@ -26,6 +26,17 @@ MCLEOD.POISSON.ERRORS = 1L
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
+#' Title
+#'
+#' @param prior.type 
+#' @param Beta.Heirarchical.Levels 
+#' @param Two.Layer.Dirichlet.Intervals 
+#' @param Two.Layer.Dirichlet.Nodes.in.First.Layer 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 mcleod.prior.parameters = function(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,
                                    Beta.Heirarchical.Levels = 6,
                                    Two.Layer.Dirichlet.Intervals = 64,
@@ -52,6 +63,18 @@ mcleod.prior.parameters = function(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHI
   return(ret)
 }
 
+#' Title
+#'
+#' @param nr.gibbs 
+#' @param nr.gibbs.burnin 
+#' @param integration_step_size 
+#' @param Fast.Gamma.Used 
+#' @param Fast.Gamma.Bank.Size 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 mcleod.computational.parameters = function(nr.gibbs = 500,
                                                    nr.gibbs.burnin = 250,
                                                    integration_step_size = 0.01,
@@ -85,6 +108,16 @@ mcleod.computational.parameters = function(nr.gibbs = 500,
 }
 
 
+#' Title
+#'
+#' @param proposal_sd 
+#' @param beta_prior_sd 
+#' @param beta_init 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 mcleod.covariates.estimation.parameters = function(proposal_sd = c(0.05),
                                            beta_prior_sd = c(5),
                                            beta_init = c(0)){
@@ -108,6 +141,22 @@ mcleod.covariates.estimation.parameters = function(proposal_sd = c(0.05),
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
+#' Title
+#'
+#' @param x.smp 
+#' @param n.smp 
+#' @param a.limits 
+#' @param Noise_Type 
+#' @param covariates 
+#' @param prior_parameters 
+#' @param computational_parameters 
+#' @param covariates_estimation_parameters 
+#' @param input_P_k_i 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 mcleod	<- function( x.smp,
                      n.smp,
                      a.limits = c(-4,4),
@@ -318,6 +367,14 @@ mcleod	<- function( x.smp,
 # Functions for plotting results
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+#' Title
+#'
+#' @param mcleod.obj 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 plot.posterior	<- function(mcleod.obj)
 {
   library(ggplot2)
@@ -351,6 +408,16 @@ plot.posterior	<- function(mcleod.obj)
 }
 
 
+#' Title
+#'
+#' @param mcleod.obj 
+#' @param plot.posterior 
+#' @param plot.MH.proposal.by.iteration 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 results.covariate.coefficients.posterior = function(mcleod.obj, plot.posterior = T, plot.MH.proposal.by.iteration = F){
 
   if(class(mcleod.obj) != CLASS.NAME.MCLEOD){
