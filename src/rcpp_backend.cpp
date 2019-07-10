@@ -212,6 +212,10 @@ class Gibbs_Sampler{
   // holds the suggestion of the next p_k_i
   NumericMatrix p_k_i_suggestion;
   
+  NumericVector ll_proposal;
+  
+  NumericVector ll_current;
+  
   
   public:  
     
@@ -305,6 +309,8 @@ class Gibbs_Sampler{
     p_k_i_vec_computation_result = NumericVector(I);
     p_k_i_suggestion = NumericMatrix(K,I);  
     
+    ll_proposal = NumericVector(n_gibbs);
+    ll_current = NumericVector(n_gibbs);
     
     ///////////////////compute p_k_i
     
@@ -378,6 +384,10 @@ class Gibbs_Sampler{
    */
   double get_elapsed_secs(){return(elapsed_secs);}
     
+    
+  NumericVector get_ll_proposal(){return(ll_proposal);}
+  NumericVector get_ll_current(){return(ll_current);}
+    
   //################################
   // Section 3 : Functions for handling covariates
   //################################
@@ -421,9 +431,12 @@ class Gibbs_Sampler{
     
     //handle term added for pi:
     for(int j=0;j<current_beta.length();j++){
-      _ret_ll += log(
-                    R::dnorm( current_beta(j), 0.0, beta_prior_sd(j),0) //should change to 1 and check - maybe their log is better...
-                    );
+      if(beta_prior_sd(j)>=0){
+        _ret_ll += log(
+          R::dnorm( current_beta(j), 0.0, beta_prior_sd(j),0) //should change to 1 and check - maybe their log is better...
+        );  
+      }
+      
     }
     
     // handle prior for beta:
@@ -458,6 +471,10 @@ class Gibbs_Sampler{
     
     // check for approval
     double _u = Rf_runif(0, 1);
+    
+    ll_proposal(gibbs_itr) = _ll_suggestion;
+    ll_current(gibbs_itr) = _ll_current_solution;
+    
     // if approved
     if(_u<= exp(_ll_suggestion - _ll_current_solution)){
       // - replace beta
@@ -1035,6 +1052,9 @@ List rcpp_Gibbs_Prob_Results(NumericVector x_vec,
   ret["beta_suggestion"]   = _gibbs.get_beta_suggestion();
   ret["proposal_approved"] = _gibbs.get_proposal_approved();
   ret["elapsed_secs"]      = _gibbs.get_elapsed_secs();
+  
+  ret["ll_proposal"]      = _gibbs.get_ll_proposal();
+  ret["ll_current"]      = _gibbs.get_ll_current();
   return(ret);
 }
 

@@ -25,6 +25,7 @@ if(F){
   mcleod::results.covariate.coefficients.posterior(res,plot.MH.proposal.by.iteration = T)
   
   plot.posterior(res)
+
 }
 
 

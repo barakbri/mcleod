@@ -124,7 +124,7 @@ mcleod.covariates.estimation.parameters = function(proposal_sd = c(0.05),
   
   #checks:
   if(any(beta_prior_sd <=0))
-    stop('all entries of beta_prior_sd must be strictly larger than zero')
+     warning('not all entries of beta_prior_sd are strictly larger than zero, non positive entries will be given a non-informative prior in sampling')
   if(any(proposal_sd <=0))
     stop('all entries of proposal_sd must be strictly larger than zero')
   
@@ -165,11 +165,12 @@ mcleod	<- function( x.smp,
                      prior_parameters = NULL,
                      computational_parameters = NULL,
                      covariates_estimation_parameters = NULL,
-                     input_P_k_i = NULL
+                     input_P_k_i = NULL,
+                     exact.numeric.integration = TRUE
                      )
 {
   
-  exact.numeric.integration = TRUE # We force exact numeric integration over dbinom for computation of P_k_i. Normal approximation is not sufficiant.
+#  exact.numeric.integration = TRUE # We force exact numeric integration over dbinom for computation of P_k_i. Normal approximation is not sufficiant.
   
   
   #%%% Retreive prior parameters
@@ -426,7 +427,7 @@ results.covariate.coefficients.posterior = function(mcleod.obj, plot.posterior =
   if(mcleod.obj$parameters_list$covariates_given != 1L){
     stop('covariates were not given, no coefficients estimated')
   }
-  
+  covariates = mcleod.obj$parameters_list$covariates
   burnin = mcleod.obj$parameters_list$nr.gibbs.burnin
   nr.covariates = ncol(covariates)
   mean_vec = rep(NA,nr.covariates)
@@ -447,7 +448,7 @@ results.covariate.coefficients.posterior = function(mcleod.obj, plot.posterior =
     par(mfrow=c(nr.covariates,1))  
     for(i in 1:nr.covariates){
       #plot, remove proposal for the last iteration
-      plot(mcleod.obj$additional$original_stat_res$beta_suggestion[i, -mcleod.obj$parameters_list$nr.gibbs ],col = res$additional$original_stat_res$proposal_approved+1,pch= 20,main = paste0('beta',i,' - proposal'),xlab = 'Iteration',ylab = 'Coefficient')    
+      plot(mcleod.obj$additional$original_stat_res$beta_suggestion[i, -mcleod.obj$parameters_list$nr.gibbs ],col = mcleod.obj$additional$original_stat_res$proposal_approved+1,pch= 20,main = paste0('beta',i,' - proposal'),xlab = 'Iteration',ylab = 'Coefficient')    
     }
     par(mfrow=c(1,1))
   }
