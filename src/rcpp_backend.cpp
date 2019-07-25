@@ -216,6 +216,9 @@ class Gibbs_Sampler{
   
   NumericVector ll_current;
   
+  int manual_beta_dist_given;   // zero or 1, for placing a manual distribution for beta
+  NumericVector manual_beta_dist_values;  // R+1 values of the distribution
+  NumericVector manual_beta_dist_Probs; // R values of probabilities for bins.
   
   public:  
     
@@ -244,7 +247,10 @@ class Gibbs_Sampler{
                      NumericVector proposal_sd_p,            // the sd for the proposal density, by beta parameter
                      NumericVector beta_prior_sd_p,          // sd for the prior over beta, by beta parameter
                      NumericVector beta_init,                // init value for beta
-                     IntegerVector noise_type                // 0 = binomial, 1 = poisson
+                     IntegerVector noise_type,               // 0 = binomial, 1 = poisson
+                     IntegerVector manual_beta_dist_given_p,   // zero or 1, for placing a manual distribution for beta
+                     NumericVector manual_beta_dist_values_p,  // R+1 values of the distribution
+                     NumericVector manual_beta_dist_Probs_p   // R values of probabilities for bins.
                      ){
     
     begin = clock();  
@@ -275,7 +281,10 @@ class Gibbs_Sampler{
       TwoLayerDirichlet_I1 = Two_Layer_Dirichlet_I1_p(0);
       TwoLayerDirichlet_I2 = (a_vec_p.length()-1) / TwoLayerDirichlet_I1;
     }
-      
+    
+    manual_beta_dist_given = manual_beta_dist_given_p(0);
+    manual_beta_dist_values = manual_beta_dist_values_p;
+    manual_beta_dist_Probs = manual_beta_dist_Probs_p;
     
     dbinom_integration_stepsize = integration_stepsize_p(0);
     
@@ -431,12 +440,21 @@ class Gibbs_Sampler{
     
     //handle term added for pi:
     for(int j=0;j<current_beta.length();j++){
-      if(beta_prior_sd(j)>=0){
-        _ret_ll += log(
-          R::dnorm( current_beta(j), 0.0, beta_prior_sd(j),0) //should change to 1 and check - maybe their log is better...
-        );  
-      }
       
+      
+      if(manual_beta_dist_given == 1){ // handle a general prior
+        for(int k=0;k<manual_beta_dist_values.length()-1;k++){
+          if(current_beta(j) > manual_beta_dist_values(k) && current_beta(j)<=manual_beta_dist_values(k+1)){
+            _ret_ll +=   manual_beta_dist_Probs(k) / (manual_beta_dist_values(k+1) - manual_beta_dist_values(k));
+          }
+        }
+      }else{ // handle a normal prior
+        if(beta_prior_sd(j)>=0){
+          _ret_ll += log(
+            R::dnorm( current_beta(j), 0.0, beta_prior_sd(j),0) //should change to 1 and check - maybe their log is better...
+          );  
+        }  
+      }
     }
     
     // handle prior for beta:
@@ -1040,9 +1058,12 @@ List rcpp_Gibbs_Prob_Results(NumericVector x_vec,
                                    NumericVector proposal_sd,
                                    NumericVector beta_prior_sd,
                                    NumericVector beta_init,
-                                   IntegerVector Noise_Type){
+                                   IntegerVector Noise_Type,
+                                   IntegerVector manual_beta_dist_given,   // zero or 1, for placing a manual distribution for beta
+                                   NumericVector manual_beta_dist_values,  // R+1 values of the distribution
+                                   NumericVector manual_beta_dist_Probs){   // R values of probabilities for bins.
   
-  Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1,covariates_given,covariates,proposal_sd,beta_prior_sd,beta_init,Noise_Type);
+  Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1,covariates_given,covariates,proposal_sd,beta_prior_sd,beta_init,Noise_Type,manual_beta_dist_given,manual_beta_dist_values,manual_beta_dist_Probs);
   
   List ret;
   ret["p_k_i"]             = _gibbs.get_p_k_i();

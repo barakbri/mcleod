@@ -90,3 +90,38 @@ if(F){
    
   
 }
+
+
+
+#simple example, two covariates, prior for beta defind explicitly
+if(F){
+  N = 30
+  K = 200
+  set.seed(1)
+  covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K)
+  real_beta_1 = -1
+  real_beta_2 = 1
+  x = rbinom(K,size = N,prob = inv.log.odds(rnorm(K,0,sd = 1) + real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
+  n = rep(N,K)
+  model_dt = data.frame(c = x,nc = n-x)
+  model_dt = cbind(model_dt,covariates)
+  model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
+  model$coefficients[-1]
+  
+  beta_prior_points = seq(-5,5,0.01)
+  beta_prior_probs = pnorm(beta_prior_points[-1]) - pnorm(beta_prior_points[-length(beta_prior_points)])
+  res = mcleod(x, n, prior_parameters = mcleod.prior.parameters(),
+               a.limits = c(-4,4),
+               covariates = covariates,
+               computational_parameters = mcleod.computational.parameters(nr.gibbs = 500),
+               covariates_estimation_parameters = mcleod.covariates.estimation.parameters(beta_init = model$coefficients[-1],
+                                                                                          Manual_Prior_Values = beta_prior_points,
+                                                                                          Manual_Prior_Probs = beta_prior_probs)
+  )
+  res$additional$original_stat_res$elapsed_secs
+  
+  mcleod::results.covariate.coefficients.posterior(res,plot.MH.proposal.by.iteration = T)
+  
+  plot.posterior(res)
+  
+}

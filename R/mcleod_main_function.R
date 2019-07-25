@@ -31,7 +31,7 @@ MCLEOD.POISSON.ERRORS = 1L
 #' @param prior.type 
 #' @param Beta.Heirarchical.Levels 
 #' @param Two.Layer.Dirichlet.Intervals 
-#' @param Two.Layer.Dirichlet.Nodes.in.First.Layer 
+#' @param Two.Layer.Dirichlet.Nodes.in.First.Layer
 #'
 #' @return
 #' @export
@@ -113,6 +113,8 @@ mcleod.computational.parameters = function(nr.gibbs = 500,
 #' @param proposal_sd 
 #' @param beta_prior_sd 
 #' @param beta_init 
+#' @param Manual_Prior_Values 
+#' @param Manual_Prior_Probs  
 #'
 #' @return
 #' @export
@@ -120,7 +122,9 @@ mcleod.computational.parameters = function(nr.gibbs = 500,
 #' @examples
 mcleod.covariates.estimation.parameters = function(proposal_sd = c(0.05),
                                            beta_prior_sd = c(5),
-                                           beta_init = c(0)){
+                                           beta_init = c(0),
+                                           Manual_Prior_Values = NULL,
+                                           Manual_Prior_Probs = NULL){
   
   #checks:
   if(any(beta_prior_sd <=0))
@@ -128,10 +132,27 @@ mcleod.covariates.estimation.parameters = function(proposal_sd = c(0.05),
   if(any(proposal_sd <=0))
     stop('all entries of proposal_sd must be strictly larger than zero')
   
+  if(!is.null(Manual_Prior_Values)){
+    if(length(Manual_Prior_Values) - 1 != length(Manual_Prior_Probs)){
+      stop('Manual_Prior_Values must be longer by one entery than Manual_Prior_Probs')      
+    }
+    if(!all.equal(Manual_Prior_Values,sort(Manual_Prior_Values))){
+      stop('Manual_Prior_Values must be sorted')
+    }
+    if(any(Manual_Prior_Probs<0)){
+      stop('All values of Manual_Prior_Probs must be positive')
+    }
+    if(abs(sum(Manual_Prior_Probs) - 1.0)> 0.00001){
+      stop('Manual_Prior_Probs must sum up to 1')
+    }
+  }
+  
   ret = list()
   ret$proposal_sd = proposal_sd
   ret$beta_prior_sd = beta_prior_sd
   ret$beta_init = beta_init
+  ret$Manual_Prior_Values = Manual_Prior_Values
+  ret$Manual_Prior_Probs = Manual_Prior_Probs
   class(ret) = CLASS.NAME.COVARIATES.ESTIMATION.PARAMETERS.DEFINITION
   return(ret)
 }
@@ -318,6 +339,17 @@ mcleod	<- function( x.smp,
     
   }
   
+  #handle manual priors:
+  Manual_Prior_Given = c(0L)
+  Manual_Prior_Values = c(-4,4)
+  Manual_Prior_Probs = c(1)
+  if(!is.null(covariates_estimation_parameters$Manual_Prior_Values)){
+    Manual_Prior_Given = c(1L)
+    Manual_Prior_Values = covariates_estimation_parameters$Manual_Prior_Values
+    Manual_Prior_Probs = covariates_estimation_parameters$Manual_Prior_Probs
+  }
+    
+    
   #%%% call Rcpp wrapper
   res = Wrapper_rcpp_Gibbs(x.smp,
                            n.smp,
@@ -338,7 +370,10 @@ mcleod	<- function( x.smp,
                            integration_step_size = integration_step_size,
                            Noise_Type = Noise_Type,
                            P_k_i_is_given = P_k_i_is_given,
-                           P_k_i_precomputed = P_k_i_precomputed
+                           P_k_i_precomputed = P_k_i_precomputed,
+                           Manual_Prior_Given = Manual_Prior_Given,
+                           Manual_Prior_Values = Manual_Prior_Values,
+                           Manual_Prior_Probs = Manual_Prior_Probs
                            )
   
   #%%% Wrap results
