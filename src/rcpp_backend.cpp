@@ -20,13 +20,13 @@ using namespace Rcpp;
  */
 class Fast_Gamma_Sampler{
   
-  //Constants for the indices of different shapes in the bank
-  static const int INDEX_0_1  = 0;
-  static const int INDEX_1    = 1;
-  static const int INDEX_10   = 2;
+  //Constants for the indices of different shapes in the bank // static const wont work here on a linux compiler...
+  int INDEX_0_1  = 0;
+  int INDEX_1    = 1;
+  int INDEX_10   = 2;
   
   //Total number of bank columns
-  static const int BANK_COLS  = 3;
+  int BANK_COLS  = 3;
   
   /**
    * Bank constructor, samples each of the columns. Receives as parameter the required bank size.
