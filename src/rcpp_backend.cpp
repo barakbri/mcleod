@@ -1,8 +1,4 @@
-// [[Rcpp::plugins(cpp11)]]
-
 #include <Rcpp.h>
-#include <RcppEigen.h>
-#include <RcppNumerical.h>
 #include <math.h>
 #include <Rmath.h>
 #include <ctime>
@@ -13,10 +9,6 @@
 
 
 using namespace Rcpp;
-using namespace Numer;
-
-// [[Rcpp::depends(RcppEigen)]]
-// [[Rcpp::depends(RcppNumerical)]]
 
 
 /**
@@ -218,7 +210,7 @@ class Gibbs_Sampler{
   
   int manual_beta_dist_given;   // zero or 1, for placing a manual distribution for beta
   NumericVector manual_beta_dist_values;  // R+1 values of the distribution
-  NumericVector manual_beta_dist_Probs; // R values of probabilities for bins.
+  NumericMatrix manual_beta_dist_Probs; // R values of probabilities for bins.
   
   public:  
     
@@ -250,7 +242,7 @@ class Gibbs_Sampler{
                      IntegerVector noise_type,               // 0 = binomial, 1 = poisson
                      IntegerVector manual_beta_dist_given_p,   // zero or 1, for placing a manual distribution for beta
                      NumericVector manual_beta_dist_values_p,  // R+1 values of the distribution
-                     NumericVector manual_beta_dist_Probs_p   // R values of probabilities for bins.
+                     NumericMatrix manual_beta_dist_Probs_p   // R values of probabilities for bins.
                      ){
     
     begin = clock();  
@@ -445,7 +437,7 @@ class Gibbs_Sampler{
       if(manual_beta_dist_given == 1){ // handle a general prior
         for(int k=0;k<manual_beta_dist_values.length()-1;k++){
           if(current_beta(j) > manual_beta_dist_values(k) && current_beta(j)<=manual_beta_dist_values(k+1)){
-            _ret_ll +=   manual_beta_dist_Probs(k) / (manual_beta_dist_values(k+1) - manual_beta_dist_values(k));
+            _ret_ll +=   manual_beta_dist_Probs(k,j) / (manual_beta_dist_values(k+1) - manual_beta_dist_values(k));
           }
         }
       }else{ // handle a normal prior
@@ -1061,7 +1053,7 @@ List rcpp_Gibbs_Prob_Results(NumericVector x_vec,
                                    IntegerVector Noise_Type,
                                    IntegerVector manual_beta_dist_given,   // zero or 1, for placing a manual distribution for beta
                                    NumericVector manual_beta_dist_values,  // R+1 values of the distribution
-                                   NumericVector manual_beta_dist_Probs){   // R values of probabilities for bins.
+                                   NumericMatrix manual_beta_dist_Probs){   // R values of probabilities for bins.
   
   Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1,covariates_given,covariates,proposal_sd,beta_prior_sd,beta_init,Noise_Type,manual_beta_dist_given,manual_beta_dist_values,manual_beta_dist_Probs);
   
@@ -1098,43 +1090,3 @@ NumericVector rcpp_Generate_Gamma_from_Fast_Gamma_Bank(NumericVector x,NumericMa
   return(_res);
 }
 
-
-//######################
-//Numeric itegration example - need to incorporate later
-//######################
-
-//this section is an example for the quadrature based integration - need to incorporate into the code...
-// P(0.3 < X < 0.8), X ~ Beta(a, b)
-class BetaPDF: public Func
-{
-private:
-  double a;
-  double b;
-public:
-  BetaPDF(double a_, double b_) : a(a_), b(b_) {}
-  
-  double operator()(const double& x) const
-  {
-    return R::dbeta(x, a, b, 0);
-  }
-};
-
-// [[Rcpp::export]]
-Rcpp::List integrate_test()
-{
-  const double a = 3, b = 10;
-  const double lower = 0.3, upper = 0.8;
-  const double true_val = R::pbeta(upper, a, b, 1, 0) -
-    R::pbeta(lower, a, b, 1, 0);
-  
-  BetaPDF f(a, b);
-  double err_est;
-  int err_code;
-  const double res = integrate(f, lower, upper, err_est, err_code);
-  return Rcpp::List::create(
-    Rcpp::Named("true") = true_val,
-    Rcpp::Named("approximate") = res,
-    Rcpp::Named("error_estimate") = err_est,
-    Rcpp::Named("error_code") = err_code
-  );
-}

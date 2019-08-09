@@ -93,7 +93,7 @@ if(F){
 
 
 
-#simple example, two covariates, prior for beta defind explicitly
+#simple example, two covariates, prior for beta defined explicitly
 if(F){
   N = 30
   K = 200
@@ -109,7 +109,10 @@ if(F){
   model$coefficients[-1]
   
   beta_prior_points = seq(-5,5,0.01)
-  beta_prior_probs = pnorm(beta_prior_points[-1]) - pnorm(beta_prior_points[-length(beta_prior_points)])
+  beta_prior_probs = pcauchy(beta_prior_points[-1]) - pcauchy(beta_prior_points[-length(beta_prior_points)])
+  beta_prior_probs = beta_prior_probs/ sum(beta_prior_probs)
+  plot(beta_prior_points[-1],beta_prior_probs,type = 'l',xlab = 'theta',ylab = 'probability in bin of beta_prior_probs')
+  beta_prior_probs = matrix(c(beta_prior_probs, beta_prior_probs),ncol = 2)
   res = mcleod(x, n, prior_parameters = mcleod.prior.parameters(),
                a.limits = c(-4,4),
                covariates = covariates,

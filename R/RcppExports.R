@@ -13,7 +13,3 @@ rcpp_Generate_Gamma_from_Fast_Gamma_Bank <- function(x, Bank) {
     .Call(`_mcleod_rcpp_Generate_Gamma_from_Fast_Gamma_Bank`, x, Bank)
 }
 
-integrate_test <- function() {
-    .Call(`_mcleod_integrate_test`)
-}
-

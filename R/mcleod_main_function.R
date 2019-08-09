@@ -133,8 +133,8 @@ mcleod.covariates.estimation.parameters = function(proposal_sd = c(0.05),
     stop('all entries of proposal_sd must be strictly larger than zero')
   
   if(!is.null(Manual_Prior_Values)){
-    if(length(Manual_Prior_Values) - 1 != length(Manual_Prior_Probs)){
-      stop('Manual_Prior_Values must be longer by one entery than Manual_Prior_Probs')      
+    if(length(Manual_Prior_Values) - 1 != dim(Manual_Prior_Probs)[1]){
+      stop('Manual_Prior_Values must be longer by one entery than nr rows of Manual_Prior_Probs')      
     }
     if(!all.equal(Manual_Prior_Values,sort(Manual_Prior_Values))){
       stop('Manual_Prior_Values must be sorted')
@@ -142,9 +142,12 @@ mcleod.covariates.estimation.parameters = function(proposal_sd = c(0.05),
     if(any(Manual_Prior_Probs<0)){
       stop('All values of Manual_Prior_Probs must be positive')
     }
-    if(abs(sum(Manual_Prior_Probs) - 1.0)> 0.00001){
-      stop('Manual_Prior_Probs must sum up to 1')
+    for(j in 1:ncol(Manual_Prior_Probs)){
+      if(abs(sum(Manual_Prior_Probs[,j]) - 1.0)> 0.00001){
+        stop(paste0('probabilities in column ',j,' of Manual_Prior_Probs do not sum up to 1'))
+      }  
     }
+    
   }
   
   ret = list()
@@ -269,9 +272,11 @@ mcleod	<- function( x.smp,
   if(is.null(input_P_k_i)){
     P_k_i_is_given = 0L
     P_k_i_precomputed = matrix(1,nrow = 1)
+    K			<- length(x.smp)
   }else{
     P_k_i_is_given = 1L
     P_k_i_precomputed = input_P_k_i
+    K			<- nrow(P_k_i_precomputed)
   }
   
   #checks
@@ -301,7 +306,7 @@ mcleod	<- function( x.smp,
   
   a.max = a.limits[2]
   a.min = a.limits[1]
-  K			<- length(x.smp)
+  
   
   Fast.Gamma.Bank = matrix(1,nrow = 1)
   Fast.Gamma.Used.p = 0
@@ -333,10 +338,11 @@ mcleod	<- function( x.smp,
     if(P_k_i_is_given & covariates_given){
       stop('covariates can be given only for Binomial or Poisson errors. A custom P_k_i must be given without covariates')
     }
-    if(P_k_i_is_given & !(is.null(x.smp) & is.null(n.smp))){
-    stop('if P_k_i is given, x.smp and n.smp must be set to NULL')  
-    }
-    
+    # if(P_k_i_is_given & !(is.null(x.smp) & is.null(n.smp))){
+    # stop('if P_k_i is given, x.smp and n.smp must be set to NULL')  
+    # }
+    # x.smp = 1 # replace to numeric value - instead of null type
+    # n.smp = 1
   }
   
   #handle manual priors:
@@ -347,6 +353,10 @@ mcleod	<- function( x.smp,
     Manual_Prior_Given = c(1L)
     Manual_Prior_Values = covariates_estimation_parameters$Manual_Prior_Values
     Manual_Prior_Probs = covariates_estimation_parameters$Manual_Prior_Probs
+    if(ncol(covariates) != dim(Manual_Prior_Probs)[2]){
+      stop('ncols of  Manual_Prior_Probs must be the same as the number of covariates')
+    }
+    
   }
     
     
