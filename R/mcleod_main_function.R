@@ -348,7 +348,7 @@ mcleod	<- function( x.smp,
   #handle manual priors:
   Manual_Prior_Given = c(0L)
   Manual_Prior_Values = c(-4,4)
-  Manual_Prior_Probs = c(1)
+  Manual_Prior_Probs = matrix(c(1))
   if(!is.null(covariates_estimation_parameters$Manual_Prior_Values)){
     Manual_Prior_Given = c(1L)
     Manual_Prior_Values = covariates_estimation_parameters$Manual_Prior_Values
