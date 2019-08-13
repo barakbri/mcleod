@@ -87,9 +87,9 @@ mcleod.computational.parameters = function(nr.gibbs = 500,
   }
   #warnings nr.gibbs and burnins
   if(nr.gibbs.burnin < 200)
-    warning('warning: nr.gibbs.burnin lower than 100 iterations')
+    warning('warning: nr.gibbs.burnin lower than 200 iterations')
   if(nr.gibbs < 500)
-    warning('warning: nr.gibbs lower than 100 iterations')
+    warning('warning: nr.gibbs lower than 500 iterations')
   #warning on integration_step_size
   if(integration_step_size>0.01)
     warning('warning: integration_step_size in natural parameter scale larger than 0.01')
