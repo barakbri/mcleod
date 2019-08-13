@@ -272,6 +272,7 @@ class Gibbs_Sampler{
     if(Prior_Type == 0){
       TwoLayerDirichlet_I1 = Two_Layer_Dirichlet_I1_p(0);
       TwoLayerDirichlet_I2 = (a_vec_p.length()-1) / TwoLayerDirichlet_I1;
+      I = (a_vec_p.length()-1);
     }
     
     manual_beta_dist_given = manual_beta_dist_given_p(0);
