@@ -1,4 +1,9 @@
 import(Rcpp)
+import(doRNG)
+import(doParallel)
+import(doRNG)
+import(ggplot2)
+import(hash)
+import(parallel)
 useDynLib(mcleod, .registration=TRUE)
 exportPattern("^[[:alpha:]]+")
-
