@@ -1,12 +1,3 @@
-#comments in code and roxygen
-#vignette
-
-#curved bottom
-#show power problem to danny
-
-
-#Part I: memory limit, load libraries, get data and set parameters
-
 library(hash)
 library(doRNG)
 library(doParallel)
@@ -19,10 +10,23 @@ CLASS.NAME.MCLEOD.CI.PARAMETERS = 'mcleod.CI.obj.parameters'
 
 
 
+#' Title
+#'
+#' @param Nr.reps.for.each.n 
+#' @param nr.cores 
+#' @param epsilon.nr.gridpoints 
+#' @param fraction.of.points.computed 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 mcleod.CI.estimation.parameters = function(Nr.reps.for.each.n = 1,
                                            nr.cores = detectCores() - 1,
                                            epsilon.nr.gridpoints = 2,
                                            fraction.of.points.computed = 1){
+  
+  # need to add checks
   ret = list()
   class(ret) = CLASS.NAME.MCLEOD.CI.PARAMETERS
   ret$Nr.reps.for.each.n = Nr.reps.for.each.n
@@ -32,6 +36,21 @@ mcleod.CI.estimation.parameters = function(Nr.reps.for.each.n = 1,
   return(ret)
 }
 
+#' Title
+#'
+#' @param x.vec 
+#' @param n.vec 
+#' @param q_grid 
+#' @param a.max 
+#' @param comp_param 
+#' @param prior_param 
+#' @param CI.estimation.parameters 
+#' @param verbose 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 mcleod.estimate.CI = function(x.vec,
                               n.vec,
                               q_grid = seq(0.1,0.9,0.1),
@@ -56,7 +75,7 @@ mcleod.estimate.CI = function(x.vec,
   epsilon.nr.gridpoints = CI.estimation.parameters$epsilon.nr.gridpoints
   fraction.of.points.computed = CI.estimation.parameters$fraction.of.points.computed
   
-  #Part II: functions for generating P_k_i based on precomputed values:
+  #Part I: functions for generating P_k_i based on precomputed values:
   
   sorted_n_data = sort(unique(n.vec))
   
@@ -97,7 +116,7 @@ mcleod.estimate.CI = function(x.vec,
   #generated_P_k_i = generate_P_k_i(x_to_generate_for)
   
   
-  #Part III: generate deconv model for the original data
+  #Part II: generate deconv model for the original data
   if(verbose){
     cat(paste0(' - Computing deconvolution estimate for original data.\n\r'))
   }
@@ -107,7 +126,7 @@ mcleod.estimate.CI = function(x.vec,
                            prior_parameters = prior_param)
   
   
-  #Part IV: generete decov models for resampled data at grid points, for LE based shift
+  #Part III: generete decov models for resampled data at grid points, for LE based shift
   if(verbose){
     cat(paste0(' - Computing deconvolution estimate for permuted, worst-case data generations.\n\r'))
   }
@@ -182,7 +201,7 @@ mcleod.estimate.CI = function(x.vec,
     cat(paste0(' - Cluster stopped. Total time in parallel: \n\r'))
     print(Elapsed_Time_Parallel)
   }
-  #Part V: compute matrix of P-values
+  #Part IV: compute matrix of P-values
   
   
   pval_LE = matrix(NA,nrow = length(q_grid),ncol = length(a.vec)-1)
@@ -275,7 +294,7 @@ mcleod.estimate.CI = function(x.vec,
     }
   }
   
-  #Part VI: Correct edge cases, for tests that are too discrete to have power:
+  #Part V: Correct edge cases, for tests that are too discrete to have power:
   if(verbose){
     cat(paste0(' - Requiring monotonicity of P-values, for grid points with (low-theta, high CDF) or (high-theta, low-CDF)\n\r'))
   }
@@ -317,6 +336,15 @@ mcleod.estimate.CI = function(x.vec,
 }
 
 
+#' Title
+#'
+#' @param mcleod.CI.obj 
+#' @param sig.level 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 plot.mcleod.CI=function(mcleod.CI.obj, sig.level = c(0.05,0.1)){
   
   if(class(mcleod.CI.obj) != CLASS.NAME.MCLEOD.CI){
@@ -329,8 +357,6 @@ plot.mcleod.CI=function(mcleod.CI.obj, sig.level = c(0.05,0.1)){
   pval_LE  = mcleod.CI.obj$pval_LE
   epsilon  = mcleod.CI.obj$epsilon
   pval_GE  = mcleod.CI.obj$pval_GE
-  
-  #Part VII: plot
   
   dt_plot_LE = matrix(NA,nrow = (length(q_grid) *(length(a.vec)-1)),ncol = 3)
   colnames(dt_plot_LE) = c('theta.LE','q','PV')

@@ -178,6 +178,16 @@ mcleod.covariates.estimation.parameters = function(proposal_sd = c(0.05),
 #' @param input_P_k_i 
 #'
 #' @return
+#' > names(res$parameters_list)
+#' [1] "a.vec"                            "nr.gibbs"                        
+#' [3] "nr.gibbs.burnin"                  "prior_parameters"                
+#' [5] "computational_parameters"         "covariates_estimation_parameters"
+#' [7] "covariates"                       "x.smp"                           
+#' [9] "n.smp"                            "Noise_Type"                      
+#' [11] "covariates_given"                
+#' > names(res$additional$original_stat_res)
+#' [1] "p_k_i"             "n_smp"             "pi_smp"            "beta_smp"          "beta_suggestion"  
+#' [6] "proposal_approved" "elapsed_secs"      "ll_proposal"       "ll_current" 
 #' @export
 #'
 #' @examples

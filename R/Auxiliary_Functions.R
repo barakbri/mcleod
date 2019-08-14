@@ -1,8 +1,29 @@
 # Auxiliary Functions and Wrapper:
 
 
-log.odds			<- function(p) 		log(p / (1-p))
-inv.log.odds		<- function(theta)	exp(theta) / (1 +exp(theta))
+#' Title
+#'
+#' @param p 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+log.odds			<- function(p){
+  log(p / (1-p))
+} 		
+
+#' Title
+#'
+#' @param theta 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+inv.log.odds		<- function(theta){
+  exp(theta) / (1 +exp(theta))
+}	
 
 #wrapper for the CPP function
 Wrapper_rcpp_Gibbs = function(x.vec,
