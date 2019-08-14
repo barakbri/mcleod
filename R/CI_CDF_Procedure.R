@@ -48,6 +48,9 @@ mcleod.estimate.CI = function(x.vec,
   K = length(n.vec)  
   M=8
   
+  if(class(CI.estimation.parameters) != CLASS.NAME.MCLEOD.CI.PARAMETERS)
+    stop('CI.estimation.parameters must be the result of mcleod.CI.estimation.parameters(...)')
+  
   NR_reps_for_each_n = CI.estimation.parameters$Nr.reps.for.each.n
   NR.CORES = CI.estimation.parameters$nr.cores
   epsilon.nr.gridpoints = CI.estimation.parameters$epsilon.nr.gridpoints
