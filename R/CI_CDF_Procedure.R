@@ -1,31 +1,57 @@
+#comments in code and roxygen
+#vignette
+
+#curved bottom
+#show power problem to danny
+
 
 #Part I: memory limit, load libraries, get data and set parameters
 
 library(hash)
 library(doRNG)
 library(doParallel)
+library(parallel)
 
 
 
 CLASS.NAME.MCLEOD.CI = 'mcleod.CI.obj'
+CLASS.NAME.MCLEOD.CI.PARAMETERS = 'mcleod.CI.obj.parameters'
 
+
+
+mcleod.CI.estimation.parameters = function(Nr.reps.for.each.n = 1,
+                                           nr.cores = detectCores() - 1,
+                                           epsilon.nr.gridpoints = 2,
+                                           fraction.of.points.computed = 1){
+  ret = list()
+  class(ret) = CLASS.NAME.MCLEOD.CI.PARAMETERS
+  ret$Nr.reps.for.each.n = Nr.reps.for.each.n
+  ret$nr.cores = nr.cores
+  ret$epsilon.nr.gridpoints = epsilon.nr.gridpoints
+  ret$fraction.of.points.computed = fraction.of.points.computed
+  return(ret)
+}
 
 mcleod.estimate.CI = function(x.vec,
                               n.vec,
+                              q_grid = seq(0.1,0.9,0.1),
+                              a.max = c(3),
                               comp_param = mcleod.computational.parameters(nr.gibbs = 200,
                                                                            nr.gibbs.burnin = 100),
                               prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
                                                                     Two.Layer.Dirichlet.Intervals = 64,
                                                                     Two.Layer.Dirichlet.Nodes.in.First.Layer = 8),
-                              NR_reps_for_each_n = 1,
-                              NR.CORES = detectCores() - 1,
-                              epsilon.nr.gridpoints = 2,
-                              fraction.of.points.computed = 1,
+                              CI.estimation.parameters = mcleod.CI.estimation.parameters(),
                               verbose = T){
   
   Start.time.overall = Sys.time()
   K = length(n.vec)  
   M=8
+  
+  NR_reps_for_each_n = CI.estimation.parameters$Nr.reps.for.each.n
+  NR.CORES = CI.estimation.parameters$nr.cores
+  epsilon.nr.gridpoints = CI.estimation.parameters$epsilon.nr.gridpoints
+  fraction.of.points.computed = CI.estimation.parameters$fraction.of.points.computed
   
   #Part II: functions for generating P_k_i based on precomputed values:
   
@@ -43,7 +69,10 @@ mcleod.estimate.CI = function(x.vec,
       x.smp = c(0:n)
       
       P_k_i_for_n = mcleod(x.smp = x.smp,n.smp = n.smp,
-                           computational_parameters = mcleod.computational.parameters(nr.gibbs = 2,nr.gibbs.burnin = 1),prior_parameters = prior_param)
+                           a.limits = c(-a.max,a.max),
+                           computational_parameters = mcleod.computational.parameters(nr.gibbs = 2,
+                                                                                      nr.gibbs.burnin = 1),
+                           prior_parameters = prior_param)
       P_k_i_generator_list[[n_i]] = P_k_i_for_n$additional$original_stat_res$p_k_i
     }
     return(P_k_i_generator_list)
@@ -70,7 +99,9 @@ mcleod.estimate.CI = function(x.vec,
     cat(paste0(' - Computing deconvolution estimate for original data.\n\r'))
   }
   
-  mcleod_for_data = mcleod(x.smp = x.vec,n.smp = n.vec,computational_parameters = comp_param,prior_parameters = prior_param)
+  mcleod_for_data = mcleod(x.smp = x.vec,n.smp = n.vec,a.limits = c(-a.max,a.max),
+                           computational_parameters = comp_param,
+                           prior_parameters = prior_param)
   
   
   #Part IV: generete decov models for resampled data at grid points, for LE based shift
@@ -112,7 +143,9 @@ mcleod.estimate.CI = function(x.vec,
         X_sampled = rbinom(n = K,size = n.vec,prob = inv.log.odds(theta = theta_sample))
         generated_P_k_i = generate_P_k_i(X_sampled)
         
-        temp_mcleod = mcleod(x.smp = X_sampled,n.smp = n.vec,input_P_k_i = generated_P_k_i,
+        temp_mcleod = mcleod(x.smp = X_sampled,n.smp = n.vec,
+                             a.limits = c(-a.max,a.max),
+                             input_P_k_i = generated_P_k_i,
                              computational_parameters = comp_param,
                              prior_parameters = prior_param)
         
@@ -148,7 +181,7 @@ mcleod.estimate.CI = function(x.vec,
   }
   #Part V: compute matrix of P-values
   
-  q_grid = seq(0.1,0.9,0.1)
+  
   pval_LE = matrix(NA,nrow = length(q_grid),ncol = length(a.vec)-1)
   pval_GE = matrix(NA,nrow = length(q_grid),ncol = length(a.vec)-1)
   data_n_smp_posterior_mat = t(mcleod_for_data$additional$original_stat_res$n_smp)
@@ -331,19 +364,22 @@ if(F){
   memory.limit(20000)
   x.vec = deconvolveR::surg[,2]
   n.vec = deconvolveR::surg[,1]
-  
+
   set.seed(1)
   CI.res = mcleod.estimate.CI(x.vec = x.vec,
                               n.vec = n.vec,
-                              fraction.of.points.computed = 0.5,
-                              NR.CORES = detectCores(),
-                              verbose = T,
+                              a.max = 3,
+                              CI.estimation.parameters = mcleod.CI.estimation.parameters(Nr.reps.for.each.n = 1,
+                                                                                         nr.cores = detectCores(),
+                                                                                         fraction.of.points.computed = 0.33,
+                                                                                         epsilon.nr.gridpoints = 2),
                               prior_param = mcleod.prior.parameters(
                                 prior.type = MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
-                                Two.Layer.Dirichlet.Intervals = 64,
-                                Two.Layer.Dirichlet.Nodes.in.First.Layer = 16)
+                                Two.Layer.Dirichlet.Intervals = 32,
+                                Two.Layer.Dirichlet.Nodes.in.First.Layer = 8),
+                              verbose = T
                               )
-  
+
   CI.res$Elapsed_Time_Parallel
   CI.res$Elapsed_Time_Overall
   plot.mcleod.CI(CI.res)
