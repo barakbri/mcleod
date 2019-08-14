@@ -73,7 +73,7 @@ mcleod.interval.censoring.density.estimation = function(lu.mat,L = 8, a.rng = c(
   for(g in 1:n.gbbs)
   {
     
-    print(g) 		
+     		
     
     #	Initialize  pi.gbbs
     if(g==1)	pi.gbbs[g,]		<- 1/I
