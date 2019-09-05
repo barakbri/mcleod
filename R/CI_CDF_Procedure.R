@@ -82,7 +82,7 @@ mcleod.estimate.CI = function(x.vec,
     n_to_P_k_i_generator_index[ as.character(sorted_n_data[i]) ] = i
   
   generate_P_k_i_generator_list = function(n_vec = 1:20){
-    P_k_i_generator_list = list()
+    P_k_i_generator_list = hash() #list()
     for(n_i in 1:length(n_vec)){
       n = n_vec[n_i]
       n.smp = rep(n,n+1)
@@ -93,17 +93,21 @@ mcleod.estimate.CI = function(x.vec,
                            computational_parameters = mcleod.computational.parameters(nr.gibbs = 2,
                                                                                       nr.gibbs.burnin = 1),
                            prior_parameters = prior_param)
-      P_k_i_generator_list[[n_i]] = P_k_i_for_n$additional$original_stat_res$p_k_i
+      P_k_i_generator_list[[as.character(n_i)]] = P_k_i_for_n$additional$original_stat_res$p_k_i
     }
     return(P_k_i_generator_list)
   }
   
   generator_list = suppressWarnings(generate_P_k_i_generator_list(n_vec = sorted_n_data)) 
   
-  generate_P_k_i = function(x_to_generate_for){
-    P_k_i_generated = matrix(NA,nrow = K,ncol = dim(generator_list[[1]])[2])
+  generate_P_k_i = function(x_to_generate_for,n.dim){
+    P_k_i_generated = matrix(NA,nrow = K,ncol = n.dim)
     for(k in 1:K){
-      P_k_i_generated[k,] = (generator_list[[  n_to_P_k_i_generator_index[[as.character(n.vec[k]) ]] ]])[ x_to_generate_for[k] + 1, ]
+      P_k_i_generated[k,] = (generator_list[[ 
+                                              as.character(
+                                              n_to_P_k_i_generator_index[[   as.character(n.vec[k])  ]]
+                                              )
+                                              ]])[ x_to_generate_for[k] + 1, ]
     }
     return(P_k_i_generated)
   }
@@ -160,7 +164,7 @@ mcleod.estimate.CI = function(x.vec,
         )
         
         X_sampled = rbinom(n = K,size = n.vec,prob = inv.log.odds(theta = theta_sample))
-        generated_P_k_i = generate_P_k_i(X_sampled)
+        generated_P_k_i = generate_P_k_i(X_sampled,length(a.vec)-1)
         
         temp_mcleod = mcleod(x.smp = X_sampled,n.smp = n.vec,
                              a.limits = c(-a.max,a.max),
@@ -405,11 +409,11 @@ if(F){
                               a.max = 4,
                               CI.estimation.parameters = mcleod.CI.estimation.parameters(Nr.reps.for.each.n = 1,
                                                                                          nr.cores = detectCores(),
-                                                                                         fraction.of.points.computed = 0.33,
+                                                                                         fraction.of.points.computed = 0.5,
                                                                                          epsilon.nr.gridpoints = 2),
                               prior_param = mcleod.prior.parameters(
                                 prior.type = MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
-                                Two.Layer.Dirichlet.Intervals = 48,
+                                Two.Layer.Dirichlet.Intervals = 64,
                                 Two.Layer.Dirichlet.Nodes.in.First.Layer = 4),
                               verbose = T
                               )
