@@ -24,6 +24,10 @@ mcleod.CI.estimation.parameters = function(Nr.reps.for.each.n = 1,
                                            epsilon.nr.gridpoints = 2,
                                            fraction.of.points.computed = 1){
   
+  library(doRNG)
+  library(doParallel)
+  library(parallel)
+  
   # need to add checks
   ret = list()
   class(ret) = CLASS.NAME.MCLEOD.CI.PARAMETERS
@@ -141,18 +145,19 @@ mcleod.estimate.CI = function(x.vec,
   cl <- makeCluster(NR.CORES)
   registerDoParallel(cl)
   
-  for(grid_point_i in 2:(length(a.vec))){ 
-    if(verbose)
-      cat(paste0('    Computing for grid point ',grid_point_i-1,'\n\r'))
-    
-    current_a.vec = a.vec[grid_point_i]
-    current_a.vec_minus_epsilon = LE_grid[grid_point_i - 1]
-    
-    worker_function_at_current_a_i = function(n_at_a.vec_grid_point){
+  worker_configurations = expand.grid(
+                                    grid_point_i = 2:(length(a.vec)),
+                                    n_at_a.vec_grid_point=0:K
+                                      )
+  worker_function_at_current_a_i = function(n_at_a.vec_grid_point,grid_point_i){
+
+      current_a.vec = a.vec[grid_point_i]
+      current_a.vec_minus_epsilon = LE_grid[grid_point_i - 1]
+
       mcleods_at_current_n_and_a_i = list()
       for(rep_i in 1:NR_reps_for_each_n){
-        
-        
+
+
         #compute a single realization of the data, for n items
         theta_sample = sample(
           c(rep(current_a.vec_minus_epsilon,
@@ -162,38 +167,99 @@ mcleod.estimate.CI = function(x.vec,
           ),
           size = K
         )
-        
+
         X_sampled = rbinom(n = K,size = n.vec,prob = inv.log.odds(theta = theta_sample))
         generated_P_k_i = generate_P_k_i(X_sampled,length(a.vec)-1)
-        
+
         temp_mcleod = mcleod(x.smp = X_sampled,n.smp = n.vec,
                              a.limits = c(-a.max,a.max),
                              input_P_k_i = generated_P_k_i,
                              computational_parameters = comp_param,
                              prior_parameters = prior_param)
-        
+
         n_smp_posterior_mat = t(temp_mcleod$additional$original_stat_res$n_smp)
         mcleods_at_current_n_and_a_i[[rep_i]] = n_smp_posterior_mat[-(1:comp_param$nr.gibbs.burnin),]
       }
       return(mcleods_at_current_n_and_a_i)
     }
+  
+  parallel_res <- foreach(job_id = 1:nrow(worker_configurations), .options.RNG=1234) %dorng% {
+    library(mcleod);
+    n_at_a.vec_grid_point = worker_configurations$n_at_a.vec_grid_point[job_id]
+    grid_point_i = worker_configurations$grid_point_i[job_id]
     
-    parallel_res <- foreach(n_at_a.vec_grid_point=0:K, .options.RNG=1234) %dorng% {
-      library(mcleod);
-      points_to_compute = seq(from = 0,to = K,by = ceiling(1/fraction.of.points.computed))
-      
-      if(!(n_at_a.vec_grid_point %in% points_to_compute)){
-        return(NA)  
-      }
-      
-      worker_function_at_current_a_i(n_at_a.vec_grid_point)
+    points_to_compute = seq(from = 0,to = K,by = ceiling(1/fraction.of.points.computed))
+    
+    if(!(n_at_a.vec_grid_point %in% points_to_compute)){
+      return(NA)
     }
-    
-    mcleods_at_currents_a_i = parallel_res
-    
-    mcleods[[grid_point_i]] = mcleods_at_currents_a_i
-    
+
+    worker_function_at_current_a_i(n_at_a.vec_grid_point,grid_point_i)
   }
+  
+  #collect the results
+  for(grid_point_i in 2:(length(a.vec))){
+    mcleods[[grid_point_i]] = list()  
+  }
+  for(job_id in 1:length(parallel_res)){
+    n_at_a.vec_grid_point = worker_configurations$n_at_a.vec_grid_point[job_id]
+    grid_point_i = worker_configurations$grid_point_i[job_id]
+     
+    mcleods[[grid_point_i]][[n_at_a.vec_grid_point + 1]] = parallel_res[[job_id]]
+  }
+  
+  # for(grid_point_i in 2:(length(a.vec))){ 
+  #   
+  #   worker_function_at_current_a_i = function(n_at_a.vec_grid_point,grid_point_i){
+  #     
+  #     current_a.vec = a.vec[grid_point_i]
+  #     current_a.vec_minus_epsilon = LE_grid[grid_point_i - 1]
+  #     
+  #     mcleods_at_current_n_and_a_i = list()
+  #     for(rep_i in 1:NR_reps_for_each_n){
+  #       
+  #       
+  #       #compute a single realization of the data, for n items
+  #       theta_sample = sample(
+  #         c(rep(current_a.vec_minus_epsilon,
+  #               n_at_a.vec_grid_point),
+  #           rep(M,
+  #               K-n_at_a.vec_grid_point)
+  #         ),
+  #         size = K
+  #       )
+  #       
+  #       X_sampled = rbinom(n = K,size = n.vec,prob = inv.log.odds(theta = theta_sample))
+  #       generated_P_k_i = generate_P_k_i(X_sampled,length(a.vec)-1)
+  #       
+  #       temp_mcleod = mcleod(x.smp = X_sampled,n.smp = n.vec,
+  #                            a.limits = c(-a.max,a.max),
+  #                            input_P_k_i = generated_P_k_i,
+  #                            computational_parameters = comp_param,
+  #                            prior_parameters = prior_param)
+  #       
+  #       n_smp_posterior_mat = t(temp_mcleod$additional$original_stat_res$n_smp)
+  #       mcleods_at_current_n_and_a_i[[rep_i]] = n_smp_posterior_mat[-(1:comp_param$nr.gibbs.burnin),]
+  #     }
+  #     return(mcleods_at_current_n_and_a_i)
+  #   }
+  #   
+  #   parallel_res <- foreach(n_at_a.vec_grid_point=0:K, .options.RNG=1234) %dorng% {
+  #     library(mcleod);
+  #     points_to_compute = seq(from = 0,to = K,by = ceiling(1/fraction.of.points.computed))
+  #     
+  #     if(!(n_at_a.vec_grid_point %in% points_to_compute)){
+  #       return(NA)  
+  #     }
+  #     
+  #     worker_function_at_current_a_i(n_at_a.vec_grid_point)
+  #   }
+  #   
+  #   mcleods_at_currents_a_i = parallel_res
+  #   
+  #   mcleods[[grid_point_i]] = mcleods_at_currents_a_i
+  #   
+  # }
   stopCluster(cl)
   
   End.time = Sys.time()
@@ -413,7 +479,7 @@ if(F){
                                                                                          epsilon.nr.gridpoints = 2),
                               prior_param = mcleod.prior.parameters(
                                 prior.type = MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
-                                Two.Layer.Dirichlet.Intervals = 64,
+                                Two.Layer.Dirichlet.Intervals = 32,
                                 Two.Layer.Dirichlet.Nodes.in.First.Layer = 4),
                               verbose = T
                               )
