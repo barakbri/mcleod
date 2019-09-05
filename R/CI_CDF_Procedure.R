@@ -4,10 +4,8 @@ library(doParallel)
 library(parallel)
 
 
-
 CLASS.NAME.MCLEOD.CI = 'mcleod.CI.obj'
 CLASS.NAME.MCLEOD.CI.PARAMETERS = 'mcleod.CI.obj.parameters'
-
 
 
 #' Title
@@ -105,7 +103,6 @@ mcleod.estimate.CI = function(x.vec,
   generate_P_k_i = function(x_to_generate_for){
     P_k_i_generated = matrix(NA,nrow = K,ncol = dim(generator_list[[1]])[2])
     for(k in 1:K){
-      
       P_k_i_generated[k,] = (generator_list[[  n_to_P_k_i_generator_index[[as.character(n.vec[k]) ]] ]])[ x_to_generate_for[k] + 1, ]
     }
     return(P_k_i_generated)
@@ -295,27 +292,27 @@ mcleod.estimate.CI = function(x.vec,
   }
   
   #Part V: Correct edge cases, for tests that are too discrete to have power:
-  if(verbose){
-    cat(paste0(' - Requiring monotonicity of P-values, for grid points with (low-theta, high CDF) or (high-theta, low-CDF)\n\r'))
-  }
-  pval_LE_original = pval_LE
-  pval_GE_original = pval_GE
-  
-  for(i in 2:ncol(pval_LE)){
-    for(j in 2:nrow(pval_LE)){
-      if(pval_LE[j,i] > pval_LE[j-1,i]){
-        pval_LE[j,i] = pval_LE[j-1,i]
-      }
-    }
-  }
-  
-  for(i in 1:(ncol(pval_GE)-1)){
-    for(j in (nrow(pval_GE)-1):1){
-      if(pval_GE[j,i] > pval_GE[j+1,i]){
-        pval_GE[j,i] = pval_GE[j+1,i]
-      }
-    }
-  }
+  # if(verbose){
+  #   cat(paste0(' - Requiring monotonicity of P-values, for grid points with (low-theta, high CDF) or (high-theta, low-CDF)\n\r'))
+  # }
+  # pval_LE_original = pval_LE
+  # pval_GE_original = pval_GE
+  # 
+  # for(i in 2:ncol(pval_LE)){
+  #   for(j in 2:nrow(pval_LE)){
+  #     if(pval_LE[j,i] > pval_LE[j-1,i]){
+  #       pval_LE[j,i] = pval_LE[j-1,i]
+  #     }
+  #   }
+  # }
+  # 
+  # for(i in 1:(ncol(pval_GE)-1)){
+  #   for(j in (nrow(pval_GE)-1):1){
+  #     if(pval_GE[j,i] > pval_GE[j+1,i]){
+  #       pval_GE[j,i] = pval_GE[j+1,i]
+  #     }
+  #   }
+  # }
   
   ret = list()
   class(ret) = CLASS.NAME.MCLEOD.CI
@@ -328,8 +325,8 @@ mcleod.estimate.CI = function(x.vec,
   ret$K = K
   ret$Elapsed_Time_Parallel = Elapsed_Time_Parallel
   ret$mcleod_for_data = mcleod_for_data
-  ret$pval_LE_original = pval_LE_original
-  ret$pval_GE_original = pval_GE_original
+  # ret$pval_LE_original = pval_LE_original
+  # ret$pval_GE_original = pval_GE_original
   ret$Elapsed_Time_Overall = Sys.time() - Start.time.overall
   return(ret)
   
@@ -363,7 +360,7 @@ plot.mcleod.CI=function(mcleod.CI.obj, sig.level = c(0.05,0.1)){
   pointer = 1
   for(qi in 1:length(q_grid)){
     for(ai in 2:(length(a.vec)-1)){
-      dt_plot_LE[pointer,] = c(LE_grid[ai-1],q_grid[qi],pval_LE[qi,ai])
+      dt_plot_LE[pointer,] = c(LE_grid[ai-1],q_grid[qi],pval_LE[qi,ai]) #c(a.vec[ai+2],q_grid[qi],pval_LE[qi,ai])#
       pointer = pointer +1
     }
   }
@@ -374,7 +371,7 @@ plot.mcleod.CI=function(mcleod.CI.obj, sig.level = c(0.05,0.1)){
   pointer = 1
   for(qi in 1:length(q_grid)){
     for(ai in 2:(length(a.vec)-1)){
-      dt_plot_GE[pointer,] = c(LE_grid[ai-1] + 2*epsilon,q_grid[qi],pval_GE[qi,ai])
+      dt_plot_GE[pointer,] = c(LE_grid[ai-1] + 2*epsilon,q_grid[qi],pval_GE[qi,ai]) #c(a.vec[ai+2],q_grid[qi],pval_GE[qi,ai])#
       pointer = pointer +1
     }
   }
@@ -382,10 +379,18 @@ plot.mcleod.CI=function(mcleod.CI.obj, sig.level = c(0.05,0.1)){
   min.a = min(a.vec)
   max.a = max(a.vec)
 
+  nr.iter.burnin = mcleod.CI.obj$mcleod_for_data$parameters_list$nr.gibbs.burnin
+  posterior_mean = (t(mcleod.CI.obj$mcleod_for_data$additional$original_stat_res$pi_smp))[-(1:nr.iter.burnin),]
+  posterior_mean =  cbind(rep(0,nrow(posterior_mean)),t(apply(posterior_mean,1,cumsum)))
+  posterior_mean = apply(posterior_mean,2,mean)
+  dt_post_mean = data.frame(theta = a.vec,posterior_mean = posterior_mean)
+  
+  
   v <- ggplot() + geom_contour(mapping =  aes(theta.LE, q, z = PV),
                                data =  dt_plot_LE,breaks = sig.level) +
     geom_contour(mapping =  aes(theta.GE, q, z = PV),
-                 data =  dt_plot_GE,breaks = sig.level)
+                 data =  dt_plot_GE,breaks = sig.level) +
+    geom_line(mapping = aes(x = theta,y=posterior_mean),col= 'red',data = dt_post_mean)
   print(v  +ylim(c(0,1)) +xlim(c(min.a,max.a)) +xlab('theta'))
 }
 
@@ -397,15 +402,15 @@ if(F){
   set.seed(1)
   CI.res = mcleod.estimate.CI(x.vec = x.vec,
                               n.vec = n.vec,
-                              a.max = 3,
+                              a.max = 4,
                               CI.estimation.parameters = mcleod.CI.estimation.parameters(Nr.reps.for.each.n = 1,
                                                                                          nr.cores = detectCores(),
                                                                                          fraction.of.points.computed = 0.33,
                                                                                          epsilon.nr.gridpoints = 2),
                               prior_param = mcleod.prior.parameters(
                                 prior.type = MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
-                                Two.Layer.Dirichlet.Intervals = 32,
-                                Two.Layer.Dirichlet.Nodes.in.First.Layer = 8),
+                                Two.Layer.Dirichlet.Intervals = 48,
+                                Two.Layer.Dirichlet.Nodes.in.First.Layer = 4),
                               verbose = T
                               )
 
@@ -413,5 +418,9 @@ if(F){
   CI.res$Elapsed_Time_Overall
   plot.mcleod.CI(CI.res)
 }
+
+
+
+
 
 
