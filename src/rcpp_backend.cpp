@@ -535,12 +535,17 @@ class Gibbs_Sampler{
       p_hat = ( (double)(x)); 
       theta_hat = log(p_hat);
       theta_se	= sqrt(((double)1.0) / ((double)( p_hat )) );
+    }else if (Noise_Type == 2){
+      p_hat = ( (double)(x)); 
+      theta_hat = log(p_hat);
+      theta_se	= sqrt(((double)1.0) / ((double)( p_hat )) );
     }
     
     double _temp_p_nrm_ul, _temp_p_nrm_ll;
     double _temp;
     double _integral = 0.0;
     double _integral_h = dbinom_integration_stepsize;
+    double _integral_h_actual = dbinom_integration_stepsize;
     double _integral_p = 0.0;
     double _integral_sum = 0.0;
     
@@ -555,12 +560,16 @@ class Gibbs_Sampler{
         //do integration
         _integral = 0.0;
         _integral_p = a_v(i);
-        while(_integral_p +_integral_h <= a_v(i+1)){
+        while(_integral_p<= a_v(i+1)){
           if(_last_density == -1){ // this rule is activated only on the first iteration, since we don't have a density computed from the last step
             _last_density = density_wrapper(x,n,(_integral_p)); 
           }
-          _this_density = density_wrapper(x,n,(_integral_p + _integral_h));
-          _integral   +=   (_last_density + _this_density) * _integral_h / 2.0;
+          _integral_h_actual = _integral_h;
+          if(_integral_p + _integral_h_actual > a_v(i+1)){
+            _integral_h_actual = a_v(i+1) - _integral_p;
+          }  
+          _this_density = density_wrapper(x,n,(_integral_p + _integral_h_actual));
+          _integral   +=   (_last_density + _this_density) * _integral_h_actual / 2.0;
           _integral_p += _integral_h;
           _last_density = _this_density;
         }
@@ -587,6 +596,8 @@ class Gibbs_Sampler{
       return(Rf_dbinom(x,n,inv_log_odds(theta),0));
     }else if (Noise_Type == 1){
       return(Rf_dpois(x,exp(theta),0));
+    }else if (Noise_Type == 2){
+      return(Rf_dnorm4(x,exp(theta),sqrt(exp(theta)),0));
     }else{
       // we shouldn't be getting here
       return(0);
