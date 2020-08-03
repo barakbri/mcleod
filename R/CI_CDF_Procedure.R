@@ -412,7 +412,7 @@ mcleod.estimate.CI = function(x.vec,
 #' @export
 #'
 #' @examples
-plot.mcleod.CI=function(mcleod.CI.obj, sig.level = c(0.05,0.1)){
+plot.mcleod.CI.old=function(mcleod.CI.obj, sig.level = c(0.05,0.1)){
   
   if(class(mcleod.CI.obj) != CLASS.NAME.MCLEOD.CI){
     stop('mcleod.CI.obj must be a result returned from mcleod.estimate.CI')
@@ -464,6 +464,148 @@ plot.mcleod.CI=function(mcleod.CI.obj, sig.level = c(0.05,0.1)){
   print(v  +ylim(c(0,1)) +xlim(c(min.a,max.a)) +xlab('theta'))
 }
 
+
+
+
+#' Title
+#'
+#' @param mcleod.CI.obj 
+#' @param conf.level 
+#' @param X_axis_as_Prob 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+plot.mcleod.CI=function(mcleod.CI.obj, conf.level = c(0.95),X_axis_as_Prob = T){
+  #mcleod.CI.obj = CI.res
+  #X_axis_as_Prob = T
+  if(class(mcleod.CI.obj) != CLASS.NAME.MCLEOD.CI){
+    stop('mcleod.CI.obj must be a result returned from mcleod.estimate.CI')
+  }
+  
+  for(conf.level.ind in 1:length(conf.level)){
+    #conf.level.ind = 1
+    curve_obj = compute.mcleod.CI.curve(mcleod.CI.obj,conf.level[conf.level.ind])
+    x_axis = curve_obj$a.vec
+    x_axis_label = 'theta'
+    if(X_axis_as_Prob){
+      x_axis = inv.log.odds(x_axis)
+      x_axis_label = 'P'
+    }
+    if(conf.level.ind == 1)
+      plot(x_axis,curve_obj$median_cumulative_pi_smp_for_data,col =  'red',type = 'b',pch = 20,xlab = x_axis_label,ylab = 'CDF')
+    lines(x_axis,curve_obj$q_star_LE,col = 'black')
+    lines(x_axis,curve_obj$q_star_GE,col = 'black')
+  }
+  
+  
+}
+
+
+
+
+compute.mcleod.CI.curve=function(mcleod.CI.obj, conf.level = c(0.95)){
+  #mcleod.CI.obj = CI.res
+  if(class(mcleod.CI.obj) != CLASS.NAME.MCLEOD.CI){
+    stop('mcleod.CI.obj must be a result returned from mcleod.estimate.CI')
+  }
+  
+  a.vec = mcleod.CI.obj$a.vec
+  q_grid  = mcleod.CI.obj$q_grid
+  LE_grid  = mcleod.CI.obj$LE_grid
+  pval_LE  = mcleod.CI.obj$pval_LE
+  epsilon  = mcleod.CI.obj$epsilon
+  pval_GE  = mcleod.CI.obj$pval_GE
+  
+  pi_smp_for_data = (t(mcleod.CI.obj$mcleod_for_data$additional$original_stat_res$pi_smp))
+  pi_smp_for_data = pi_smp_for_data[-(1:mcleod.CI.obj$mcleod_for_data$parameters_list$nr.gibbs.burnin),]
+  cumulative_pi_smp_for_data = t(apply(pi_smp_for_data,1,cumsum))
+  median_cumulative_pi_smp_for_data = c(0,apply(cumulative_pi_smp_for_data,2,median))
+  
+  nr_points_trim_GE = sum(apply(is.na(pval_GE),2,sum)>0)
+  nr_points_trim_LE = sum(apply(is.na(pval_LE),2,sum)>0)
+  
+  maximal_point_for_GE = rep(NA, length(a.vec))
+  minimal_point_for_LE = rep(NA, length(a.vec))
+  for(ai in 2:(length(a.vec)-1)){
+    maximal_point_for_GE[ai] = max(which(q_grid<=median_cumulative_pi_smp_for_data[ai]),1)
+    minimal_point_for_LE[ai] = min(which(q_grid>=median_cumulative_pi_smp_for_data[ai]),length(q_grid))
+  }
+  
+  i_star_GE = rep(NA,length(a.vec))
+  q_star_GE = rep(NA,length(a.vec))
+  for(ai in 2:(length(a.vec)-1-nr_points_trim_GE)){
+    #ai = 2
+    if(ai == 2){
+      N_21_GE = 1
+    }else{
+      N_21_GE = min(i_star_GE[ai-1] + 1,length(q_grid))
+    }
+    N_22_GE = maximal_point_for_GE[ai]
+    
+    ind_to_select_from = (max(N_21_GE,1)):N_22_GE
+    rejected_ind = pval_GE[ind_to_select_from,ai]<= (1-conf.level)/2
+    if(ai == 2 & rejected_ind[1] == F){
+      i_star_GE[ai] = 0
+    }else if (ai == 2){
+      i_star_GE[ai] = ind_to_select_from[max(which(rejected_ind))]
+    }
+    
+    if(ai >2 & rejected_ind[1] == F){
+      i_star_GE[ai] = i_star_GE[ai-1]
+    }else if (ai >2){
+      i_star_GE[ai] = ind_to_select_from[max(which(rejected_ind))]
+    }
+    
+    if(i_star_GE[ai] == 0){
+      q_star_GE[ai] = 0  
+    }else{
+      q_star_GE[ai] = q_grid[i_star_GE[ai]]   
+    }
+    
+  }
+  
+  #maximum_point_to_consider_for_LE = max(which(is.finite(minimal_point_for_LE)))
+  #maximum_point_to_consider_for_LE = min(maximum_point_to_consider_for_LE,length(a.vec)-1 )
+  i_star_LE = rep(NA,length(a.vec))
+  q_star_LE = rep(NA,length(a.vec))
+  for(ai in (length(a.vec)-1):(nr_points_trim_LE +1)){
+    #ai = nr_points_trim_LE +1
+    #ai = 31#32
+    if(ai == length(a.vec)-1){
+      N_21_LE = length(q_grid)
+    }else{
+      N_21_LE = max(i_star_LE[ai+1] - 1,1)
+    }
+    N_22_LE = minimal_point_for_LE[ai]
+    
+    ind_to_select_from = N_22_LE:N_21_LE # (max(N_21_LE,1)):N_22_LE
+    rejected_ind = pval_LE[ind_to_select_from,ai]<= (1-conf.level)/2
+    if(ai == length(a.vec)-1 & rejected_ind[length(rejected_ind)] == F){
+      i_star_LE[ai] = length(q_grid)+1
+    }else if (ai == length(a.vec)-1){
+      i_star_LE[ai] = ind_to_select_from[min(which(rejected_ind))]
+    }
+    
+    if(ai <length(a.vec)-1 & rejected_ind[length(rejected_ind)] == F){
+      i_star_LE[ai] = i_star_LE[ai+1]
+    }else if (ai <length(a.vec)-1){
+      i_star_LE[ai] = ind_to_select_from[min(which(rejected_ind))]
+    }
+    
+    if(i_star_LE[ai] == length(q_grid)+1){
+      q_star_LE[ai] = 1  
+    }else{
+      q_star_LE[ai] = q_grid[i_star_LE[ai]]   
+    }
+    
+  }
+  
+  ret = list(a.vec = a.vec,q_star_LE = q_star_LE,q_star_GE = q_star_GE,median_cumulative_pi_smp_for_data = median_cumulative_pi_smp_for_data)
+  return(ret)
+}
+
 if(F){
   memory.limit(20000)
   x.vec = deconvolveR::surg[,2]
@@ -472,15 +614,13 @@ if(F){
   set.seed(1)
   CI.res = mcleod.estimate.CI(x.vec = x.vec,
                               n.vec = n.vec,
-                              a.max = 4,
+                              a.max = 5,
+                              seq(0.025,0.975,0.025),
                               CI.estimation.parameters = mcleod.CI.estimation.parameters(Nr.reps.for.each.n = 1,
                                                                                          nr.cores = detectCores(),
                                                                                          fraction.of.points.computed = 0.5,
                                                                                          epsilon.nr.gridpoints = 2),
-                              prior_param = mcleod.prior.parameters(
-                                prior.type = MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
-                                Two.Layer.Dirichlet.Intervals = 32,
-                                Two.Layer.Dirichlet.Nodes.in.First.Layer = 4),
+                              prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),
                               verbose = T
                               )
 
@@ -490,7 +630,32 @@ if(F){
 }
 
 
-
+if(F){
+  memory.limit(20000)
+  
+  K = 1000
+  n.vec = rep(2,K)
+  p.vec = rbeta(n = K,2,2)
+  x.vec = rbinom(K,size = n.vec,p.vec)
+  
+  
+  set.seed(1)
+  CI.res_beta_binomial = mcleod.estimate.CI(x.vec = x.vec,
+                              n.vec = n.vec,
+                              a.max = 4,
+                              seq(0.025,0.975,0.025),
+                              CI.estimation.parameters = mcleod.CI.estimation.parameters(Nr.reps.for.each.n = 1,
+                                                                                         nr.cores = detectCores(),
+                                                                                         fraction.of.points.computed = 0.5,
+                                                                                         epsilon.nr.gridpoints = 2),
+                              prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),
+                              verbose = T
+  )
+  
+  CI.res_beta_binomial$Elapsed_Time_Parallel
+  CI.res_beta_binomial$Elapsed_Time_Overall
+  plot.mcleod.CI(CI.res_beta_binomial)
+}
 
 
 
