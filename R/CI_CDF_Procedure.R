@@ -102,6 +102,7 @@ mcleod.estimate.CI = function(x.vec,
     return(P_k_i_generator_list)
   }
   
+  
   generator_list = suppressWarnings(generate_P_k_i_generator_list(n_vec = sorted_n_data)) 
   
   generate_P_k_i = function(x_to_generate_for,n.dim){
@@ -260,7 +261,7 @@ mcleod.estimate.CI = function(x.vec,
   #   mcleods[[grid_point_i]] = mcleods_at_currents_a_i
   #   
   # }
-  stopCluster(cl)
+  #stopCluster(cl)
   
   End.time = Sys.time()
   Elapsed_Time_Parallel = End.time - Start.time
@@ -285,15 +286,12 @@ mcleod.estimate.CI = function(x.vec,
   
   
   if(verbose){
-    cat(paste0(' - Computing P-values for determining Upper CI : \n\r'))
+    cat(paste0(' - Computing P-values for determining Upper CI \n\r'))
   }
-  for(ai in 2:(length(a.vec)-1)){
-    if(verbose){
-      cat(paste0('    Computing at grid point: ',ai,'\n\r'))
-    }
-    
-    grid_point_i = ai 
-    
+  
+  
+  worker_PV_computer_LE = function(grid_point_i){
+    ret_vec  =rep(NA,length(q_grid))
     for(qi in 1:length(q_grid)){
       
       q_0 = q_grid[qi]
@@ -321,19 +319,33 @@ mcleod.estimate.CI = function(x.vec,
       
       indicators_matrix = 1*(indicators_matrix >= data_based_estimate)
       pval_at_point = sum(apply(indicators_matrix,1,mean,na.rm=T) * binom_weights,na.rm = T)
-      pval_LE[qi,ai] = pval_at_point
+      ret_vec[qi] = pval_at_point
+      #pval_LE[qi,ai] = pval_at_point
     }
+    return(ret_vec)
+  }
+  
+  
+  #cl <- makeCluster(NR.CORES)
+  #registerDoParallel(cl)
+  parallel_res_LE <- foreach(ai = 2:(length(a.vec)-1), .options.RNG=1234) %dorng% {
+    library(mcleod);
+    grid_point_i = ai 
+    return(list(ai=ai,PV = worker_PV_computer_LE(grid_point_i)))
+  }
+  
+  #stopCluster(cl) 
+  
+  for(j in 1:length(parallel_res_LE)){
+    pval_LE[,parallel_res_LE[[j]]$ai] = parallel_res_LE[[j]]$PV
   }
   
   if(verbose){
-    cat(paste0(' - Computing P-values for determining Lower CI : \n\r'))
+    cat(paste0(' - Computing P-values for determining Lower CI \n\r'))
   }
-  for(ai in 1:(length(a.vec)-2)){
-    if(verbose){
-      cat(paste0('    Computing at grid point: ',ai,'\n\r'))
-    }
-    grid_point_i = ai 
-    
+  
+  worker_PV_computer_GE = function(grid_point_i){
+    ret_vec  =rep(NA,length(q_grid))
     for(qi in 1:length(q_grid)){
       
       q_0 = q_grid[qi]
@@ -357,8 +369,24 @@ mcleod.estimate.CI = function(x.vec,
       }
       indicators_matrix = 1*(indicators_matrix >= data_based_estimate)
       pval_at_point = sum(apply(indicators_matrix,1,mean) * binom_weights,na.rm = T) #need to debug
-      pval_GE[qi,ai] = pval_at_point
+      #pval_GE[qi,ai] = pval_at_point
+      ret_vec[qi] = pval_at_point
     }
+    return(ret_vec)
+  }
+  
+  #cl <- makeCluster(NR.CORES)
+  #registerDoParallel(cl)
+  parallel_res_GE <- foreach(ai = 1:(length(a.vec)-2), .options.RNG=1234) %dorng% {
+    library(mcleod);
+    grid_point_i = ai 
+    return(list(ai=ai,PV = worker_PV_computer_GE(grid_point_i)))
+  }
+  
+  stopCluster(cl) 
+  
+  for(j in 1:length(parallel_res_GE)){
+    pval_GE[,parallel_res_GE[[j]]$ai] = parallel_res_GE[[j]]$PV
   }
   
   #Part V: Correct edge cases, for tests that are too discrete to have power:
@@ -614,11 +642,10 @@ if(F){
   set.seed(1)
   CI.res = mcleod.estimate.CI(x.vec = x.vec,
                               n.vec = n.vec,
-                              a.max = 5,
-                              seq(0.025,0.975,0.025),
+                              a.max = 5,q_grid = seq(0.025,0.975,0.025),
                               CI.estimation.parameters = mcleod.CI.estimation.parameters(Nr.reps.for.each.n = 1,
                                                                                          nr.cores = detectCores(),
-                                                                                         fraction.of.points.computed = 0.5,
+                                                                                         fraction.of.points.computed = 0.05,#0.2,#0.5,
                                                                                          epsilon.nr.gridpoints = 2),
                               prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),
                               verbose = T
@@ -626,15 +653,16 @@ if(F){
 
   CI.res$Elapsed_Time_Parallel
   CI.res$Elapsed_Time_Overall
-  plot.mcleod.CI(CI.res)
+  plot.mcleod.CI(CI.res,X_axis_as_Prob=T)
+  plot.mcleod.CI(CI.res,X_axis_as_Prob=F)
 }
 
 
 if(F){
   memory.limit(20000)
   
-  K = 1000
-  n.vec = rep(2,K)
+  K = 50#1000
+  n.vec = rep(50,K)#rep(2,K)
   p.vec = rbeta(n = K,2,2)
   x.vec = rbinom(K,size = n.vec,p.vec)
   
@@ -657,5 +685,7 @@ if(F){
   plot.mcleod.CI(CI.res_beta_binomial)
 }
 
-
+#add msg
+# 1*length(n.vec)*0.05*64/7*0.18*2
+# points per n * length N.vec * fraction of points computed * length(a.vec) / cores * time of data run *2
 
