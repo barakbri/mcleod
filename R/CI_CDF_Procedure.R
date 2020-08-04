@@ -5,6 +5,7 @@ library(parallel)
 
 
 CLASS.NAME.MCLEOD.CI = 'mcleod.CI.obj'
+CLASS.NAME.MCLEOD.CI.MEDIAN.BASED.STATISTIC = 'mcleod.CI.obj.median.based.stat'
 CLASS.NAME.MCLEOD.CI.PARAMETERS = 'mcleod.CI.obj.parameters'
 
 
@@ -35,6 +36,60 @@ mcleod.CI.estimation.parameters = function(Nr.reps.for.each.n = 1,
   ret$nr.cores = nr.cores
   ret$epsilon.nr.gridpoints = epsilon.nr.gridpoints
   ret$fraction.of.points.computed = fraction.of.points.computed
+  return(ret)
+}
+
+
+generate_P_k_i_matrix_cache = function(n.vec,a.max,prior_param,comp_param){
+  
+  sorted_n_data = sort(unique(n.vec))
+  
+  n_to_P_k_i_generator_index = hash()
+  for(i in 1:length(sorted_n_data))
+    n_to_P_k_i_generator_index[ as.character(sorted_n_data[i]) ] = i
+  
+  generate_P_k_i_generator_list = function(n_vec = 1:20){
+    P_k_i_generator_list = hash() #list()
+    for(n_i in 1:length(n_vec)){
+      n = n_vec[n_i]
+      n.smp = rep(n,n+1)
+      x.smp = c(0:n)
+      
+      P_k_i_for_n = mcleod(x.smp = x.smp,n.smp = n.smp,
+                           a.limits = c(-a.max,a.max),
+                           computational_parameters = mcleod.computational.parameters(nr.gibbs = 2,
+                                                                                      nr.gibbs.burnin = 1,
+                                                                                      integration_step_size = comp_param$integration_step_size,
+                                                                                      Fast.Gamma.Used = comp_param$Fast.Gamma.Used,
+                                                                                      Fast.Gamma.Bank.Size = comp_param$Fast.Gamma.Bank.Size),
+                           prior_parameters = prior_param)
+      P_k_i_generator_list[[as.character(n_i)]] = P_k_i_for_n$additional$original_stat_res$p_k_i
+    }
+    return(P_k_i_generator_list)
+  }
+  
+  
+  generator_list = suppressWarnings(generate_P_k_i_generator_list(n_vec = sorted_n_data)) 
+  
+  generate_P_k_i = function(x_to_generate_for,n.dim,n.vec){
+    K=length(n.vec)
+    P_k_i_generated = matrix(NA,nrow = K,ncol = n.dim)
+    for(k in 1:K){
+      P_k_i_generated[k,] = (generator_list[[ 
+        as.character(
+          n_to_P_k_i_generator_index[[   as.character(n.vec[k])  ]]
+        )
+        ]])[ x_to_generate_for[k] + 1, ]
+    }
+    return(P_k_i_generated)
+  }
+  
+  ret = list()
+  ret$sorted_n_data = sorted_n_data
+  ret$n_to_P_k_i_generator_index = n_to_P_k_i_generator_index
+  ret$generate_P_k_i_generator_list = generate_P_k_i_generator_list
+  ret$generator_list = generator_list
+  ret$generate_P_k_i = generate_P_k_i
   return(ret)
 }
 
@@ -78,48 +133,16 @@ mcleod.estimate.CI = function(x.vec,
   fraction.of.points.computed = CI.estimation.parameters$fraction.of.points.computed
   
   #Part I: functions for generating P_k_i based on precomputed values:
+  gen_object = generate_P_k_i_matrix_cache(n.vec,a.max,prior_param,comp_param)
+  sorted_n_data = gen_object$sorted_n_data
+  n_to_P_k_i_generator_index = gen_object$n_to_P_k_i_generator_index
+  generate_P_k_i_generator_list = gen_object$generate_P_k_i_generator_list
+  generator_list = gen_object$generator_list
+  generate_P_k_i = gen_object$generate_P_k_i
   
-  sorted_n_data = sort(unique(n.vec))
-  
-  n_to_P_k_i_generator_index = hash()
-  for(i in 1:length(sorted_n_data))
-    n_to_P_k_i_generator_index[ as.character(sorted_n_data[i]) ] = i
-  
-  generate_P_k_i_generator_list = function(n_vec = 1:20){
-    P_k_i_generator_list = hash() #list()
-    for(n_i in 1:length(n_vec)){
-      n = n_vec[n_i]
-      n.smp = rep(n,n+1)
-      x.smp = c(0:n)
-      
-      P_k_i_for_n = mcleod(x.smp = x.smp,n.smp = n.smp,
-                           a.limits = c(-a.max,a.max),
-                           computational_parameters = mcleod.computational.parameters(nr.gibbs = 2,
-                                                                                      nr.gibbs.burnin = 1),
-                           prior_parameters = prior_param)
-      P_k_i_generator_list[[as.character(n_i)]] = P_k_i_for_n$additional$original_stat_res$p_k_i
-    }
-    return(P_k_i_generator_list)
-  }
-  
-  
-  generator_list = suppressWarnings(generate_P_k_i_generator_list(n_vec = sorted_n_data)) 
-  
-  generate_P_k_i = function(x_to_generate_for,n.dim){
-    P_k_i_generated = matrix(NA,nrow = K,ncol = n.dim)
-    for(k in 1:K){
-      P_k_i_generated[k,] = (generator_list[[ 
-                                              as.character(
-                                              n_to_P_k_i_generator_index[[   as.character(n.vec[k])  ]]
-                                              )
-                                              ]])[ x_to_generate_for[k] + 1, ]
-    }
-    return(P_k_i_generated)
-  }
-  
-  #e.g., you can now call
+  #e.g., you can now call:
   #x_to_generate_for = deconvolveR::surg[,2]
-  #generated_P_k_i = generate_P_k_i(x_to_generate_for)
+  #generated_P_k_i = generate_P_k_i(x_to_generate_for,length(a.vec)-1,n.vec)
   
   
   #Part II: generate deconv model for the original data
@@ -180,7 +203,7 @@ mcleod.estimate.CI = function(x.vec,
         )
 
         X_sampled = rbinom(n = K,size = n.vec,prob = inv.log.odds(theta = theta_sample))
-        generated_P_k_i = generate_P_k_i(X_sampled,length(a.vec)-1)
+        generated_P_k_i = generate_P_k_i(X_sampled,length(a.vec)-1,n.vec)
 
         temp_mcleod = mcleod(x.smp = X_sampled,n.smp = n.vec,
                              a.limits = c(-a.max,a.max),
@@ -241,7 +264,7 @@ mcleod.estimate.CI = function(x.vec,
   #       )
   #       
   #       X_sampled = rbinom(n = K,size = n.vec,prob = inv.log.odds(theta = theta_sample))
-  #       generated_P_k_i = generate_P_k_i(X_sampled,length(a.vec)-1)
+  #       generated_P_k_i = generate_P_k_i(X_sampled,length(a.vec)-1,n.vec)
   #       
   #       temp_mcleod = mcleod(x.smp = X_sampled,n.smp = n.vec,
   #                            a.limits = c(-a.max,a.max),
@@ -441,68 +464,6 @@ mcleod.estimate.CI = function(x.vec,
 }
 
 
-#' Title
-#'
-#' @param mcleod.CI.obj 
-#' @param sig.level 
-#'
-#' @return
-#' @export
-#'
-#' @examples
-plot.mcleod.CI.old=function(mcleod.CI.obj, sig.level = c(0.05,0.1)){
-  
-  if(class(mcleod.CI.obj) != CLASS.NAME.MCLEOD.CI){
-    stop('mcleod.CI.obj must be a result returned from mcleod.estimate.CI')
-  }
-  
-  a.vec = mcleod.CI.obj$a.vec
-  q_grid  = mcleod.CI.obj$q_grid
-  LE_grid  = mcleod.CI.obj$LE_grid
-  pval_LE  = mcleod.CI.obj$pval_LE
-  epsilon  = mcleod.CI.obj$epsilon
-  pval_GE  = mcleod.CI.obj$pval_GE
-  
-  dt_plot_LE = matrix(NA,nrow = (length(q_grid) *(length(a.vec)-1)),ncol = 3)
-  colnames(dt_plot_LE) = c('theta.LE','q','PV')
-  pointer = 1
-  for(qi in 1:length(q_grid)){
-    for(ai in 2:(length(a.vec)-1)){
-      dt_plot_LE[pointer,] = c(LE_grid[ai-1],q_grid[qi],pval_LE[qi,ai]) #c(a.vec[ai+2],q_grid[qi],pval_LE[qi,ai])#
-      pointer = pointer +1
-    }
-  }
-  dt_plot_LE = as.data.frame(dt_plot_LE)
-  
-  dt_plot_GE = matrix(NA,nrow = (length(q_grid) *(length(a.vec)-1)),ncol = 3)
-  colnames(dt_plot_GE) = c('theta.GE','q','PV')
-  pointer = 1
-  for(qi in 1:length(q_grid)){
-    for(ai in 2:(length(a.vec)-1)){
-      dt_plot_GE[pointer,] = c(LE_grid[ai-1] + 2*epsilon,q_grid[qi],pval_GE[qi,ai]) #c(a.vec[ai+2],q_grid[qi],pval_GE[qi,ai])#
-      pointer = pointer +1
-    }
-  }
-  dt_plot_GE = as.data.frame(dt_plot_GE)
-  min.a = min(a.vec)
-  max.a = max(a.vec)
-
-  nr.iter.burnin = mcleod.CI.obj$mcleod_for_data$parameters_list$nr.gibbs.burnin
-  posterior_mean = (t(mcleod.CI.obj$mcleod_for_data$additional$original_stat_res$pi_smp))[-(1:nr.iter.burnin),]
-  posterior_mean =  cbind(rep(0,nrow(posterior_mean)),t(apply(posterior_mean,1,cumsum)))
-  posterior_mean = apply(posterior_mean,2,mean)
-  dt_post_mean = data.frame(theta = a.vec,posterior_mean = posterior_mean)
-  
-  
-  v <- ggplot() + geom_contour(mapping =  aes(theta.LE, q, z = PV),
-                               data =  dt_plot_LE,breaks = sig.level) +
-    geom_contour(mapping =  aes(theta.GE, q, z = PV),
-                 data =  dt_plot_GE,breaks = sig.level) +
-    geom_line(mapping = aes(x = theta,y=posterior_mean),col= 'red',data = dt_post_mean)
-  print(v  +ylim(c(0,1)) +xlim(c(min.a,max.a)) +xlab('theta'))
-}
-
-
 
 
 #' Title
@@ -616,6 +577,11 @@ compute.mcleod.CI.curve=function(mcleod_for_data,
       rejected_ind[u] = function_for_Pval_GE(ind_to_select_from[u],ai)<= (1-conf.level)/2  
       if(is.na(rejected_ind[u])) #need to handle bounds and shifts better
         rejected_ind[u] = F  
+      if(u==1 & rejected_ind[u] == F ){
+        rejected_ind = rep(F,length(ind_to_select_from))
+        break
+      }
+        
     }
     if(ai == 2 & rejected_ind[1] == F){
       i_star_GE[ai] = 0
@@ -655,10 +621,12 @@ compute.mcleod.CI.curve=function(mcleod_for_data,
     
     rejected_ind = rep(NA,length(ind_to_select_from))
     
-    for(u in 1:length(ind_to_select_from)){
+    for(u in length(ind_to_select_from):1){
       rejected_ind[u] = function_for_Pval_LE(ind_to_select_from[u],ai)<= (1-conf.level)/2
       if(is.na(rejected_ind[u])) #need to handle bounds and shifts better
-        rejected_ind[u] = F  
+        rejected_ind[u] = F
+      if(u==length(ind_to_select_from) & rejected_ind[u] == F )
+        break
     }
     
     if(ai == length(a.vec)-1 & rejected_ind[length(rejected_ind)] == F){
@@ -685,6 +653,82 @@ compute.mcleod.CI.curve=function(mcleod_for_data,
   return(ret)
 }
 
+
+
+
+mcleod.estimate.CI.based.on.medians = function(x.vec,
+                              n.vec,
+                              conf.level = 0.95,nr.perm = 200,
+                              q_grid = seq(0.1,0.9,0.1),
+                              a.max = c(3),
+                              comp_param = mcleod.computational.parameters(nr.gibbs = 200,nr.gibbs.burnin = 100),
+                              prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),
+                              shift.size.in.log.odds.scale = NULL,
+                              verbose = T){
+  
+  Start.time.overall = Sys.time()
+  K = length(n.vec)  
+  M=8
+  
+  if(class(CI.estimation.parameters) != CLASS.NAME.MCLEOD.CI.PARAMETERS)
+    stop('CI.estimation.parameters must be the result of mcleod.CI.estimation.parameters(...)')
+  
+  #Part I: generate deconv model for the original data
+  if(verbose){
+    cat(paste0(' - Computing deconvolution estimate for original data.\n\r'))
+  }
+  
+  mcleod_for_data = mcleod(x.smp = x.vec,n.smp = n.vec,a.limits = c(-a.max,a.max),
+                           computational_parameters = comp_param,
+                           prior_parameters = prior_param)
+  
+  
+  
+  function_for_Pval_LE = function(q_ind,ai){
+    return(1)
+  }
+  
+  function_for_Pval_GE = function(q_ind,ai){
+    return(1)
+  }
+  
+  
+  nr_points_trim_GE = 1
+  nr_points_trim_LE = 1
+  
+  
+  
+  curve_obj = compute.mcleod.CI.curve(mcleod_for_data,
+                                      q_grid,
+                                      function_for_Pval_LE,
+                                      function_for_Pval_GE,
+                                      nr_points_trim_LE,
+                                      nr_points_trim_GE,
+                                      conf.level)
+  
+  a.vec = mcleod_for_data$parameters_list$a.vec
+  
+  if(is.null(shift.size.in.log.odds.scale)){
+    shift.size.in.log.odds.scale = 2*(a.vec[2]-a.vec[1])
+  }
+  
+  ret = list()
+  class(ret) = CLASS.NAME.MCLEOD.CI.MEDIAN.BASED.STATISTIC
+  ret$a.vec = a.vec
+  ret$q_grid = q_grid
+  #ret$pval_LE = pval_LE
+  #ret$pval_GE = pval_GE
+  ret$shift.size.in.log.odds.scale = shift.size.in.log.odds.scale
+  ret$K = K
+  ret$Elapsed_Time_Parallel = Elapsed_Time_Parallel
+  ret$mcleod_for_data = mcleod_for_data
+  ret$curve_obj = curve_obj
+  ret$Elapsed_Time_Overall = Sys.time() - Start.time.overall
+  return(ret)
+  
+}
+
+
 if(F){
   memory.limit(20000)
   x.vec = deconvolveR::surg[,2]
@@ -704,7 +748,7 @@ if(F){
 
   CI.res$Elapsed_Time_Parallel
   CI.res$Elapsed_Time_Overall
-  plot.mcleod.CI(CI.res,X_axis_as_Prob=F)
+  plot.mcleod.CI(CI.res,X_axis_as_Prob=T)
   #plot.mcleod.CI(CI.res,X_axis_as_Prob=F)
 }
 
@@ -735,8 +779,4 @@ if(F){
   CI.res_beta_binomial$Elapsed_Time_Overall
   plot.mcleod.CI(CI.res_beta_binomial)
 }
-
-#add msg
-# 1*length(n.vec)*0.05*64/7*0.18*2
-# points per n * length N.vec * fraction of points computed * length(a.vec) / cores * time of data run *2
 
