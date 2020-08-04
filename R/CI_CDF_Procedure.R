@@ -135,6 +135,16 @@ mcleod.estimate.CI = function(x.vec,
   #Part III: generete decov models for resampled data at grid points, for LE based shift
   if(verbose){
     cat(paste0(' - Computing deconvolution estimate for permuted, worst-case data generations.\n\r'))
+    #points per n * length N.vec * fraction of points computed * length(a.vec) / cores * time of data run *2
+    
+    estiamted_time_to_run_in_seconds = mcleod_for_data$additional$original_stat_res$elapsed_secs *
+      CI.estimation.parameters$fraction.of.points.computed *
+      length(n.vec) *
+      CI.estimation.parameters$Nr.reps.for.each.n *
+      (length(mcleod_for_data$parameters_list$a.vec)-1) / NR.CORES *2 *1.1
+    #The 1.1 is due to some overhead...
+    cat(paste0('    Estimated time to run worst-case data generations : ',estiamted_time_to_run_in_seconds,' seconds.\n\r'))
+      
   }
   Start.time = Sys.time()
   a.vec = mcleod_for_data$parameters_list$a.vec
@@ -266,7 +276,7 @@ mcleod.estimate.CI = function(x.vec,
   End.time = Sys.time()
   Elapsed_Time_Parallel = End.time - Start.time
   if(verbose){
-    cat(paste0(' - Cluster stopped. Total time in parallel: \n\r'))
+    cat(paste0(' - Cluster stopped. Total time in parallel for worst case: \n\r'))
     print(Elapsed_Time_Parallel)
   }
   #Part IV: compute matrix of P-values
@@ -512,9 +522,30 @@ plot.mcleod.CI=function(mcleod.CI.obj, conf.level = c(0.95),X_axis_as_Prob = T){
     stop('mcleod.CI.obj must be a result returned from mcleod.estimate.CI')
   }
   
+  function_for_Pval_LE = function(q_ind,ai){
+    return(mcleod.CI.obj$pval_LE[q_ind,ai])
+  }
+  
+  function_for_Pval_GE = function(q_ind,ai){
+    return(mcleod.CI.obj$pval_GE[q_ind,ai])
+  }
+  
+  
+  nr_points_trim_GE = sum(apply(is.na(mcleod.CI.obj$pval_GE),2,sum)>0)
+  nr_points_trim_LE = sum(apply(is.na(mcleod.CI.obj$pval_LE),2,sum)>0)
+  
+  
+  
   for(conf.level.ind in 1:length(conf.level)){
     #conf.level.ind = 1
-    curve_obj = compute.mcleod.CI.curve(mcleod.CI.obj,conf.level[conf.level.ind])
+    
+    curve_obj = compute.mcleod.CI.curve(mcleod.CI.obj$mcleod_for_data,
+                                        mcleod.CI.obj$q_grid,
+                                        function_for_Pval_LE,
+                                        function_for_Pval_GE,
+                                        nr_points_trim_LE,
+                                        nr_points_trim_GE,
+                                        conf.level[conf.level.ind])
     x_axis = curve_obj$a.vec
     x_axis_label = 'theta'
     if(X_axis_as_Prob){
@@ -533,26 +564,32 @@ plot.mcleod.CI=function(mcleod.CI.obj, conf.level = c(0.95),X_axis_as_Prob = T){
 
 
 
-compute.mcleod.CI.curve=function(mcleod.CI.obj, conf.level = c(0.95)){
+compute.mcleod.CI.curve=function(mcleod_for_data,
+                                 q_grid,
+                                 function_for_Pval_LE,
+                                 function_for_Pval_GE,
+                                 nr_points_trim_LE,
+                                 nr_points_trim_GE,
+                                 conf.level = c(0.95)){
   #mcleod.CI.obj = CI.res
-  if(class(mcleod.CI.obj) != CLASS.NAME.MCLEOD.CI){
-    stop('mcleod.CI.obj must be a result returned from mcleod.estimate.CI')
-  }
+  # if(class(mcleod.CI.obj) != CLASS.NAME.MCLEOD.CI){
+  #   stop('mcleod.CI.obj must be a result returned from mcleod.estimate.CI')
+  # }
+  # 
+  a.vec = mcleod_for_data$parameters_list$a.vec
+  #q_grid  = mcleod.CI.obj$q_grid
+  #LE_grid  = mcleod.CI.obj$LE_grid
+  #pval_LE  = mcleod.CI.obj$pval_LE
+  #epsilon  = mcleod.CI.obj$epsilon
+  #pval_GE  = mcleod.CI.obj$pval_GE
   
-  a.vec = mcleod.CI.obj$a.vec
-  q_grid  = mcleod.CI.obj$q_grid
-  LE_grid  = mcleod.CI.obj$LE_grid
-  pval_LE  = mcleod.CI.obj$pval_LE
-  epsilon  = mcleod.CI.obj$epsilon
-  pval_GE  = mcleod.CI.obj$pval_GE
   
-  pi_smp_for_data = (t(mcleod.CI.obj$mcleod_for_data$additional$original_stat_res$pi_smp))
-  pi_smp_for_data = pi_smp_for_data[-(1:mcleod.CI.obj$mcleod_for_data$parameters_list$nr.gibbs.burnin),]
+  
+  pi_smp_for_data = (t(mcleod_for_data$additional$original_stat_res$pi_smp))
+  pi_smp_for_data = pi_smp_for_data[-(1:mcleod_for_data$parameters_list$nr.gibbs.burnin),]
   cumulative_pi_smp_for_data = t(apply(pi_smp_for_data,1,cumsum))
   median_cumulative_pi_smp_for_data = c(0,apply(cumulative_pi_smp_for_data,2,median))
   
-  nr_points_trim_GE = sum(apply(is.na(pval_GE),2,sum)>0)
-  nr_points_trim_LE = sum(apply(is.na(pval_LE),2,sum)>0)
   
   maximal_point_for_GE = rep(NA, length(a.vec))
   minimal_point_for_LE = rep(NA, length(a.vec))
@@ -560,6 +597,7 @@ compute.mcleod.CI.curve=function(mcleod.CI.obj, conf.level = c(0.95)){
     maximal_point_for_GE[ai] = max(which(q_grid<=median_cumulative_pi_smp_for_data[ai]),1)
     minimal_point_for_LE[ai] = min(which(q_grid>=median_cumulative_pi_smp_for_data[ai]),length(q_grid))
   }
+  
   
   i_star_GE = rep(NA,length(a.vec))
   q_star_GE = rep(NA,length(a.vec))
@@ -573,7 +611,12 @@ compute.mcleod.CI.curve=function(mcleod.CI.obj, conf.level = c(0.95)){
     N_22_GE = maximal_point_for_GE[ai]
     
     ind_to_select_from = (max(N_21_GE,1)):N_22_GE
-    rejected_ind = pval_GE[ind_to_select_from,ai]<= (1-conf.level)/2
+    rejected_ind = rep(NA,length(ind_to_select_from))
+    for(u in 1:length(rejected_ind)){
+      rejected_ind[u] = function_for_Pval_GE(ind_to_select_from[u],ai)<= (1-conf.level)/2  
+      if(is.na(rejected_ind[u])) #need to handle bounds and shifts better
+        rejected_ind[u] = F  
+    }
     if(ai == 2 & rejected_ind[1] == F){
       i_star_GE[ai] = 0
     }else if (ai == 2){
@@ -609,7 +652,15 @@ compute.mcleod.CI.curve=function(mcleod.CI.obj, conf.level = c(0.95)){
     N_22_LE = minimal_point_for_LE[ai]
     
     ind_to_select_from = N_22_LE:N_21_LE # (max(N_21_LE,1)):N_22_LE
-    rejected_ind = pval_LE[ind_to_select_from,ai]<= (1-conf.level)/2
+    
+    rejected_ind = rep(NA,length(ind_to_select_from))
+    
+    for(u in 1:length(ind_to_select_from)){
+      rejected_ind[u] = function_for_Pval_LE(ind_to_select_from[u],ai)<= (1-conf.level)/2
+      if(is.na(rejected_ind[u])) #need to handle bounds and shifts better
+        rejected_ind[u] = F  
+    }
+    
     if(ai == length(a.vec)-1 & rejected_ind[length(rejected_ind)] == F){
       i_star_LE[ai] = length(q_grid)+1
     }else if (ai == length(a.vec)-1){
@@ -642,10 +693,10 @@ if(F){
   set.seed(1)
   CI.res = mcleod.estimate.CI(x.vec = x.vec,
                               n.vec = n.vec,
-                              a.max = 5,q_grid = seq(0.025,0.975,0.025),
+                              a.max = 4,q_grid = seq(0.025,0.975,0.025),
                               CI.estimation.parameters = mcleod.CI.estimation.parameters(Nr.reps.for.each.n = 1,
                                                                                          nr.cores = detectCores(),
-                                                                                         fraction.of.points.computed = 0.05,#0.2,#0.5,
+                                                                                         fraction.of.points.computed = 0.1,#0.2,#0.5,
                                                                                          epsilon.nr.gridpoints = 2),
                               prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),
                               verbose = T
@@ -653,8 +704,8 @@ if(F){
 
   CI.res$Elapsed_Time_Parallel
   CI.res$Elapsed_Time_Overall
-  plot.mcleod.CI(CI.res,X_axis_as_Prob=T)
   plot.mcleod.CI(CI.res,X_axis_as_Prob=F)
+  #plot.mcleod.CI(CI.res,X_axis_as_Prob=F)
 }
 
 
