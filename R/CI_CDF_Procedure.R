@@ -523,6 +523,14 @@ plot.mcleod.CI=function(mcleod.CI.obj, conf.level = c(0.95),X_axis_as_Prob = T){
 }
 
 
+compute_medians_curve = function(mcleod_for_data){
+  pi_smp_for_data = (t(mcleod_for_data$additional$original_stat_res$pi_smp))
+  pi_smp_for_data = pi_smp_for_data[-(1:mcleod_for_data$parameters_list$nr.gibbs.burnin),]
+  cumulative_pi_smp_for_data = t(apply(pi_smp_for_data,1,cumsum))
+  median_cumulative_pi_smp_for_data = c(0,apply(cumulative_pi_smp_for_data,2,median))
+  return(median_cumulative_pi_smp_for_data)
+}
+
 
 
 compute.mcleod.CI.curve=function(mcleod_for_data,
@@ -545,11 +553,8 @@ compute.mcleod.CI.curve=function(mcleod_for_data,
   #pval_GE  = mcleod.CI.obj$pval_GE
   
   
+  median_cumulative_pi_smp_for_data = compute_medians_curve(mcleod_for_data)
   
-  pi_smp_for_data = (t(mcleod_for_data$additional$original_stat_res$pi_smp))
-  pi_smp_for_data = pi_smp_for_data[-(1:mcleod_for_data$parameters_list$nr.gibbs.burnin),]
-  cumulative_pi_smp_for_data = t(apply(pi_smp_for_data,1,cumsum))
-  median_cumulative_pi_smp_for_data = c(0,apply(cumulative_pi_smp_for_data,2,median))
   
   
   maximal_point_for_GE = rep(NA, length(a.vec))
@@ -685,10 +690,16 @@ mcleod.estimate.CI.based.on.medians = function(x.vec,
   
   
   function_for_Pval_LE = function(q_ind,ai){
+    # assign q_ind prob to location ai - epsilon 
+    # and assign (1-q_ind) to location inf
+    
     return(1)
   }
   
   function_for_Pval_GE = function(q_ind,ai){
+    
+    # assign q_ind prob to location -inf 
+    # and assign (1-q_ind) to location ai + epsilon
     return(1)
   }
   
