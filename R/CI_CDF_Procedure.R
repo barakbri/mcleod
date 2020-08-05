@@ -477,11 +477,16 @@ mcleod.estimate.CI = function(x.vec,
 #'
 #' @examples
 plot.mcleod.CI=function(mcleod.CI.obj, conf.level = c(0.95),X_axis_as_Prob = T){
-  #mcleod.CI.obj = CI.res
-  #X_axis_as_Prob = T
-  if(class(mcleod.CI.obj) != CLASS.NAME.MCLEOD.CI){
-    stop('mcleod.CI.obj must be a result returned from mcleod.estimate.CI')
+  
+  OBJECT_IS_CLASS.NAME.MCLEOD.CI = (class(mcleod.CI.obj) == CLASS.NAME.MCLEOD.CI)
+  OBJECT_IS_CLASS.NAME.MCLEOD.CI.MEDIAN.BASED.STATISTIC = (class(mcleod.CI.obj) == CLASS.NAME.MCLEOD.CI.MEDIAN.BASED.STATISTIC)
+  
+  if(!OBJECT_IS_CLASS.NAME.MCLEOD.CI & !OBJECT_IS_CLASS.NAME.MCLEOD.CI.MEDIAN.BASED.STATISTIC){
+    stop('mcleod.CI.obj must be a result returned from mcleod.estimate.CI or mcleod.estimate.CI.based.on.medians')
   }
+  
+  
+  
   
   function_for_Pval_LE = function(q_ind,ai){
     return(mcleod.CI.obj$pval_LE[q_ind,ai])
@@ -491,22 +496,29 @@ plot.mcleod.CI=function(mcleod.CI.obj, conf.level = c(0.95),X_axis_as_Prob = T){
     return(mcleod.CI.obj$pval_GE[q_ind,ai])
   }
   
+  if(OBJECT_IS_CLASS.NAME.MCLEOD.CI){
+    nr_points_trim_GE = sum(apply(is.na(mcleod.CI.obj$pval_GE),2,sum)>0)
+    nr_points_trim_LE = sum(apply(is.na(mcleod.CI.obj$pval_LE),2,sum)>0)  
+  }
   
-  nr_points_trim_GE = sum(apply(is.na(mcleod.CI.obj$pval_GE),2,sum)>0)
-  nr_points_trim_LE = sum(apply(is.na(mcleod.CI.obj$pval_LE),2,sum)>0)
   
   
   
   for(conf.level.ind in 1:length(conf.level)){
     #conf.level.ind = 1
+    if(OBJECT_IS_CLASS.NAME.MCLEOD.CI){
+      curve_obj = compute.mcleod.CI.curve(mcleod.CI.obj$mcleod_for_data,
+                                          mcleod.CI.obj$q_grid,
+                                          function_for_Pval_LE,
+                                          function_for_Pval_GE,
+                                          nr_points_trim_LE,
+                                          nr_points_trim_GE,
+                                          conf.level[conf.level.ind])  
+    }
+    if(OBJECT_IS_CLASS.NAME.MCLEOD.CI.MEDIAN.BASED.STATISTIC){
+      curve_obj = mcleod.CI.obj$curve_obj
+    }
     
-    curve_obj = compute.mcleod.CI.curve(mcleod.CI.obj$mcleod_for_data,
-                                        mcleod.CI.obj$q_grid,
-                                        function_for_Pval_LE,
-                                        function_for_Pval_GE,
-                                        nr_points_trim_LE,
-                                        nr_points_trim_GE,
-                                        conf.level[conf.level.ind])
     x_axis = curve_obj$a.vec
     x_axis_label = 'theta'
     if(X_axis_as_Prob){
@@ -514,7 +526,7 @@ plot.mcleod.CI=function(mcleod.CI.obj, conf.level = c(0.95),X_axis_as_Prob = T){
       x_axis_label = 'P'
     }
     if(conf.level.ind == 1)
-      plot(x_axis,curve_obj$median_cumulative_pi_smp_for_data,col =  'red',type = 'b',pch = 20,xlab = x_axis_label,ylab = 'CDF')
+      plot(x_axis,curve_obj$median_cumulative_pi_smp_for_data, col =  'red',type = 'b',pch = 20,xlab = x_axis_label,ylab = 'CDF')
     lines(x_axis,curve_obj$q_star_LE,col = 'black')
     lines(x_axis,curve_obj$q_star_GE,col = 'black')
   }
@@ -539,7 +551,7 @@ compute.mcleod.CI.curve=function(mcleod_for_data,
                                  function_for_Pval_GE,
                                  nr_points_trim_LE,
                                  nr_points_trim_GE,
-                                 conf.level = c(0.95)){
+                                 conf.level = c(0.95),verbose = F){
   #mcleod.CI.obj = CI.res
   # if(class(mcleod.CI.obj) != CLASS.NAME.MCLEOD.CI){
   #   stop('mcleod.CI.obj must be a result returned from mcleod.estimate.CI')
@@ -568,6 +580,9 @@ compute.mcleod.CI.curve=function(mcleod_for_data,
   i_star_GE = rep(NA,length(a.vec))
   q_star_GE = rep(NA,length(a.vec))
   for(ai in 2:(length(a.vec)-1-nr_points_trim_GE)){
+    if(verbose){
+      print(paste0('Computing GE confidence intervals, log.odds = ',a.vec[ai]))
+    }
     #ai = 2
     if(ai == 2){
       N_21_GE = 1
@@ -613,6 +628,9 @@ compute.mcleod.CI.curve=function(mcleod_for_data,
   i_star_LE = rep(NA,length(a.vec))
   q_star_LE = rep(NA,length(a.vec))
   for(ai in (length(a.vec)-1):(nr_points_trim_LE +1)){
+    if(verbose){
+      print(paste0('Computing LE confidence intervals, log.odds = ',a.vec[ai]))
+    }
     #ai = nr_points_trim_LE +1
     #ai = 31#32
     if(ai == length(a.vec)-1){
@@ -675,9 +693,6 @@ mcleod.estimate.CI.based.on.medians = function(x.vec,
   K = length(n.vec)  
   M=8
   
-  if(class(CI.estimation.parameters) != CLASS.NAME.MCLEOD.CI.PARAMETERS)
-    stop('CI.estimation.parameters must be the result of mcleod.CI.estimation.parameters(...)')
-  
   #Part I: generate deconv model for the original data
   if(verbose){
     cat(paste0(' - Computing deconvolution estimate for original data.\n\r'))
@@ -687,27 +702,73 @@ mcleod.estimate.CI.based.on.medians = function(x.vec,
                            computational_parameters = comp_param,
                            prior_parameters = prior_param)
   
+  median_curve_for_data = compute_medians_curve(mcleod_for_data)
   
   
-  function_for_Pval_LE = function(q_ind,ai){
-    # assign q_ind prob to location ai - epsilon 
-    # and assign (1-q_ind) to location inf
-    
-    return(1)
-  }
+  a.vec = mcleod_for_data$parameters_list$a.vec
   
-  function_for_Pval_GE = function(q_ind,ai){
-    
-    # assign q_ind prob to location -inf 
-    # and assign (1-q_ind) to location ai + epsilon
-    return(1)
+  if(is.null(shift.size.in.log.odds.scale)){
+    shift.size.in.log.odds.scale = 2*(a.vec[2]-a.vec[1])
   }
   
   
   nr_points_trim_GE = 1
   nr_points_trim_LE = 1
   
+  function_for_Worst_Case_PV_computation = function(q_ind,ai,is_LE){
+    
+    NR_OVER_TO_QUIT = nr.perm*(1-conf.level)/2
+    nr_more_extreme = 0
+    for(bi in 1:nr.perm){
+      if(is_LE){
+        # assign q_ind prob to location ai - epsilon 
+        # and assign (1-q_ind) to location inf
+        theta_sample = sample(x = c(a.vec[ai]- shift.size.in.log.odds.scale,a.vec[ai]+M),
+                              size = K,
+                              replace = T,
+                              prob = c(q_grid[q_ind],1-q_grid[q_ind]))
+        
+      }else{
+        # assign q_ind prob to location -inf 
+        # and assign (1-q_ind) to location ai + epsilon  
+        theta_sample = sample(x = c(a.vec[ai]-M, a.vec[ai]+ shift.size.in.log.odds.scale),
+                              size = K,
+                              replace = T,
+                              prob = c(q_grid[q_ind],1-q_grid[q_ind]))
+      }
+      
+      
+      sampled_x_vec = rbinom(K,size = n.vec,prob = inv.log.odds(theta_sample))
+      
+      
+      mcleod_for_resampled_data = mcleod(x.smp = sampled_x_vec,n.smp = n.vec,a.limits = c(-a.max,a.max),
+                                         computational_parameters = comp_param,
+                                         prior_parameters = prior_param)
+      
+      median_curve_for_resampled_data = compute_medians_curve(mcleod_for_resampled_data)
+      
+      if((is_LE & median_curve_for_resampled_data[ai]<=median_curve_for_data[ai]) |
+         (!is_LE & median_curve_for_resampled_data[ai]>=median_curve_for_data[ai]) ){
+        nr_more_extreme = nr_more_extreme +1
+      }
+      if(nr_more_extreme > NR_OVER_TO_QUIT) #no need to to more permutations, we wont reject
+        return(1)
+      
+    }
+    
+    return((nr_more_extreme +1 )/(nr.perm+1))
+  }
   
+  
+  function_for_Pval_LE = function(q_ind,ai){
+    return(function_for_Worst_Case_PV_computation(q_ind, ai, is_LE = T))
+  }
+  
+  function_for_Pval_GE = function(q_ind,ai){
+    return(function_for_Worst_Case_PV_computation(q_ind, ai, is_LE = F))
+  }
+  
+  #function_for_Pval_LE(39,33)
   
   curve_obj = compute.mcleod.CI.curve(mcleod_for_data,
                                       q_grid,
@@ -715,13 +776,8 @@ mcleod.estimate.CI.based.on.medians = function(x.vec,
                                       function_for_Pval_GE,
                                       nr_points_trim_LE,
                                       nr_points_trim_GE,
-                                      conf.level)
+                                      conf.level,verbose = verbose)
   
-  a.vec = mcleod_for_data$parameters_list$a.vec
-  
-  if(is.null(shift.size.in.log.odds.scale)){
-    shift.size.in.log.odds.scale = 2*(a.vec[2]-a.vec[1])
-  }
   
   ret = list()
   class(ret) = CLASS.NAME.MCLEOD.CI.MEDIAN.BASED.STATISTIC
@@ -731,7 +787,6 @@ mcleod.estimate.CI.based.on.medians = function(x.vec,
   #ret$pval_GE = pval_GE
   ret$shift.size.in.log.odds.scale = shift.size.in.log.odds.scale
   ret$K = K
-  ret$Elapsed_Time_Parallel = Elapsed_Time_Parallel
   ret$mcleod_for_data = mcleod_for_data
   ret$curve_obj = curve_obj
   ret$Elapsed_Time_Overall = Sys.time() - Start.time.overall
@@ -761,11 +816,28 @@ if(F){
   CI.res$Elapsed_Time_Overall
   plot.mcleod.CI(CI.res,X_axis_as_Prob=T)
   #plot.mcleod.CI(CI.res,X_axis_as_Prob=F)
+  
+  
+  CI.res_median_based = mcleod.estimate.CI.based.on.medians(x.vec = x.vec,
+                                                             n.vec = n.vec,
+                                                             conf.level = 0.95,
+                                                             nr.perm = 200,
+                                                             q_grid = seq(0.025,0.975,0.025),
+                                                             a.max = 4,
+                                                             shift.size.in.log.odds.scale = 0.25,
+                                                             verbose = T,
+                                                             prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),
+                                                             comp_param = mcleod.computational.parameters())
+  
+  plot.mcleod.CI(CI.res_median_based,X_axis_as_Prob=T)
+  
 }
 
 
 if(F){
   memory.limit(20000)
+  
+  set.seed(1)
   
   K = 50#1000
   n.vec = rep(50,K)#rep(2,K)
@@ -773,7 +845,7 @@ if(F){
   x.vec = rbinom(K,size = n.vec,p.vec)
   
   
-  set.seed(1)
+  
   CI.res_beta_binomial = mcleod.estimate.CI(x.vec = x.vec,
                               n.vec = n.vec,
                               a.max = 4,
@@ -783,11 +855,27 @@ if(F){
                                                                                          fraction.of.points.computed = 0.5,
                                                                                          epsilon.nr.gridpoints = 2),
                               prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),
-                              verbose = T
-  )
+                              verbose = T)
   
   CI.res_beta_binomial$Elapsed_Time_Parallel
   CI.res_beta_binomial$Elapsed_Time_Overall
   plot.mcleod.CI(CI.res_beta_binomial)
+  
+  CI.res_beta_binomial_based_on_medians = mcleod.estimate.CI.based.on.medians(x.vec = x.vec,
+                                                             n.vec = n.vec,
+                                                             conf.level = 0.95,
+                                                             nr.perm = 200,
+                                                             q_grid = seq(0.025,0.975,0.025),
+                                                             a.max = 4,
+                                                             shift.size.in.log.odds.scale = 0.25,
+                                                             verbose = T,
+                                                             prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),
+                                                             comp_param = mcleod.computational.parameters())
+  
+  
+  plot.mcleod.CI(CI.res_beta_binomial_based_on_medians,X_axis_as_Prob=T)
+  plot.mcleod.CI(CI.res_beta_binomial_based_on_medians,X_axis_as_Prob=F)
+
+  
 }
 
