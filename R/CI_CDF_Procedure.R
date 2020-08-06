@@ -176,11 +176,18 @@ mcleod.estimate.CI = function(x.vec,
   
   mcleods = list()
   
+  compute_LE_stat = function(q,grid_point_i,n_smp_mat){
+    Left_n_smp = n_smp_mat[,1:grid_point_i,drop = F]
+    Right_n_smp = n_smp_mat[,-c(1:grid_point_i),drop = F]
+    pbeta_vec = pbeta(q,shape1 = 1+ apply(Left_n_smp,1,sum),shape2 = 1+ apply(Right_n_smp,1,sum))
+    return(mean(pbeta_vec))
+  }
+  
   cl <- makeCluster(NR.CORES)
   registerDoParallel(cl)
   
   worker_configurations = expand.grid(
-                                    grid_point_i = 2:(length(a.vec)),
+                                    grid_point_i = 2:(length(a.vec)-1),
                                     n_at_a.vec_grid_point=0:K
                                       )
   worker_function_at_current_a_i = function(n_at_a.vec_grid_point,grid_point_i){
@@ -212,11 +219,29 @@ mcleod.estimate.CI = function(x.vec,
                              prior_parameters = prior_param)
 
         n_smp_posterior_mat = t(temp_mcleod$additional$original_stat_res$n_smp)
-        mcleods_at_current_n_and_a_i[[rep_i]] = n_smp_posterior_mat[-(1:comp_param$nr.gibbs.burnin),]
+        n_smp_posterior_mat = n_smp_posterior_mat[-(1:comp_param$nr.gibbs.burnin),]
+        mcleods_at_current_n_and_a_i[[rep_i]] = rep(NA,length(q_grid))
+        for(qi in 1:length(q_grid)){
+          
+          q_0 = q_grid[qi]
+          
+          mcleods_at_current_n_and_a_i[[rep_i]][qi] = compute_LE_stat(q = q_0,
+                                                      grid_point_i = grid_point_i,
+                                                      n_smp_mat = n_smp_posterior_mat)
+        }
       }
       return(mcleods_at_current_n_and_a_i)
     }
   
+  # job_id = 64
+  # n_at_a.vec_grid_point = worker_configurations$n_at_a.vec_grid_point[job_id]
+  # grid_point_i = worker_configurations$grid_point_i[job_id]
+  # points_to_compute = seq(from = 0,to = K,by = ceiling(1/fraction.of.points.computed))
+  # if(!(n_at_a.vec_grid_point %in% points_to_compute)){
+  #   return(NA)
+  # }
+  # worker_function_at_current_a_i(n_at_a.vec_grid_point,grid_point_i)
+  # 
   parallel_res <- foreach(job_id = 1:nrow(worker_configurations), .options.RNG=1234) %dorng% {
     library(mcleod);
     n_at_a.vec_grid_point = worker_configurations$n_at_a.vec_grid_point[job_id]
@@ -310,12 +335,6 @@ mcleod.estimate.CI = function(x.vec,
   data_n_smp_posterior_mat = t(mcleod_for_data$additional$original_stat_res$n_smp)
   data_n_smp_posterior_mat = (data_n_smp_posterior_mat)[-(1:comp_param$nr.gibbs.burnin),]
   
-  compute_LE_stat = function(q,grid_point_i,n_smp_mat){
-    Left_n_smp = n_smp_mat[,1:grid_point_i,drop = F]
-    Right_n_smp = n_smp_mat[,-c(1:grid_point_i),drop = F]
-    pbeta_vec = pbeta(q,shape1 = 1+ apply(Left_n_smp,1,sum),shape2 = 1+ apply(Right_n_smp,1,sum))
-    return(mean(pbeta_vec))
-  }
   
   
   if(verbose){
@@ -336,11 +355,13 @@ mcleod.estimate.CI = function(x.vec,
       for(k in 1:(K+1)){
         for(r in 1:NR_reps_for_each_n){
           if(!is.na((mcleods[[grid_point_i]])[[k]])){ # check that the point wasnt skipped
-            current_sampled_posterior = (mcleods[[grid_point_i]])[[k]][[r]]
+            #current_sampled_posterior = (mcleods[[grid_point_i]])[[k]][[r]]
             
-            indicators_matrix[k,r] = compute_LE_stat(q = q_0,
-                                                     grid_point_i = grid_point_i,
-                                                     n_smp_mat = current_sampled_posterior)  
+            #indicators_matrix[k,r] = compute_LE_stat(q = q_0,
+            #                                         grid_point_i = grid_point_i,
+            #                                         n_smp_mat = current_sampled_posterior)  
+            
+            indicators_matrix[k,r] = (mcleods[[grid_point_i]])[[k]][[r]][qi]
           }else{
             binom_weights[k] = NA
           }
@@ -390,11 +411,13 @@ mcleod.estimate.CI = function(x.vec,
       for(k in 1:(K+1)){
         for(r in 1:NR_reps_for_each_n){
           if(!is.na(mcleods[[length(a.vec) - grid_point_i]])[[(K+2) - k]]){ # check that the point wasnt skipped
-            current_sampled_posterior = (mcleods[[length(a.vec) - grid_point_i]])[[(K+2) - k]][[r]]
+            # current_sampled_posterior = (mcleods[[length(a.vec) - grid_point_i]])[[(K+2) - k]][[r]]
             
-            indicators_matrix[k,r] = compute_LE_stat(q = 1-q_0,
-                                                     grid_point_i = length(a.vec) - grid_point_i,
-                                                     n_smp_mat = current_sampled_posterior)
+            # indicators_matrix[k,r] = compute_LE_stat(q = 1-q_0,
+            #                                          grid_point_i = length(a.vec) - grid_point_i,
+            #                                          n_smp_mat = current_sampled_posterior)
+            
+            indicators_matrix[k,r] = (mcleods[[length(a.vec) - grid_point_i]])[[(K+2) - k]][[r]][length(q_grid)-qi+1]
           }else{
             binom_weights[k] = NA
           }
@@ -808,10 +831,12 @@ if(F){
                                                                                          nr.cores = detectCores(),
                                                                                          fraction.of.points.computed = 0.1,#0.2,#0.5,
                                                                                          epsilon.nr.gridpoints = 2),
-                              prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),
+                              prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),comp_param = mcleod.computational.parameters(nr.gibbs = 600,nr.gibbs.burnin = 300),
                               verbose = T
                               )
 
+  #save(CI.res,file = 'E:/temp/CI_res.rdata')
+  #load(file = 'E:/temp/CI_res.rdata')
   CI.res$Elapsed_Time_Parallel
   CI.res$Elapsed_Time_Overall
   plot.mcleod.CI(CI.res,X_axis_as_Prob=T)
@@ -827,9 +852,12 @@ if(F){
                                                              shift.size.in.log.odds.scale = 0.25,
                                                              verbose = T,
                                                              prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),
-                                                             comp_param = mcleod.computational.parameters())
+                                                             comp_param = mcleod.computational.parameters(nr.gibbs = 600,nr.gibbs.burnin = 300))
   
   plot.mcleod.CI(CI.res_median_based,X_axis_as_Prob=T)
+  CI.res_median_based$Elapsed_Time_Overall
+  #save(CI.res_median_based,file = 'E:/temp/CI_res_median_based.rdata')
+  #load(file = 'E:/temp/CI_res_median_based.rdata')
   
 }
 
@@ -839,8 +867,8 @@ if(F){
   
   set.seed(1)
   
-  K = 50#1000
-  n.vec = rep(50,K)#rep(2,K)
+  K = 1000
+  n.vec = rep(2,K)
   p.vec = rbeta(n = K,2,2)
   x.vec = rbinom(K,size = n.vec,p.vec)
   
@@ -852,7 +880,7 @@ if(F){
                               seq(0.025,0.975,0.025),
                               CI.estimation.parameters = mcleod.CI.estimation.parameters(Nr.reps.for.each.n = 1,
                                                                                          nr.cores = detectCores(),
-                                                                                         fraction.of.points.computed = 0.5,
+                                                                                         fraction.of.points.computed = 0.1,
                                                                                          epsilon.nr.gridpoints = 2),
                               prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),
                               verbose = T)
@@ -861,20 +889,23 @@ if(F){
   CI.res_beta_binomial$Elapsed_Time_Overall
   plot.mcleod.CI(CI.res_beta_binomial)
   
-  CI.res_beta_binomial_based_on_medians = mcleod.estimate.CI.based.on.medians(x.vec = x.vec,
-                                                             n.vec = n.vec,
-                                                             conf.level = 0.95,
-                                                             nr.perm = 200,
-                                                             q_grid = seq(0.025,0.975,0.025),
-                                                             a.max = 4,
-                                                             shift.size.in.log.odds.scale = 0.25,
-                                                             verbose = T,
-                                                             prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),
-                                                             comp_param = mcleod.computational.parameters())
+  if(F){
+    CI.res_beta_binomial_based_on_medians = mcleod.estimate.CI.based.on.medians(x.vec = x.vec,
+                                                                                n.vec = n.vec,
+                                                                                conf.level = 0.95,
+                                                                                nr.perm = 200,
+                                                                                q_grid = seq(0.025,0.975,0.025),
+                                                                                a.max = 4,
+                                                                                shift.size.in.log.odds.scale = 0.25,
+                                                                                verbose = T,
+                                                                                prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),
+                                                                                comp_param = mcleod.computational.parameters())
+    
+    
+    plot.mcleod.CI(CI.res_beta_binomial_based_on_medians,X_axis_as_Prob=T)
+    plot.mcleod.CI(CI.res_beta_binomial_based_on_medians,X_axis_as_Prob=F)
+  }
   
-  
-  plot.mcleod.CI(CI.res_beta_binomial_based_on_medians,X_axis_as_Prob=T)
-  plot.mcleod.CI(CI.res_beta_binomial_based_on_medians,X_axis_as_Prob=F)
 
   
 }
