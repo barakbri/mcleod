@@ -710,6 +710,7 @@ mcleod.estimate.CI.based.on.medians = function(x.vec,
                               comp_param = mcleod.computational.parameters(nr.gibbs = 200,nr.gibbs.burnin = 100),
                               prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),
                               shift.size.in.log.odds.scale = NULL,
+                              nr.cores = detectCores() - 1,
                               verbose = T){
   
   Start.time.overall = Sys.time()
@@ -727,7 +728,6 @@ mcleod.estimate.CI.based.on.medians = function(x.vec,
   
   median_curve_for_data = compute_medians_curve(mcleod_for_data)
   
-  
   a.vec = mcleod_for_data$parameters_list$a.vec
   
   if(is.null(shift.size.in.log.odds.scale)){
@@ -737,6 +737,100 @@ mcleod.estimate.CI.based.on.medians = function(x.vec,
   
   nr_points_trim_GE = 1
   nr_points_trim_LE = 1
+  
+  function_for_Worst_Case_PV_computation_parallelized = function(q_ind,ai,is_LE){
+    
+    NR_OVER_TO_QUIT = nr.perm*(1-conf.level)/2
+    
+    current_temp_dir = paste0(tempdir(),'/parallel_worker_',q_ind,'_',ai,'_',is_LE,'/')
+    if(!dir.exists(current_temp_dir)){
+      dir.create(current_temp_dir)
+    }else{
+      for(u in list.files(current_temp_dir,full.names = T)){
+        file.remove(u)
+      }  
+    }
+    parallel_worker = function(worker_id){
+      nr_perm_for_worker = ceiling(nr.perm/nr.cores)
+      worker_nr_done = 0
+      worker_nr_more_extreme = 0
+      for(bi in 1:nr_perm_for_worker){
+        if(is_LE){
+          # assign q_ind prob to location ai - epsilon 
+          # and assign (1-q_ind) to location inf
+          theta_sample = sample(x = c(a.vec[ai]- shift.size.in.log.odds.scale,a.vec[ai]+M),
+                                size = K,
+                                replace = T,
+                                prob = c(q_grid[q_ind],1-q_grid[q_ind]))
+          
+        }else{
+          # assign q_ind prob to location -inf 
+          # and assign (1-q_ind) to location ai + epsilon  
+          theta_sample = sample(x = c(a.vec[ai]-M, a.vec[ai]+ shift.size.in.log.odds.scale),
+                                size = K,
+                                replace = T,
+                                prob = c(q_grid[q_ind],1-q_grid[q_ind]))
+        }
+        
+        
+        sampled_x_vec = rbinom(K,size = n.vec,prob = inv.log.odds(theta_sample))
+        
+        
+        mcleod_for_resampled_data = mcleod(x.smp = sampled_x_vec,n.smp = n.vec,a.limits = c(-a.max,a.max),
+                                           computational_parameters = comp_param,
+                                           prior_parameters = prior_param)
+        
+        median_curve_for_resampled_data = compute_medians_curve(mcleod_for_resampled_data)
+        
+        worker_nr_done = worker_nr_done +1
+        if((is_LE & median_curve_for_resampled_data[ai]<=median_curve_for_data[ai]) |
+           (!is_LE & median_curve_for_resampled_data[ai]>=median_curve_for_data[ai]) ){
+          worker_nr_more_extreme = worker_nr_more_extreme +1
+          ghost_object = list(a=1) # not letting me save a blank list with no name for some reason
+          save(ghost_object,file = paste0(current_temp_dir,'signal_file_worker_',
+                                    worker_id,'_sig_nr_',worker_nr_more_extreme,'.rdata'))
+        }
+        if(length(list.files(current_temp_dir,full.names = T)) > NR_OVER_TO_QUIT) #no need to to more permutations, we wont reject
+          return(list(worker_nr_more_extreme = worker_nr_more_extreme,worker_nr_done = worker_nr_done))
+      }
+      
+      return(list(worker_nr_more_extreme = worker_nr_more_extreme,worker_nr_done = worker_nr_done))
+    }
+    
+    
+    variables_to_pass_as_vector = c('mcleod_for_data',
+                                    'median_curve_for_data',
+                                    'a.vec',
+                                    'K',
+                                    'M',
+                                    'x.vec',
+                                    'n.vec',
+                                    'conf.level',
+                                    'nr.perm',
+                                    'q_grid',
+                                    'a.max',
+                                    'comp_param',
+                                    'prior_param',
+                                    'shift.size.in.log.odds.scale',
+                                    'nr.cores')
+    
+    perm_worker_results <- foreach(wi = 1:nr.cores, .options.RNG=1234,.export = variables_to_pass_as_vector) %dorng% {
+      library(mcleod);
+      return(parallel_worker(wi))
+    }
+    
+    total_nr_more_extreme = 0
+    total_nr_computed = 0
+    for(wi in 1:length(perm_worker_results)){
+      total_nr_more_extreme = total_nr_more_extreme + perm_worker_results[[wi]]$worker_nr_more_extreme
+      total_nr_computed = total_nr_computed + perm_worker_results[[wi]]$worker_nr_done
+    }
+    
+    if(dir.exists(current_temp_dir))
+      unlist(current_temp_dir)
+    
+    return((total_nr_more_extreme+1)/(total_nr_computed+1))
+  }
   
   function_for_Worst_Case_PV_computation = function(q_ind,ai,is_LE){
     
@@ -784,14 +878,20 @@ mcleod.estimate.CI.based.on.medians = function(x.vec,
   
   
   function_for_Pval_LE = function(q_ind,ai){
-    return(function_for_Worst_Case_PV_computation(q_ind, ai, is_LE = T))
+    #return(function_for_Worst_Case_PV_computation(q_ind, ai, is_LE = T))
+    return(function_for_Worst_Case_PV_computation_parallelized(q_ind, ai, is_LE = T))
+    
   }
   
   function_for_Pval_GE = function(q_ind,ai){
-    return(function_for_Worst_Case_PV_computation(q_ind, ai, is_LE = F))
+    #return(function_for_Worst_Case_PV_computation(q_ind, ai, is_LE = F))
+    return(function_for_Worst_Case_PV_computation_parallelized(q_ind, ai, is_LE = F))
   }
   
   #function_for_Pval_LE(39,33)
+  
+  cl <- makeCluster(nr.cores)
+  registerDoParallel(cl)
   
   curve_obj = compute.mcleod.CI.curve(mcleod_for_data,
                                       q_grid,
@@ -801,6 +901,7 @@ mcleod.estimate.CI.based.on.medians = function(x.vec,
                                       nr_points_trim_GE,
                                       conf.level,verbose = verbose)
   
+  stopCluster(cl) 
   
   ret = list()
   class(ret) = CLASS.NAME.MCLEOD.CI.MEDIAN.BASED.STATISTIC
@@ -829,9 +930,9 @@ if(F){
                               a.max = 4,q_grid = seq(0.025,0.975,0.025),
                               CI.estimation.parameters = mcleod.CI.estimation.parameters(Nr.reps.for.each.n = 1,
                                                                                          nr.cores = detectCores(),
-                                                                                         fraction.of.points.computed = 0.1,#0.2,#0.5,
+                                                                                         fraction.of.points.computed = 0.2,#0.5,
                                                                                          epsilon.nr.gridpoints = 2),
-                              prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),comp_param = mcleod.computational.parameters(nr.gibbs = 600,nr.gibbs.burnin = 300),
+                              prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),comp_param = mcleod.computational.parameters(nr.gibbs = 200,nr.gibbs.burnin = 100),
                               verbose = T
                               )
 
@@ -855,6 +956,7 @@ if(F){
                                                              comp_param = mcleod.computational.parameters(nr.gibbs = 600,nr.gibbs.burnin = 300))
   
   plot.mcleod.CI(CI.res_median_based,X_axis_as_Prob=T)
+  #plot.mcleod.CI(CI.res_median_based,X_axis_as_Prob=F)
   CI.res_median_based$Elapsed_Time_Overall
   #save(CI.res_median_based,file = 'E:/temp/CI_res_median_based.rdata')
   #load(file = 'E:/temp/CI_res_median_based.rdata')
@@ -867,7 +969,7 @@ if(F){
   
   set.seed(1)
   
-  K = 1000
+  K = 500
   n.vec = rep(2,K)
   p.vec = rbeta(n = K,2,2)
   x.vec = rbinom(K,size = n.vec,p.vec)
@@ -880,14 +982,17 @@ if(F){
                               seq(0.025,0.975,0.025),
                               CI.estimation.parameters = mcleod.CI.estimation.parameters(Nr.reps.for.each.n = 1,
                                                                                          nr.cores = detectCores(),
-                                                                                         fraction.of.points.computed = 0.1,
+                                                                                         fraction.of.points.computed = 1,
                                                                                          epsilon.nr.gridpoints = 2),
-                              prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),
+                              prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 5),
+                              comp_param = mcleod.computational.parameters(nr.gibbs = 200,nr.gibbs.burnin = 100),
                               verbose = T)
-  
+  #save(CI.res_beta_binomial,file = 'E:/temp/CI_res_beta_binomial.rdata')
+  #load(file = 'E:/temp/CI_res_beta_binomial.rdata')
   CI.res_beta_binomial$Elapsed_Time_Parallel
   CI.res_beta_binomial$Elapsed_Time_Overall
   plot.mcleod.CI(CI.res_beta_binomial)
+  plot.mcleod.CI(CI.res_beta_binomial,X_axis_as_Prob = F)
   
   if(F){
     CI.res_beta_binomial_based_on_medians = mcleod.estimate.CI.based.on.medians(x.vec = x.vec,
@@ -899,10 +1004,13 @@ if(F){
                                                                                 shift.size.in.log.odds.scale = 0.25,
                                                                                 verbose = T,
                                                                                 prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),
-                                                                                comp_param = mcleod.computational.parameters())
+                                                                                comp_param = mcleod.computational.parameters(nr.gibbs = 200,nr.gibbs.burnin = 100))
     
     
     plot.mcleod.CI(CI.res_beta_binomial_based_on_medians,X_axis_as_Prob=T)
+    abline(v=(0.65),col =  'blue')
+    abline(v=(0.75),col =  'blue')
+    abline(h=(0.4),col =  'blue')
     plot.mcleod.CI(CI.res_beta_binomial_based_on_medians,X_axis_as_Prob=F)
   }
   
