@@ -508,8 +508,11 @@ plot.mcleod.CI=function(mcleod.CI.obj, conf.level = c(0.95),X_axis_as_Prob = T){
     stop('mcleod.CI.obj must be a result returned from mcleod.estimate.CI or mcleod.estimate.CI.based.on.medians')
   }
   
-  
-  
+  shift.for.draw = NA
+  if(OBJECT_IS_CLASS.NAME.MCLEOD.CI.MEDIAN.BASED.STATISTIC)
+    shift.for.draw = mcleod.CI.obj$shift.size.in.log.odds.scale
+  if(OBJECT_IS_CLASS.NAME.MCLEOD.CI)
+    shift.for.draw = mcleod.CI.obj$epsilon
   
   function_for_Pval_LE = function(q_ind,ai){
     return(mcleod.CI.obj$pval_LE[q_ind,ai])
@@ -543,9 +546,13 @@ plot.mcleod.CI=function(mcleod.CI.obj, conf.level = c(0.95),X_axis_as_Prob = T){
     }
     
     x_axis = curve_obj$a.vec
+    x_axis_GE = x_axis + shift.for.draw
+    x_axis_LE = x_axis - shift.for.draw
     x_axis_label = 'theta'
     if(X_axis_as_Prob){
       x_axis = inv.log.odds(x_axis)
+      x_axis_GE = inv.log.odds(x_axis_GE)
+      x_axis_LE = inv.log.odds(x_axis_LE)
       x_axis_label = 'P'
     }
     if(conf.level.ind == 1)
@@ -917,104 +924,3 @@ mcleod.estimate.CI.based.on.medians = function(x.vec,
   return(ret)
   
 }
-
-
-if(F){
-  memory.limit(20000)
-  x.vec = deconvolveR::surg[,2]
-  n.vec = deconvolveR::surg[,1]
-
-  set.seed(1)
-  CI.res = mcleod.estimate.CI(x.vec = x.vec,
-                              n.vec = n.vec,
-                              a.max = 4,q_grid = seq(0.025,0.975,0.025),
-                              CI.estimation.parameters = mcleod.CI.estimation.parameters(Nr.reps.for.each.n = 1,
-                                                                                         nr.cores = detectCores(),
-                                                                                         fraction.of.points.computed = 0.2,#0.5,
-                                                                                         epsilon.nr.gridpoints = 2),
-                              prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),comp_param = mcleod.computational.parameters(nr.gibbs = 200,nr.gibbs.burnin = 100),
-                              verbose = T
-                              )
-
-  #save(CI.res,file = 'E:/temp/CI_res.rdata')
-  #load(file = 'E:/temp/CI_res.rdata')
-  CI.res$Elapsed_Time_Parallel
-  CI.res$Elapsed_Time_Overall
-  plot.mcleod.CI(CI.res,X_axis_as_Prob=T)
-  #plot.mcleod.CI(CI.res,X_axis_as_Prob=F)
-  
-  
-  CI.res_median_based = mcleod.estimate.CI.based.on.medians(x.vec = x.vec,
-                                                             n.vec = n.vec,
-                                                             conf.level = 0.95,
-                                                             nr.perm = 200,
-                                                             q_grid = seq(0.025,0.975,0.025),
-                                                             a.max = 4,
-                                                             shift.size.in.log.odds.scale = 0.25,
-                                                             verbose = T,
-                                                             prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),
-                                                             comp_param = mcleod.computational.parameters(nr.gibbs = 600,nr.gibbs.burnin = 300))
-  
-  plot.mcleod.CI(CI.res_median_based,X_axis_as_Prob=T)
-  #plot.mcleod.CI(CI.res_median_based,X_axis_as_Prob=F)
-  CI.res_median_based$Elapsed_Time_Overall
-  #save(CI.res_median_based,file = 'E:/temp/CI_res_median_based.rdata')
-  #load(file = 'E:/temp/CI_res_median_based.rdata')
-  
-}
-
-
-if(F){
-  memory.limit(20000)
-  
-  set.seed(1)
-  
-  K = 500
-  n.vec = rep(2,K)
-  p.vec = rbeta(n = K,2,2)
-  x.vec = rbinom(K,size = n.vec,p.vec)
-  
-  
-  
-  CI.res_beta_binomial = mcleod.estimate.CI(x.vec = x.vec,
-                              n.vec = n.vec,
-                              a.max = 4,
-                              seq(0.025,0.975,0.025),
-                              CI.estimation.parameters = mcleod.CI.estimation.parameters(Nr.reps.for.each.n = 1,
-                                                                                         nr.cores = detectCores(),
-                                                                                         fraction.of.points.computed = 1,
-                                                                                         epsilon.nr.gridpoints = 2),
-                              prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 5),
-                              comp_param = mcleod.computational.parameters(nr.gibbs = 200,nr.gibbs.burnin = 100),
-                              verbose = T)
-  #save(CI.res_beta_binomial,file = 'E:/temp/CI_res_beta_binomial.rdata')
-  #load(file = 'E:/temp/CI_res_beta_binomial.rdata')
-  CI.res_beta_binomial$Elapsed_Time_Parallel
-  CI.res_beta_binomial$Elapsed_Time_Overall
-  plot.mcleod.CI(CI.res_beta_binomial)
-  plot.mcleod.CI(CI.res_beta_binomial,X_axis_as_Prob = F)
-  
-  if(F){
-    CI.res_beta_binomial_based_on_medians = mcleod.estimate.CI.based.on.medians(x.vec = x.vec,
-                                                                                n.vec = n.vec,
-                                                                                conf.level = 0.95,
-                                                                                nr.perm = 200,
-                                                                                q_grid = seq(0.025,0.975,0.025),
-                                                                                a.max = 4,
-                                                                                shift.size.in.log.odds.scale = 0.25,
-                                                                                verbose = T,
-                                                                                prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 6),
-                                                                                comp_param = mcleod.computational.parameters(nr.gibbs = 200,nr.gibbs.burnin = 100))
-    
-    
-    plot.mcleod.CI(CI.res_beta_binomial_based_on_medians,X_axis_as_Prob=T)
-    abline(v=(0.65),col =  'blue')
-    abline(v=(0.75),col =  'blue')
-    abline(h=(0.4),col =  'blue')
-    plot.mcleod.CI(CI.res_beta_binomial_based_on_medians,X_axis_as_Prob=F)
-  }
-  
-
-  
-}
-

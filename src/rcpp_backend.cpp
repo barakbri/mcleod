@@ -25,8 +25,7 @@ class Fast_Gamma_Sampler{
   int INDEX_1    = 1;
   int INDEX_10   = 2;
   
-  //Total number of bank columns
-  int BANK_COLS  = 3;
+  //Total number of bank columns is 3, and is currently hard-coded
   
   /**
    * Bank constructor, samples each of the columns. Receives as parameter the required bank size.
@@ -34,7 +33,7 @@ class Fast_Gamma_Sampler{
   public:
   NumericMatrix generate_Bank(IntegerVector BankSize){
     int _sample_size = BankSize(0);
-    NumericMatrix Bank(_sample_size , BANK_COLS);
+    NumericMatrix Bank(_sample_size , 3);
     Bank(_,INDEX_0_1)  = rgamma(_sample_size,0.1,1.0);
     Bank(_,INDEX_1)    = rgamma(_sample_size,1,1.0);
     Bank(_,INDEX_10)   = rgamma(_sample_size,10,1.0);
@@ -46,7 +45,7 @@ class Fast_Gamma_Sampler{
    */
   double sample_Gamma_from_Bank(double x,NumericMatrix Bank){
     
-    double VALUES_OF_COLS[BANK_COLS] = {0.1,1,10}; 
+    double VALUES_OF_COLS[3] = {0.1,1,10}; //BANK_COLS
     double _x = x;
     double _cummulator = 0.0;
     int _bank_size = Bank.nrow();
@@ -57,7 +56,7 @@ class Fast_Gamma_Sampler{
     // While sampling, aggregating the hape value for each column to a cummulator. 
     // Stop when a given resolution is acheived.
     
-    for(int i=BANK_COLS - 1 ; i>=0 ; i--){
+    for(int i=3 - 1 ; i>=0 ; i--){//BANK_COLS
       while(_x >= VALUES_OF_COLS[i]){
         _sampled_pointer = (int)((_bank_size_d)* unif_rand());
         _cummulator += Bank(_sampled_pointer, i);
@@ -204,13 +203,27 @@ class Gibbs_Sampler{
   // holds the suggestion of the next p_k_i
   NumericMatrix p_k_i_suggestion;
   
+  //holds loglikelihood proposal values, for MH step with covariates
   NumericVector ll_proposal;
   
+  //holds loglikelihood values, for MH step with covariates
   NumericVector ll_current;
   
   int manual_beta_dist_given;   // zero or 1, for placing a manual distribution for beta
   NumericVector manual_beta_dist_values;  // R+1 values of the distribution
   NumericMatrix manual_beta_dist_Probs; // R values of probabilities for bins.
+  
+  // a mechanism for storing P_ki's, to reduce time spent on computing them if covariates are available
+  std::map<std::vector<int>, Rcpp::NumericVector> Pki_hashmap;
+  std::vector<int> Pki_hashmap_temp_key;
+  bool Pki_hashmap_do_hashing;
+  double Pki_hashmap_covariates_resolution;
+  
+  //Hyper parameters for priors
+  NumericMatrix Prior_Hyper_Parameters_BetaH_L;
+  NumericMatrix Prior_Hyper_Parameters_BetaH_U;
+  NumericMatrix Prior_Hyper_Parameters_2LDT;
+  
   
   public:  
     
@@ -225,6 +238,9 @@ class Gibbs_Sampler{
                      IntegerVector IsExact_p,                // should integration be exact - ?
                      IntegerVector Verbose_p,                // should be verbose ?
                      IntegerVector L_,                       // Number of tree levels
+                     NumericMatrix Prior_Hyper_Parameters_BetaH_L_p, //Hyper parameters for the BetaH prior
+                     NumericMatrix Prior_Hyper_Parameters_BetaH_U_p,
+                     NumericMatrix Prior_Hyper_Parameters_2LDT_p, // Hyper parameters for the 2 Layer Dirichlet tree prior
                      IntegerVector Init_Given,               // Is a initialization point for the Gibbs sampler given
                      NumericVector Init,                     // The given initialization 
                      IntegerVector Fast_Gamma_Sample_p,      // Is a fast sampling gamma bank given
@@ -242,7 +258,9 @@ class Gibbs_Sampler{
                      IntegerVector noise_type,               // 0 = binomial, 1 = poisson
                      IntegerVector manual_beta_dist_given_p,   // zero or 1, for placing a manual distribution for beta
                      NumericVector manual_beta_dist_values_p,  // R+1 values of the distribution
-                     NumericMatrix manual_beta_dist_Probs_p   // R values of probabilities for bins.
+                     NumericMatrix manual_beta_dist_Probs_p,   // R values of probabilities for bins.
+                     IntegerVector P_k_i_hashing_do_hashing_for_covariates, // 0 = false, 1 = true
+                     NumericVector P_k_i_hashing_theta_resolution // resolution parameter for hashing
                      ){
     
     begin = clock();  
@@ -304,7 +322,13 @@ class Gibbs_Sampler{
     }else{
       beta = NumericVector(Nr_covariates);
     }
-      
+    
+    Pki_hashmap_do_hashing = (P_k_i_hashing_do_hashing_for_covariates[0] == 1) ? true: false;
+    Pki_hashmap_covariates_resolution = P_k_i_hashing_theta_resolution(0);
+    
+    Prior_Hyper_Parameters_BetaH_L = Prior_Hyper_Parameters_BetaH_L_p;
+    Prior_Hyper_Parameters_BetaH_U = Prior_Hyper_Parameters_BetaH_U_p;
+    Prior_Hyper_Parameters_2LDT  = Prior_Hyper_Parameters_2LDT_p;
     
     beta_suggestion = NumericMatrix(Nr_covariates,n_gibbs);
     proposal_approved = NumericVector(n_gibbs);
@@ -603,6 +627,15 @@ class Gibbs_Sampler{
       return(0);
     }
   }
+    
+    
+    
+  //function to convert X,N,theta to key
+  std::vector<int> vec_to_key(int X,int N,double theta){
+    int keys[] = {X,N,( (int) (theta / Pki_hashmap_covariates_resolution) ) };
+    std::vector<int> res (keys, keys + sizeof(keys) / sizeof(int) );
+    return(res);
+  }
   
   /*
   * compute P_k_i matrix, row by row (row = observation).
@@ -611,14 +644,33 @@ class Gibbs_Sampler{
   * results returned in p_mat - must be of dimensions K X I
   */
   void compute_p_k_i(NumericVector x_v, NumericVector n_v,NumericVector theta, NumericVector a_v,NumericMatrix p_mat){
-
+    
+    bool do_computation = true;
     for(int k = 0; k < K ; k++)
     {
-      for(int j=0;j<a_v_plus_theta.length();j++){
-        a_v_plus_theta(j) = a_v(j) +theta(k);
+      
+      do_computation = true;
+      
+      if(Pki_hashmap_do_hashing){
+        Pki_hashmap_temp_key = vec_to_key( x_v(k), n_v(k),theta(k));
+        
+        if( Pki_hashmap.count(Pki_hashmap_temp_key)>0 ){
+          p_k_i_vec_computation_result = Pki_hashmap[Pki_hashmap_temp_key];
+          do_computation = false;
+        }
       }
       
-      compute_p_k_i_vec( x_v(k), n_v(k), a_v_plus_theta );
+      if(do_computation){
+        for(int j=0;j<a_v_plus_theta.length();j++){
+          a_v_plus_theta(j) = a_v(j) +theta(k);
+        }
+        
+        compute_p_k_i_vec( x_v(k), n_v(k), a_v_plus_theta );
+        
+        if(Pki_hashmap_do_hashing){
+          Pki_hashmap[Pki_hashmap_temp_key] = p_k_i_vec_computation_result;
+        }
+      }
       
       for(int j=0;j<I;j++){ // need to benchmark against memcopy - however this requires a row object - not sure how it will work...
         p_mat(k,j) =  p_k_i_vec_computation_result(j);
@@ -672,6 +724,7 @@ class Gibbs_Sampler{
     double q_sum;
     double temp_beta;
     int _place_l_s, _place_l_e, _place_r_s, _place_r_e;
+    int _hyper_parameter_L,_hyper_parameter_U;
     
     for(int gibbs_itr = 0 ; gibbs_itr < n_gibbs ; gibbs_itr++){
       
@@ -725,10 +778,13 @@ class Gibbs_Sampler{
             
             q_sum = _n_vec_cum_sum( _place_r_e + 1) - _n_vec_cum_sum( _place_r_s );
             
+            _hyper_parameter_L = Prior_Hyper_Parameters_BetaH_L(l-1,i);
+            _hyper_parameter_U = Prior_Hyper_Parameters_BetaH_U(l-1,i);
+            
             if(Fast_Sample_Gamma){
-              temp_beta = FGS_rbeta(p_sum + 1, q_sum + 1);
+              temp_beta = FGS_rbeta(p_sum + _hyper_parameter_L, q_sum + _hyper_parameter_U);
             }else{
-              temp_beta = rbeta(1,p_sum + 1, q_sum + 1)[0];  
+              temp_beta = rbeta(1,p_sum + _hyper_parameter_L, q_sum + _hyper_parameter_U)[0];  
             }
             
             // place the results
@@ -852,7 +908,7 @@ class Gibbs_Sampler{
         for(int i1=1;i1<=TwoLayerDirichlet_I1;i1++){
           _dirichlet_parameters_first_layer(i1-1) = _n_vec_cum_sum( two_layer_dirichlet_right_descendant_by_I1_index(i1) + 1) -
             _n_vec_cum_sum( two_layer_dirichlet_left_descendant_by_I1_index(i1)) +
-            1.0;
+            Prior_Hyper_Parameters_2LDT(0,i1-1);
         }
         
         //    sample:
@@ -863,7 +919,7 @@ class Gibbs_Sampler{
           //for each subvector of size i1, sample a subvector based on the entries of n_smp in the relevant subvector.
           //   collect parameters:
           for(int i2 = 1;i2<= TwoLayerDirichlet_I2;i2++){
-            _dirichlet_parameters_second_layer(i2 - 1) = n_smp(two_layer_dirichlet_left_descendant_by_I1_index(i1) + i2 - 1 , gibbs_itr) + 1.0;
+            _dirichlet_parameters_second_layer(i2 - 1) = n_smp(two_layer_dirichlet_left_descendant_by_I1_index(i1) + i2 - 1 , gibbs_itr) + Prior_Hyper_Parameters_2LDT(1,two_layer_dirichlet_left_descendant_by_I1_index(i1) + i2 - 1);
           }
           
           //    sample:
@@ -1048,6 +1104,9 @@ List rcpp_Gibbs_Prob_Results(NumericVector x_vec,
                                    IntegerVector IsExact,
                                    IntegerVector Verbose,
                                    IntegerVector L,
+                                   NumericMatrix Prior_Hyper_Parameters_BetaH_L,
+                                   NumericMatrix Prior_Hyper_Parameters_BetaH_U,
+                                   NumericMatrix Prior_Hyper_Parameters_2LDT,
                                    IntegerVector InitGiven,
                                    NumericVector Init,
                                    IntegerVector Sample_Gamma_From_Bank,
@@ -1065,9 +1124,42 @@ List rcpp_Gibbs_Prob_Results(NumericVector x_vec,
                                    IntegerVector Noise_Type,
                                    IntegerVector manual_beta_dist_given,   // zero or 1, for placing a manual distribution for beta
                                    NumericVector manual_beta_dist_values,  // R+1 values of the distribution
-                                   NumericMatrix manual_beta_dist_Probs){   // R values of probabilities for bins.
+                                   NumericMatrix manual_beta_dist_Probs,   // R values of probabilities for bins.
+                                   IntegerVector do_P_k_i_hashing,
+                                   NumericVector P_k_i_hashing_resolution
+                                   ){   
   
-  Gibbs_Sampler _gibbs(x_vec, n_vec, a_vec, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed,Pki_Integration_Stepsize,Prior_Type, Two_Layer_Dirichlet_I1,covariates_given,covariates,proposal_sd,beta_prior_sd,beta_init,Noise_Type,manual_beta_dist_given,manual_beta_dist_values,manual_beta_dist_Probs);
+  Gibbs_Sampler _gibbs(x_vec,
+                       n_vec,
+                       a_vec,
+                       n_gibbs,
+                       n_gibbs_burnin,
+                       IsExact,
+                       Verbose,
+                       L,
+                       Prior_Hyper_Parameters_BetaH_L,
+                       Prior_Hyper_Parameters_BetaH_U,
+                       Prior_Hyper_Parameters_2LDT,
+                       InitGiven,
+                       Init,
+                       Sample_Gamma_From_Bank,
+                       Bank,
+                       P_k_i_is_given,
+                       P_k_i_precomputed,
+                       Pki_Integration_Stepsize,
+                       Prior_Type,
+                       Two_Layer_Dirichlet_I1,
+                       covariates_given,
+                       covariates,
+                       proposal_sd,
+                       beta_prior_sd,
+                       beta_init,
+                       Noise_Type,
+                       manual_beta_dist_given,
+                       manual_beta_dist_values,
+                       manual_beta_dist_Probs,
+                       do_P_k_i_hashing,
+                       P_k_i_hashing_resolution);
   
   List ret;
   ret["p_k_i"]             = _gibbs.get_p_k_i();

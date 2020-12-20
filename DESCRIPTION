@@ -1,7 +1,7 @@
 Package: mcleod
 Type: Package
 Title: Monte Carlo methods for Estimating Latent OverDispersion of binomial and Poisson random variables.
-Version: 1.0
+Version: 1.0.1
 Date: 2019-05-17
 Author: Barak Brill, Daniel Yekutieli
 Maintainer: Barak Brill <barakbri@mail.tau.ac.il>

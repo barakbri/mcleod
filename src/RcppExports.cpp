@@ -6,8 +6,8 @@
 using namespace Rcpp;
 
 // rcpp_Gibbs_Prob_Results
-List rcpp_Gibbs_Prob_Results(NumericVector x_vec, NumericVector n_vec, NumericVector a_vec, IntegerVector n_gibbs, IntegerVector n_gibbs_burnin, IntegerVector IsExact, IntegerVector Verbose, IntegerVector L, IntegerVector InitGiven, NumericVector Init, IntegerVector Sample_Gamma_From_Bank, NumericMatrix Bank, IntegerVector P_k_i_is_given, NumericMatrix P_k_i_precomputed, NumericVector Pki_Integration_Stepsize, IntegerVector Prior_Type, IntegerVector Two_Layer_Dirichlet_I1, IntegerVector covariates_given, NumericMatrix covariates, NumericVector proposal_sd, NumericVector beta_prior_sd, NumericVector beta_init, IntegerVector Noise_Type, IntegerVector manual_beta_dist_given, NumericVector manual_beta_dist_values, NumericMatrix manual_beta_dist_Probs);
-RcppExport SEXP _mcleod_rcpp_Gibbs_Prob_Results(SEXP x_vecSEXP, SEXP n_vecSEXP, SEXP a_vecSEXP, SEXP n_gibbsSEXP, SEXP n_gibbs_burninSEXP, SEXP IsExactSEXP, SEXP VerboseSEXP, SEXP LSEXP, SEXP InitGivenSEXP, SEXP InitSEXP, SEXP Sample_Gamma_From_BankSEXP, SEXP BankSEXP, SEXP P_k_i_is_givenSEXP, SEXP P_k_i_precomputedSEXP, SEXP Pki_Integration_StepsizeSEXP, SEXP Prior_TypeSEXP, SEXP Two_Layer_Dirichlet_I1SEXP, SEXP covariates_givenSEXP, SEXP covariatesSEXP, SEXP proposal_sdSEXP, SEXP beta_prior_sdSEXP, SEXP beta_initSEXP, SEXP Noise_TypeSEXP, SEXP manual_beta_dist_givenSEXP, SEXP manual_beta_dist_valuesSEXP, SEXP manual_beta_dist_ProbsSEXP) {
+List rcpp_Gibbs_Prob_Results(NumericVector x_vec, NumericVector n_vec, NumericVector a_vec, IntegerVector n_gibbs, IntegerVector n_gibbs_burnin, IntegerVector IsExact, IntegerVector Verbose, IntegerVector L, NumericMatrix Prior_Hyper_Parameters_BetaH_L, NumericMatrix Prior_Hyper_Parameters_BetaH_U, NumericMatrix Prior_Hyper_Parameters_2LDT, IntegerVector InitGiven, NumericVector Init, IntegerVector Sample_Gamma_From_Bank, NumericMatrix Bank, IntegerVector P_k_i_is_given, NumericMatrix P_k_i_precomputed, NumericVector Pki_Integration_Stepsize, IntegerVector Prior_Type, IntegerVector Two_Layer_Dirichlet_I1, IntegerVector covariates_given, NumericMatrix covariates, NumericVector proposal_sd, NumericVector beta_prior_sd, NumericVector beta_init, IntegerVector Noise_Type, IntegerVector manual_beta_dist_given, NumericVector manual_beta_dist_values, NumericMatrix manual_beta_dist_Probs, IntegerVector do_P_k_i_hashing, NumericVector P_k_i_hashing_resolution);
+RcppExport SEXP _mcleod_rcpp_Gibbs_Prob_Results(SEXP x_vecSEXP, SEXP n_vecSEXP, SEXP a_vecSEXP, SEXP n_gibbsSEXP, SEXP n_gibbs_burninSEXP, SEXP IsExactSEXP, SEXP VerboseSEXP, SEXP LSEXP, SEXP Prior_Hyper_Parameters_BetaH_LSEXP, SEXP Prior_Hyper_Parameters_BetaH_USEXP, SEXP Prior_Hyper_Parameters_2LDTSEXP, SEXP InitGivenSEXP, SEXP InitSEXP, SEXP Sample_Gamma_From_BankSEXP, SEXP BankSEXP, SEXP P_k_i_is_givenSEXP, SEXP P_k_i_precomputedSEXP, SEXP Pki_Integration_StepsizeSEXP, SEXP Prior_TypeSEXP, SEXP Two_Layer_Dirichlet_I1SEXP, SEXP covariates_givenSEXP, SEXP covariatesSEXP, SEXP proposal_sdSEXP, SEXP beta_prior_sdSEXP, SEXP beta_initSEXP, SEXP Noise_TypeSEXP, SEXP manual_beta_dist_givenSEXP, SEXP manual_beta_dist_valuesSEXP, SEXP manual_beta_dist_ProbsSEXP, SEXP do_P_k_i_hashingSEXP, SEXP P_k_i_hashing_resolutionSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -19,6 +19,9 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< IntegerVector >::type IsExact(IsExactSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type Verbose(VerboseSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type L(LSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type Prior_Hyper_Parameters_BetaH_L(Prior_Hyper_Parameters_BetaH_LSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type Prior_Hyper_Parameters_BetaH_U(Prior_Hyper_Parameters_BetaH_USEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type Prior_Hyper_Parameters_2LDT(Prior_Hyper_Parameters_2LDTSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type InitGiven(InitGivenSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type Init(InitSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type Sample_Gamma_From_Bank(Sample_Gamma_From_BankSEXP);
@@ -37,7 +40,9 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< IntegerVector >::type manual_beta_dist_given(manual_beta_dist_givenSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type manual_beta_dist_values(manual_beta_dist_valuesSEXP);
     Rcpp::traits::input_parameter< NumericMatrix >::type manual_beta_dist_Probs(manual_beta_dist_ProbsSEXP);
-    rcpp_result_gen = Rcpp::wrap(rcpp_Gibbs_Prob_Results(x_vec, n_vec, a_vec, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed, Pki_Integration_Stepsize, Prior_Type, Two_Layer_Dirichlet_I1, covariates_given, covariates, proposal_sd, beta_prior_sd, beta_init, Noise_Type, manual_beta_dist_given, manual_beta_dist_values, manual_beta_dist_Probs));
+    Rcpp::traits::input_parameter< IntegerVector >::type do_P_k_i_hashing(do_P_k_i_hashingSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type P_k_i_hashing_resolution(P_k_i_hashing_resolutionSEXP);
+    rcpp_result_gen = Rcpp::wrap(rcpp_Gibbs_Prob_Results(x_vec, n_vec, a_vec, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, Prior_Hyper_Parameters_BetaH_L, Prior_Hyper_Parameters_BetaH_U, Prior_Hyper_Parameters_2LDT, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed, Pki_Integration_Stepsize, Prior_Type, Two_Layer_Dirichlet_I1, covariates_given, covariates, proposal_sd, beta_prior_sd, beta_init, Noise_Type, manual_beta_dist_given, manual_beta_dist_values, manual_beta_dist_Probs, do_P_k_i_hashing, P_k_i_hashing_resolution));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -66,7 +71,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_mcleod_rcpp_Gibbs_Prob_Results", (DL_FUNC) &_mcleod_rcpp_Gibbs_Prob_Results, 26},
+    {"_mcleod_rcpp_Gibbs_Prob_Results", (DL_FUNC) &_mcleod_rcpp_Gibbs_Prob_Results, 31},
     {"_mcleod_rcpp_Generate_Fast_Gamma_Bank", (DL_FUNC) &_mcleod_rcpp_Generate_Fast_Gamma_Bank, 1},
     {"_mcleod_rcpp_Generate_Gamma_from_Fast_Gamma_Bank", (DL_FUNC) &_mcleod_rcpp_Generate_Gamma_from_Fast_Gamma_Bank, 2},
     {NULL, NULL, 0}

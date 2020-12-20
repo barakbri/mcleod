@@ -41,7 +41,10 @@ MCLEOD.NORMAL.MEAN.IS.VAR.ERRORS = 2L
 mcleod.prior.parameters = function(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,
                                    Beta.Heirarchical.Levels = 6,
                                    Two.Layer.Dirichlet.Intervals = 64,
-                                   Two.Layer.Dirichlet.Nodes.in.First.Layer = 8){
+                                   Two.Layer.Dirichlet.Nodes.in.First.Layer = 8,
+                                   Prior_Hyper_Parameters_BetaH_L = NULL,
+                                   Prior_Hyper_Parameters_BetaH_U = NULL,
+                                   Prior_Hyper_Parameters_2LDT = NULL){
   
   #checks:
   if(!(prior.type%in% c(MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET))){
@@ -55,11 +58,57 @@ mcleod.prior.parameters = function(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHI
     stop('Two.Layer.Dirichlet.Intervals must be a complete multiple of Two.Layer.Dirichlet.Nodes.in.First.Layer')
   }
   
+  
+  #if no priors are given, we generate default parameters:
+  #for the BetaH case:
+  if(prior.type == MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL & (is.null(Prior_Hyper_Parameters_BetaH_L) | is.null(Prior_Hyper_Parameters_BetaH_U)) ){
+    Prior_Hyper_Parameters_BetaH_L = matrix(NA,nrow = Beta.Heirarchical.Levels,ncol = 2^(Beta.Heirarchical.Levels-1))
+    Prior_Hyper_Parameters_BetaH_U = matrix(NA,nrow = Beta.Heirarchical.Levels,ncol = 2^(Beta.Heirarchical.Levels-1))
+    for(l in 1:Beta.Heirarchical.Levels){
+      for(u in 1:(2^(l-1))){
+        Prior_Hyper_Parameters_BetaH_L[l,u] = 1
+        Prior_Hyper_Parameters_BetaH_U[l,u] = 1
+      }
+    }
+  }
+  #for the 2 layer Dirichlet tree case:
+  if(prior.type == MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET & is.null(Prior_Hyper_Parameters_2LDT)){
+    Prior_Hyper_Parameters_2LDT = matrix(NA,nrow = 2,ncol = Two.Layer.Dirichlet.Intervals)
+    for(u in 1:Two.Layer.Dirichlet.Nodes.in.First.Layer){
+      Prior_Hyper_Parameters_2LDT[1,u] = 1
+    }
+    for(u in 1:Two.Layer.Dirichlet.Intervals){
+      Prior_Hyper_Parameters_2LDT[2,u] = 1
+    }
+  }
+  
+  #check dimensions:
+  if(prior.type == MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL){
+    dimensions_should_be = c(Beta.Heirarchical.Levels,2^(Beta.Heirarchical.Levels-1))
+    if(!all.equal(dim(Prior_Hyper_Parameters_BetaH_L),dimensions_should_be) | 
+                  !all.equal(dim(Prior_Hyper_Parameters_BetaH_U),dimensions_should_be)){
+      stop('Prior type selected to be Heirarchical Beta, but supplied values for Prior_Hyper_Parameters_BetaH_L or Prior_Hyper_Parameters_BetaH_U are not a (L,2^(L-1)) matrix')
+    }
+    Prior_Hyper_Parameters_2LDT = matrix(NA,nrow = 1,ncol = 1)
+  }
+  if(prior.type == MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET){
+    dimensions_should_be = c(2,Two.Layer.Dirichlet.Intervals)
+    if(!all.equal(dim(Prior_Hyper_Parameters_2LDT),dimensions_should_be)){
+      stop('Prior type selected to be 2 Layer Dirichlet Tree, but supplied value for Prior_Hyper_Parameters_2LDT is not a (2,Two.Layer.Dirichlet.Intervals) matrix')
+    }
+    Prior_Hyper_Parameters_BetaH_L = matrix(NA,nrow = 1,ncol = 1)
+    Prior_Hyper_Parameters_BetaH_U = matrix(NA,nrow = 1,ncol = 1)
+  }
+  
+  
   ret = list()
   ret$prior.type = prior.type
   ret$Beta.Heirarchical.Levels = Beta.Heirarchical.Levels
   ret$Two.Layer.Dirichlet.Intervals = Two.Layer.Dirichlet.Intervals
   ret$Two.Layer.Dirichlet.Nodes.in.First.Layer = Two.Layer.Dirichlet.Nodes.in.First.Layer
+  ret$Prior_Hyper_Parameters_BetaH_L = Prior_Hyper_Parameters_BetaH_L
+  ret$Prior_Hyper_Parameters_BetaH_U = Prior_Hyper_Parameters_BetaH_U
+  ret$Prior_Hyper_Parameters_2LDT = Prior_Hyper_Parameters_2LDT
   class(ret) = CLASS.NAME.PRIOR.DEFINITION
   return(ret)
 }
@@ -115,7 +164,9 @@ mcleod.computational.parameters = function(nr.gibbs = 500,
 #' @param beta_prior_sd 
 #' @param beta_init 
 #' @param Manual_Prior_Values 
-#' @param Manual_Prior_Probs  
+#' @param Manual_Prior_Probs
+#' @param do_P_k_i_hashing 
+#' @param P_k_i_hashing_resolution_by_theta    
 #'
 #' @return
 #' @export
@@ -125,7 +176,9 @@ mcleod.covariates.estimation.parameters = function(proposal_sd = c(0.05),
                                            beta_prior_sd = c(5),
                                            beta_init = c(0),
                                            Manual_Prior_Values = NULL,
-                                           Manual_Prior_Probs = NULL){
+                                           Manual_Prior_Probs = NULL,
+                                           do_P_k_i_hashing = F,
+                                           P_k_i_hashing_resolution_by_theta = 0.0001){
   
   #checks:
   if(any(beta_prior_sd <=0))
@@ -157,6 +210,8 @@ mcleod.covariates.estimation.parameters = function(proposal_sd = c(0.05),
   ret$beta_init = beta_init
   ret$Manual_Prior_Values = Manual_Prior_Values
   ret$Manual_Prior_Probs = Manual_Prior_Probs
+  ret$do_P_k_i_hashing = do_P_k_i_hashing
+  ret$P_k_i_hashing_resolution_by_theta = P_k_i_hashing_resolution_by_theta
   class(ret) = CLASS.NAME.COVARIATES.ESTIMATION.PARAMETERS.DEFINITION
   return(ret)
 }
@@ -222,6 +277,12 @@ mcleod	<- function( x.smp,
   I1 = prior_parameters$Two.Layer.Dirichlet.Nodes.in.First.Layer
   Prior_Type = prior_parameters$prior.type
   I_specificy_parameter = prior_parameters$Two.Layer.Dirichlet.Intervals
+  
+  #Hyper parameters for the prior:
+  Prior_Hyper_Parameters_BetaH_L = prior_parameters$Prior_Hyper_Parameters_BetaH_L
+  Prior_Hyper_Parameters_BetaH_U = prior_parameters$Prior_Hyper_Parameters_BetaH_U
+  Prior_Hyper_Parameters_2LDT = prior_parameters$Prior_Hyper_Parameters_2LDT
+  
   
   #%%% Retreive computational parameters
   if(is.null(computational_parameters)){
@@ -375,10 +436,14 @@ mcleod	<- function( x.smp,
   res = Wrapper_rcpp_Gibbs(x.smp,
                            n.smp,
                            a.vec.used,
-                           nr.gibbs,nr.gibbs.burnin,
+                           nr.gibbs,
+                           nr.gibbs.burnin,
                            as.integer(exact.numeric.integration),
                            as.integer(0), #verbose - turned off
                            L,
+                           Prior_Hyper_Parameters_BetaH_L,
+                           Prior_Hyper_Parameters_BetaH_U,
+                           Prior_Hyper_Parameters_2LDT,
                            Fast.Gamma.Used.p,
                            Fast.Gamma.Bank,
                            PriorType = Prior_Type,
@@ -394,7 +459,9 @@ mcleod	<- function( x.smp,
                            P_k_i_precomputed = P_k_i_precomputed,
                            Manual_Prior_Given = Manual_Prior_Given,
                            Manual_Prior_Values = Manual_Prior_Values,
-                           Manual_Prior_Probs = Manual_Prior_Probs
+                           Manual_Prior_Probs = Manual_Prior_Probs,
+                           do_P_k_i_hashing = covariates_estimation_parameters$do_P_k_i_hashing,
+                           P_k_i_hashing_resolution = covariates_estimation_parameters$P_k_i_hashing_resolution_by_theta
                            )
   
   #%%% Wrap results

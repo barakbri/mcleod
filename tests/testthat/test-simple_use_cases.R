@@ -11,18 +11,21 @@ test_that("Run Simple Usecases", {
     covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K)
     real_beta_1 = -1
     real_beta_2 = 1
-    x = rbinom(K,size = N,prob = inv.log.odds(rnorm(K,0,sd = 1) + real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
+    x = rbinom(K,size = N,prob = inv.log.odds(rnorm(K,0,sd = 1) +
+                                                real_beta_1*covariates[,1] +
+                                                real_beta_2*covariates[,2]))
     n = rep(N,K)
     model_dt = data.frame(c = x,nc = n-x)
     model_dt = cbind(model_dt,covariates)
-    model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
+    model <- glm(cbind(c,nc) ~.,
+                 family=binomial,data=model_dt)
     model$coefficients[-1]
     
     res = mcleod(x, n, prior_parameters = mcleod.prior.parameters(),
                  a.limits = c(-4,4),
                  covariates = covariates,
                  computational_parameters = mcleod.computational.parameters(nr.gibbs = 500),
-                 covariates_estimation_parameters = mcleod.covariates.estimation.parameters(beta_init = model$coefficients[-1])
+                 covariates_estimation_parameters = mcleod.covariates.estimation.parameters(beta_init = model$coefficients[-1],do_P_k_i_hashing = T,P_k_i_hashing_resolution_by_theta = 0.0001)
     )
     res$additional$original_stat_res$elapsed_secs
     

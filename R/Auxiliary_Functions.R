@@ -34,6 +34,9 @@ Wrapper_rcpp_Gibbs = function(x.vec,
                               numeric_integration,
                               Verbose,
                               L,
+                              Prior_Hyper_Parameters_BetaH_L,
+                              Prior_Hyper_Parameters_BetaH_U,
+                              Prior_Hyper_Parameters_2LDT,
                               FastGammaUsed=0,
                               FastGammaBank=matrix(1,nrow = 1),
                               P_k_i_is_given = 0L,
@@ -49,7 +52,10 @@ Wrapper_rcpp_Gibbs = function(x.vec,
                               Noise_Type = c(0L),
                               Manual_Prior_Given = c(0L),
                               Manual_Prior_Values = c(-4,4),
-                              Manual_Prior_Probs = c(1)){ 
+                              Manual_Prior_Probs = c(1),
+                              do_P_k_i_hashing = c(0L),
+                              P_k_i_hashing_resolution = 0.0001
+                              ){ 
   
     return(
       rcpp_Gibbs_Prob_Results(x.vec,
@@ -60,6 +66,9 @@ Wrapper_rcpp_Gibbs = function(x.vec,
                                     as.integer(numeric_integration),
                                     as.integer(Verbose),
                                     L,
+                                    Prior_Hyper_Parameters_BetaH_L,
+                                    Prior_Hyper_Parameters_BetaH_U,
+                                    Prior_Hyper_Parameters_2LDT,
                                     as.integer(0),
                                     rep(1/(length(a.vec)-1),(length(a.vec)-1)),
                                     FastGammaUsed,
@@ -77,7 +86,9 @@ Wrapper_rcpp_Gibbs = function(x.vec,
                                     Noise_Type,
                                     Manual_Prior_Given,
                                     Manual_Prior_Values,
-                                    Manual_Prior_Probs
+                                    Manual_Prior_Probs,
+                                    do_P_k_i_hashing,
+                                    P_k_i_hashing_resolution
                               ) 
     )
 }

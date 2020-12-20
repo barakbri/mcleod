@@ -31,7 +31,7 @@ Here we discuss the structure of the document, what the method is about and wher
 # Deconvolution estimates
 
 ## Deconvolution for binomial errors
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 N = 30
 K = 300
 set.seed(1)
@@ -41,7 +41,7 @@ n = rep(N,K)
 head(cbind(x,n))
 ```
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 res = mcleod(x, n)
   
 plot.posterior(res)
@@ -49,12 +49,12 @@ plot.posterior(res)
 
 
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 res = mcleod(x, n, a.limits = c(-5,5))
 ```
 
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 prior_obj  = mcleod.prior.parameters(
   prior.type =MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,
   Beta.Heirarchical.Levels = 6
@@ -63,7 +63,7 @@ res = mcleod(x, n, prior_parameters = prior_obj)
 ```
 
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 prior_obj  = mcleod.prior.parameters(
   prior.type =MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
   Two.Layer.Dirichlet.Intervals = 64,
@@ -74,7 +74,7 @@ res = mcleod(x, n, prior_parameters = prior_obj)
 ```
 
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 comp_obj = mcleod.computational.parameters(nr.gibbs = 500,
                                              nr.gibbs.burnin = 250)
 
@@ -84,7 +84,7 @@ res = mcleod(x, n,
 ```
 ## Deconvolution for Poisson errors
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 
   K = 200
   set.seed(1)
@@ -98,7 +98,7 @@ res = mcleod(x, n,
 
 Setting parameters...
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 
 prior_obj  = mcleod.prior.parameters(
   prior.type =MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
@@ -118,7 +118,7 @@ res = mcleod(x, n.smp = NULL,a.limits = c(-2,8),
 # Constructing confidence intervals for the CDF of rate parameters
 
 ## Confidence intervals for CDF, binomial noise
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 suppressWarnings(library(doRNG))
 
 x.vec = deconvolveR::surg[,2]
@@ -158,7 +158,7 @@ plot.mcleod.CI(CI.res)
 ## Logistic regression with a general random intercept
 
 ### Example 1: Coefficients intialized at 0
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 N = 30
 K = 200
 set.seed(1)
@@ -174,25 +174,25 @@ n = rep(N,K)
 head(round(cbind(x,n,covariates),digits = 2))
 ```
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 res = mcleod(x, n, covariates = covariates)
 ```
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 coeffs = mcleod::results.covariate.coefficients.posterior(res)
 ```
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 print(coeffs)
 ```
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 plot.posterior(res)
 ```
 
 ### Example 2: Coefficients intialized by logistic regression, change priors for $\beta$s
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
   N = 30
   K = 300
   set.seed(2)
@@ -207,14 +207,14 @@ plot.posterior(res)
   n = rep(N,K)
 ```
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
   model_dt = data.frame(c = x,nc = n-x)
   model_dt = cbind(model_dt,covariates)
   model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
   model$coefficients[-1]
 ```
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
   coeffs_obj  = mcleod.covariates.estimation.parameters(
                   beta_init = model$coefficients[-1],
                   beta_prior_sd = c(1.5))
@@ -228,12 +228,12 @@ plot.posterior(res)
 ```
 
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 coeffs = mcleod::results.covariate.coefficients.posterior(res,plot.posterior = F)
 print(coeffs)
 ```
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 plot.posterior(res)
 ```
 
@@ -256,18 +256,18 @@ plot.posterior(res)
                )
 ```
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 mcleod::results.covariate.coefficients.posterior(res)
 
 ```
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 plot.posterior(res)
 ```
 
 ## Setting the prior distributions on coefficient to be other than normal
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 N = 30
 K = 200
 set.seed(1)
@@ -278,14 +278,14 @@ x = rbinom(K,size = N,prob = inv.log.odds(rnorm(K,0,sd = 1) + real_beta_1*covari
 n = rep(N,K)
 ```
 
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 model_dt = data.frame(c = x,nc = n-x)
 model_dt = cbind(model_dt,covariates)
 model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
 ```
 
 
-```{r, cache=TRUE}
+```{r, cache=TRUE,eval=FALSE}
 beta_prior_points = seq(-5,5,0.01)
 
 beta_prior_probs = pcauchy(beta_prior_points[-1]) - 
@@ -295,31 +295,31 @@ beta_prior_probs = beta_prior_probs/ sum(beta_prior_probs)
   
 ```
 
-```{r, cache=TRUE}
+```{r, cache=TRUE,eval=FALSE}
  plot(beta_prior_points[-1],beta_prior_probs,type = 'l',xlab = 'theta',ylab = 'probability in bin of beta_prior_probs')
 ```
  
-```{r, cache=TRUE}
+```{r, cache=TRUE,eval=FALSE}
 beta_prior_probs = matrix(c(beta_prior_probs, beta_prior_probs),ncol = 2)
 ```
 
 
-```{r, cache=TRUE}
+```{r, cache=TRUE,eval=FALSE}
 coeffs_obj = mcleod.covariates.estimation.parameters(
   beta_init = model$coefficients[-1],                                                                Manual_Prior_Values = beta_prior_points,                                                           Manual_Prior_Probs = beta_prior_probs)
 ```
 
-```{r, cache=TRUE}
+```{r, cache=TRUE,eval=FALSE}
 res = mcleod(x, n, covariates = covariates,
                covariates_estimation_parameters = coeffs_obj)
 ```
   
-```{r, cache=TRUE}
+```{r, cache=TRUE,eval=FALSE}
 mcleod::results.covariate.coefficients.posterior(res,plot.posterior = F)
 ```
 
 # Interval censoring
-```{r, cache=TRUE}
+```{r, cache=TRUE,eval=FALSE}
 suppressWarnings(library(icenReg)) 
 data(miceData)
   
