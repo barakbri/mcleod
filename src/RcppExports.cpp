@@ -5,6 +5,11 @@
 
 using namespace Rcpp;
 
+#ifdef RCPP_USE_GLOBAL_ROSTREAM
+Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
+Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
+#endif
+
 // rcpp_Gibbs_Prob_Results
 List rcpp_Gibbs_Prob_Results(NumericVector x_vec, NumericVector n_vec, NumericVector a_vec, IntegerVector n_gibbs, IntegerVector n_gibbs_burnin, IntegerVector IsExact, IntegerVector Verbose, IntegerVector L, NumericMatrix Prior_Hyper_Parameters_BetaH_L, NumericMatrix Prior_Hyper_Parameters_BetaH_U, NumericMatrix Prior_Hyper_Parameters_2LDT, IntegerVector InitGiven, NumericVector Init, IntegerVector Sample_Gamma_From_Bank, NumericMatrix Bank, IntegerVector P_k_i_is_given, NumericMatrix P_k_i_precomputed, NumericVector Pki_Integration_Stepsize, IntegerVector Prior_Type, IntegerVector Two_Layer_Dirichlet_I1, IntegerVector covariates_given, NumericMatrix covariates, NumericVector proposal_sd, NumericVector beta_prior_sd, NumericVector beta_init, IntegerVector Noise_Type, IntegerVector manual_beta_dist_given, NumericVector manual_beta_dist_values, NumericMatrix manual_beta_dist_Probs, IntegerVector do_P_k_i_hashing, NumericVector P_k_i_hashing_resolution);
 RcppExport SEXP _mcleod_rcpp_Gibbs_Prob_Results(SEXP x_vecSEXP, SEXP n_vecSEXP, SEXP a_vecSEXP, SEXP n_gibbsSEXP, SEXP n_gibbs_burninSEXP, SEXP IsExactSEXP, SEXP VerboseSEXP, SEXP LSEXP, SEXP Prior_Hyper_Parameters_BetaH_LSEXP, SEXP Prior_Hyper_Parameters_BetaH_USEXP, SEXP Prior_Hyper_Parameters_2LDTSEXP, SEXP InitGivenSEXP, SEXP InitSEXP, SEXP Sample_Gamma_From_BankSEXP, SEXP BankSEXP, SEXP P_k_i_is_givenSEXP, SEXP P_k_i_precomputedSEXP, SEXP Pki_Integration_StepsizeSEXP, SEXP Prior_TypeSEXP, SEXP Two_Layer_Dirichlet_I1SEXP, SEXP covariates_givenSEXP, SEXP covariatesSEXP, SEXP proposal_sdSEXP, SEXP beta_prior_sdSEXP, SEXP beta_initSEXP, SEXP Noise_TypeSEXP, SEXP manual_beta_dist_givenSEXP, SEXP manual_beta_dist_valuesSEXP, SEXP manual_beta_dist_ProbsSEXP, SEXP do_P_k_i_hashingSEXP, SEXP P_k_i_hashing_resolutionSEXP) {

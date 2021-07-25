@@ -5,12 +5,12 @@ DO_EFRON_DATA_ANALYSIS = F
 DO_BETA_EXAMPLE_ANALYSIS = F
 
 # Create the results dir
-RESULTS_DIR = 'E:/CI_Results/'
+RESULTS_DIR = 'C:/CI_Results/'
 if(!dir.exists(RESULTS_DIR)){
   dir.create(RESULTS_DIR)
 }
 
-
+#library(mcleod)
 #Run the Efron example
 if(DO_EFRON_DATA_ANALYSIS){
   # load the data

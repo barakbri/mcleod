@@ -238,7 +238,7 @@ plot.posterior(res)
 ```
 
 ## Poisson regression with a general random intercept
-```{r,cache=TRUE}
+```{r,cache=TRUE,eval=FALSE}
 
   K = 200
   set.seed(2)

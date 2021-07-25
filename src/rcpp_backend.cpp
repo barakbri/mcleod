@@ -597,7 +597,7 @@ class Gibbs_Sampler{
           _integral_p += _integral_h;
           _last_density = _this_density;
         }
-        _temp = _integral;
+        _temp = _integral / ( (a_v(i+1)) - a_v(i) );
       }else{
         _temp_p_nrm_ul = Rf_pnorm5(a_v(i+1) , theta_hat, theta_se, 1, 0); 
         _temp_p_nrm_ll = Rf_pnorm5(a_v(i)   , theta_hat, theta_se, 1, 0); 
