@@ -224,6 +224,7 @@ class Gibbs_Sampler{
   NumericMatrix Prior_Hyper_Parameters_BetaH_U;
   NumericMatrix Prior_Hyper_Parameters_2LDT;
   
+  NumericVector offset_vec;
   
   public:  
     
@@ -260,7 +261,8 @@ class Gibbs_Sampler{
                      NumericVector manual_beta_dist_values_p,  // R+1 values of the distribution
                      NumericMatrix manual_beta_dist_Probs_p,   // R values of probabilities for bins.
                      IntegerVector P_k_i_hashing_do_hashing_for_covariates, // 0 = false, 1 = true
-                     NumericVector P_k_i_hashing_theta_resolution // resolution parameter for hashing
+                     NumericVector P_k_i_hashing_theta_resolution, // resolution parameter for hashing
+                     NumericVector offset_vec_p             // offset vector, designed for use in Poisson regression
                      ){
     
     begin = clock();  
@@ -329,6 +331,8 @@ class Gibbs_Sampler{
     Prior_Hyper_Parameters_BetaH_L = Prior_Hyper_Parameters_BetaH_L_p;
     Prior_Hyper_Parameters_BetaH_U = Prior_Hyper_Parameters_BetaH_U_p;
     Prior_Hyper_Parameters_2LDT  = Prior_Hyper_Parameters_2LDT_p;
+    
+    offset_vec = offset_vec_p;
     
     beta_suggestion = NumericMatrix(Nr_covariates,n_gibbs);
     proposal_approved = NumericVector(n_gibbs);
@@ -662,7 +666,7 @@ class Gibbs_Sampler{
       
       if(do_computation){
         for(int j=0;j<a_v_plus_theta.length();j++){
-          a_v_plus_theta(j) = a_v(j) +theta(k);
+          a_v_plus_theta(j) = a_v(j) + theta(k) + offset_vec(k);
         }
         
         compute_p_k_i_vec( x_v(k), n_v(k), a_v_plus_theta );
@@ -1126,7 +1130,8 @@ List rcpp_Gibbs_Prob_Results(NumericVector x_vec,
                                    NumericVector manual_beta_dist_values,  // R+1 values of the distribution
                                    NumericMatrix manual_beta_dist_Probs,   // R values of probabilities for bins.
                                    IntegerVector do_P_k_i_hashing,
-                                   NumericVector P_k_i_hashing_resolution
+                                   NumericVector P_k_i_hashing_resolution,
+                                   NumericVector offset_vec
                                    ){   
   
   Gibbs_Sampler _gibbs(x_vec,
@@ -1159,7 +1164,8 @@ List rcpp_Gibbs_Prob_Results(NumericVector x_vec,
                        manual_beta_dist_values,
                        manual_beta_dist_Probs,
                        do_P_k_i_hashing,
-                       P_k_i_hashing_resolution);
+                       P_k_i_hashing_resolution,
+                       offset_vec);
   
   List ret;
   ret["p_k_i"]             = _gibbs.get_p_k_i();

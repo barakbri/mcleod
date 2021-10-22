@@ -237,22 +237,28 @@ print(coeffs)
 plot.posterior(res)
 ```
 
-## Poisson regression with a general random intercept
+## Poisson regression with a general random intercept and offset term
 ```{r,cache=TRUE,eval=FALSE}
 
+   
   K = 200
   set.seed(2)
   covariates = matrix(rexp(K,rate = 2),nrow = K)
   real_beta = 0.5
   u = sample(c(0,1),size = K,replace = T)
-  x = rpois(K,lambda = exp(rnorm(K,2 + 3*u,0.5) + real_beta* covariates) )
+  extrinsic_size = runif(n = K,1,100)
+  offset = log(extrinsic_size)
+  
+  x = rpois(K,lambda = extrinsic_size * exp(rnorm(K,2 + 3*u,0.5) + real_beta* covariates) )
+  
   
   comp_obj = mcleod.computational.parameters(nr.gibbs = 1000,nr.gibbs.burnin = 500)
   
   res = mcleod(x, n.smp = NULL,a.limits = c(-2,8),
                computational_parameters = comp_obj,
                covariates = covariates,
-               Noise_Type = MCLEOD.POISSON.ERRORS
+               Noise_Type = MCLEOD.POISSON.ERRORS,
+               offset_vec = offset
                )
 ```
 

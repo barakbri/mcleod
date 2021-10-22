@@ -71,7 +71,10 @@ if(F){
   covariates = matrix(rexp(K,rate = 2),nrow = K)
   real_beta = 0.5
   u = sample(c(0,1),size = K,replace = T)
-  x = rpois(K,lambda = exp(rnorm(K,2 + 3*u,0.5) + real_beta* covariates) )
+  extrinsic_size = runif(n = K,1,100)
+  offset = log(extrinsic_size)
+  
+  x = rpois(K,lambda = extrinsic_size * exp(rnorm(K,2 + 3*u,0.5) + real_beta* covariates) )
   
   res = mcleod(x, n.smp = NULL,
                prior_parameters = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
@@ -79,7 +82,8 @@ if(F){
                                                                                 a.limits = c(-2,8),
                computational_parameters = mcleod.computational.parameters(nr.gibbs = 1000,nr.gibbs.burnin = 500),
                                         covariates = covariates,
-                                        Noise_Type = MCLEOD.POISSON.ERRORS
+                                        Noise_Type = MCLEOD.POISSON.ERRORS,
+               offset_vec = offset
   )
   
   res$additional$original_stat_res$elapsed_secs

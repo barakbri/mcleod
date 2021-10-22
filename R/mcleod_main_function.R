@@ -256,7 +256,8 @@ mcleod	<- function( x.smp,
                      computational_parameters = NULL,
                      covariates_estimation_parameters = NULL,
                      input_P_k_i = NULL,
-                     exact.numeric.integration = TRUE
+                     exact.numeric.integration = TRUE,
+                     offset_vec = rep(0,length(x.smp))
                      )
 {
   
@@ -337,7 +338,9 @@ mcleod	<- function( x.smp,
     else
       stop('beta_init must be of length ncol(covariates)')
   }
-  
+  if(!all(is.numeric(offset_vec)) & length(offset_vec)!=length(x.smp)){
+    stop('offset_vec must be numric and same length as x.smp')
+  }
   #%%% Function settings
   
   
@@ -461,7 +464,8 @@ mcleod	<- function( x.smp,
                            Manual_Prior_Values = Manual_Prior_Values,
                            Manual_Prior_Probs = Manual_Prior_Probs,
                            do_P_k_i_hashing = covariates_estimation_parameters$do_P_k_i_hashing,
-                           P_k_i_hashing_resolution = covariates_estimation_parameters$P_k_i_hashing_resolution_by_theta
+                           P_k_i_hashing_resolution = covariates_estimation_parameters$P_k_i_hashing_resolution_by_theta,
+                           offset_vec = offset_vec
                            )
   
   #%%% Wrap results

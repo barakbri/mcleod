@@ -54,7 +54,8 @@ Wrapper_rcpp_Gibbs = function(x.vec,
                               Manual_Prior_Values = c(-4,4),
                               Manual_Prior_Probs = c(1),
                               do_P_k_i_hashing = c(0L),
-                              P_k_i_hashing_resolution = 0.0001
+                              P_k_i_hashing_resolution = 0.0001,
+                              offset_vec = rep(0,length(x.vec))
                               ){ 
   
     return(
@@ -88,7 +89,8 @@ Wrapper_rcpp_Gibbs = function(x.vec,
                                     Manual_Prior_Values,
                                     Manual_Prior_Probs,
                                     do_P_k_i_hashing,
-                                    P_k_i_hashing_resolution
+                                    P_k_i_hashing_resolution,
+                                    offset_vec
                               ) 
     )
 }
