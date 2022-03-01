@@ -111,8 +111,14 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
       worker_function_Binomial_GE = function(seed){
         set.seed(seed)
         
-        current_theta = bank$CI_param$theta_vec[ind_theta]
-        current_q = bank$CI_param$q_vec[ind_q]
+        if(is_GE){
+          current_theta = bank$CI_param$theta_vec[ind_theta]
+          current_q = bank$CI_param$q_vec[ind_q]  
+        }else{ # we compute the corresponding GE hypothesis and revert the curves afterwords
+          current_theta = bank$CI_param$theta_vec[bank$CI_param$n_theta - ind_theta + 1]
+          current_q = bank$CI_param$q_vec[bank$CI_param$n_q - ind_q +1]  
+        }
+        
         N_vec = bank$N_vec
         P_sample = rbinom(n = length(N_vec),size = 1,1-current_q) * inv.log.odds(current_theta)
         X_sampled = rbinom(n = length(N_vec),size = N_vec,prob = P_sample)
@@ -128,30 +134,61 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
         return(compute_medians_curve(temp_mcleod))
       }
       if(do_serial){
-        res_Binomial_GE = list()
+        res_Binomial = list()
         for(k in 1:nr.to.compute){
-          res_Binomial_GE[[k]] = worker_function_Binomial_GE(k)
+          res_Binomial[[k]] = worker_function_Binomial_GE(k)
         }
       }else{
         #this assumes a cluster is registered
-        res_Binomial_GE = foreach(seed=(nr.computed+1):nr.curves, .options.RNG=1,
+        res_Binomial = foreach(seed=(nr.computed+1):nr.curves, .options.RNG=1,
                                   .export = c('ind_theta','ind_q','bank','worker_function_Binomial_GE')) %dorng% {
                                     worker_function_Binomial_GE(seed)
                                     
                                   }
       }
-    
       
-      for(k in 1:length(res_Binomial_GE)){
-        bank$median_curve_GE[[ind_theta]][[ind_q]][[k + nr.computed]] <<- res_Binomial_GE[[k]]
-        bank$median_curve_LE[[ind_theta]][[ind_q]][[k + nr.computed]] <<- rev(1- res_Binomial_GE[[k]])
+      #Collecting results
+      ret = list()
+      if(is_GE){
+        if(nr.computed>0){
+          for(k in 1:nr.computed){
+            ret[[k]] = bank$median_curve_GE[[ind_theta]][[ind_q]][[k]]
+          }
+        }
+        for(k in 1:length(res_Binomial)){
+          ret[[k + nr.computed]] = res_Binomial[[k]]
+          bank$median_curve_GE[[ind_theta]][[ind_q]][[k + nr.computed]] <<- res_Binomial[[k]]
+          bank$median_curve_LE[[bank$CI_param$n_theta - ind_theta + 1]][[bank$CI_param$n_q - ind_q +1]][[k + nr.computed]] <<- rev(1- res_Binomial[[k]])
+        }  
+      }else{
+        if(nr.computed>0){
+          for(k in 1:nr.computed){
+            ret[[k]] = bank$median_curve_LE[[ind_theta]][[ind_q]][[k]]
+          }
+        }
+        for(k in 1:length(res_Binomial)){
+          ret[[k + nr.computed]] = rev(1- res_Binomial[[k]])
+          bank$median_curve_GE[[bank$CI_param$n_theta - ind_theta + 1]][[bank$CI_param$n_q - ind_q +1]][[k + nr.computed]] <<- res_Binomial[[k]]
+          bank$median_curve_LE[[ind_theta]][[ind_q]][[k + nr.computed]] <<- rev(1- res_Binomial[[k]])
+        }
+      }
+      
+    }# end of case binomial
+  }else{ # if there are none to compute, we can just take from bank
+    ret = list()
+    if(is_GE){
+      for(k in 1:nr.curves){
+        ret[[k]] = bank$median_curve_GE[[ind_theta]][[ind_q]][[k]]
+      }
+    }else{
+      for(k in 1:nr.curves){
+        ret[[k]] = bank$median_curve_LE[[ind_theta]][[ind_q]][[k]]
       }
     }
   }
   
-  if(is_GE)
-    return(bank$median_curve_GE[[ind_theta]][[ind_q]])
-  return(bank$median_curve_LE[[ind_theta]][[ind_q]])
+  
+  return(ret)
   
 }
 
@@ -164,18 +201,96 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis_at_point = fun
                                                                                       nr.perms,
                                                                                       is_GE = T,
                                                                                       do_serial = F){
-  mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis(bank = bank,
+  computed_curves_object = mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis(bank = bank,
                                                                     ind_theta = ind_theta,
                                                                     ind_q = ind_q,
                                                                     nr.curves = nr.perms,
                                                                     is_GE = is_GE,
                                                                     do_serial = do_serial)
   
-  if(is_GE)
-    computed_curves_object = bank$median_curve_GE
-  else
-    computed_curves_object = bank$median_curve_LE
-  
-  ret = unlist(lapply(computed_curves_object[[ind_theta]][[ind_q]][1:nr.perms],FUN = function(x){x[a_index]}))
+  ret = unlist(lapply(computed_curves_object,FUN = function(x){x[a_index]}))
   return(ret)    
 }
+
+
+
+
+mcleod.CI.lower_bound_PV_for_worst_case=function(bank,
+                                                 ind_q,
+                                                 CDF_value,
+                                                 is_GE = F){
+  
+  current_q = bank$CI_param$q_vec[ind_q]
+  n = length(bank$N_vec)
+  t_value = n*CDF_value
+  prob_at_t_value = 0
+  if(is_GE & t_value == round(t_value)){
+    prob_at_t_value = dbinom(x = t_value,size = n,prob = current_q)
+  }
+  if(!is_GE & t_value == round(t_value)){
+    prob_at_t_value = dbinom(x = n-t_value,size = n,prob = 1-current_q)
+  }
+  
+  if(is_GE)
+    return(pbinom(q = t_value,size = n,prob = current_q,lower.tail = F)+prob_at_t_value)
+  return(pbinom(q = n-t_value,size = n,prob = 1-current_q,lower.tail = F)+prob_at_t_value)
+}
+
+
+mcleod.CI.PV.at_point = function(bank,
+                                 ind_theta,
+                                 ind_q,
+                                 CDF_value,
+                                 a_index,
+                                 alpha = 0.05,
+                                 nr.perm = 200,
+                                 do_check_vs_noiseless_case = T,
+                                 do_check_vs_minimum_number_of_required_iterations = T,
+                                 is_GE = F,
+                                 do_serial = F){
+  
+  current_q = bank$CI_param$q_vec[ind_q]
+  current_theta = bank$CI_param$theta_vec[ind_theta]
+  n = length(bank$N_vec)
+  
+  ret = NA
+  if(do_check_vs_noiseless_case){
+    ret = mcleod.CI.lower_bound_PV_for_worst_case(bank = bank,ind_q = ind_q,CDF_value = CDF_value,is_GE = is_GE)
+    if(ret>=alpha){
+      print(paste0('Break early by worst case'))
+      return(1)
+    }
+  }
+  
+  if(do_check_vs_minimum_number_of_required_iterations){
+    minimal_required_number_of_iterations = alpha*nr.perm
+    
+    null_stat_values_for_quick_test = mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis_at_point(bank,
+                                                                                                                 ind_theta = ind_theta,
+                                                                                                                 ind_q = ind_q,
+                                                                                                                 a_index = a_index,
+                                                                                                                 nr.perms = minimal_required_number_of_iterations,
+                                                                                                                 is_GE = is_GE,
+                                                                                                                 do_serial = do_serial)
+    if(( is_GE & all(null_stat_values_for_quick_test >= CDF_value)) |
+       (!is_GE & all(null_stat_values_for_quick_test <= CDF_value))){
+      print(paste0('Break early by iterations'))
+      return(1)
+    }
+    
+  }
+  
+  null_stat_values = mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis_at_point(bank,
+                                                                                                ind_theta = ind_theta,
+                                                                                                ind_q = ind_q,
+                                                                                                a_index = a_index,
+                                                                                                nr.perms = nr.perm,
+                                                                                                is_GE = is_GE,
+                                                                                                do_serial = do_serial)
+  
+  if(is_GE)
+    return(mean(c(null_stat_values,CDF_value) >= CDF_value))
+  return(mean(c(null_stat_values,CDF_value) <= CDF_value))
+  
+}
+
