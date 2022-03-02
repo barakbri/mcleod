@@ -1,5 +1,5 @@
 #mcleod package
-#- (Tuesday) create functions for estimating rho, for single theha
+#- (Tuesday) create functions for estimating rho, for single theha, then for all theths (interpolation)
 #- (Wednesday) create function for solving the estimation problem.
 #- (Wednesday) create new function for plotting
 
