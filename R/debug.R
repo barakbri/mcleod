@@ -47,130 +47,31 @@ if(F){
 if(F){
   
   n = 300
-  N = rep(20, n)
+  N = rpois(n = n,lambda = 20)
+  shape_1 = 2
+  shape_2 = 2
   set.seed(1)
-  X = rbinom(n = n,size = N,prob = runif(n = 100))
-  compute_P_values_over_grid = T
-  compute_CI_curves = F
-  verbose = T
-  ratio_holdout = 0.1
+  X = rbinom(n = n,size = N,prob = rbeta(n = n,shape1 = shape_1,shape2 = shape_2))
+  CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-2.5,2.5,0.25),
+                                             q_vec = seq(0.05,0.95,0.05),
+                                             do_serial = F,
+                                             rho.estimation.perm = 50)
   
-  ret = list()
-  
-  CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-2,2,0.5),
-                                             do_serial = F,rho.estimation.perm = 50)
-  
-  alpha.one.sided = (1-CI_param$alpha.CI)/2
-  n_holdout = ceiling(ratio_holdout * length(X))
-  X_rho = X[1:n_holdout]; N_rho = N[1:n_holdout]
-  X_test = X[-(1:n_holdout)]; N_test = N[-(1:n_holdout)]
+  CI.est.res = mcleod.estimate.CI(X = X,
+                                  N = N,
+                                  CI_param = CI_param,
+                                  ratio_holdout = 0.1,
+                                  compute_P_values_over_grid = F,
+                                  compute_CI_curves = T,
+                                  verbose = T)
   
   
-  bank <<- mcleod.CI.deconv.bank.constructor(N_test,CI_param)
-  
-  cl <- NULL
-  if(!CI_param$do_serial){
-    cl <- makeCluster(CI_param$nr.cores)
-    registerDoParallel(cl)
-  }
+  plot.mcleod.CI(mcleod.CI.obj = CI.est.res,
+                 X_axis_as_Prob = T,
+                 add_CI_curves_on_top_of_plot = F)
   
   
-  res_mcleod_holdout = mcleod(x.smp = X_rho,n.smp =N_rho,
-                           a.limits = bank$CI_param$a.limits,
-                           computational_parameters = bank$CI_param$comp_parameters,
-                           prior_parameters = bank$CI_param$prior_parameters,
-                           exact.numeric.integration = T)
+  oracle_x = seq(0.1,0.9,0.01)
+  lines(oracle_x,pbeta(q = oracle_x,shape1 = shape_1,shape2 = shape_2),col = 'blue',lwd =1.5)
   
-  CDF_holdout = mcleod:::compute_medians_curve(res_mcleod_holdout)
-  
-  start.time = Sys.time()
-  rho_calibration_obj = mcleod.CI.rho.calibration.constructor(bank_original = bank,
-                                      res_mcleod_holdout = res_mcleod_holdout,
-                                      CDF_holdout = CDF_holdout,
-                                      alpha.one.sided = alpha.one.sided,
-                                      verbose = T,
-                                      nr.perm = CI_param$rho.estimation.perm,
-                                      possible_rhos = CI_param$rho.possible.values,
-                                      q_for_rho_optimization = CI_param$rho.q_for_calibration)
-  end.time = Sys.time()
-  rho_calibration_obj$Elapsed_time = end.time-start.time
-  if(verbose){
-    print('rho calibration time')
-    print(end.time-start.time)  
-  }
-  bank <<- rho_calibration_obj$bank
-  rho_calibration_obj$bank <- NULL
-  
-  
-  #rho_calibration_obj$rho_approx_fun_LE(seq(-2,2,0.25))
-  #rho_calibration_obj$rho_approx_fun_GE(seq(-2,2,0.25))
-  
-  res_mcleod_data = mcleod(x.smp = X_test,n.smp =N_test,
-                           a.limits = bank$CI_param$a.limits,
-                           computational_parameters = bank$CI_param$comp_parameters,
-                           prior_parameters = bank$CI_param$prior_parameters,
-                           exact.numeric.integration = T)
-  
-  median_curve = mcleod:::compute_medians_curve(res_mcleod_data)
-  
-  
-  if(compute_P_values_over_grid){
-    start.time = Sys.time()
-    
-    
-    pvalues_grid = mcleod:::compute_P_values_over_grid_function(
-                               bank_original = bank,
-                               rho_calibration_obj = rho_calibration_obj,
-                               res_mcleod_data = res_mcleod_data,
-                               median_curve = median_curve,
-                               alpha.one.sided = alpha.one.sided,
-                               verbose = verbose)
-
-    
-    
-    end.time = Sys.time()
-    pvalues_grid$Elapsed_time = end.time-start.time
-    ret$pvalues_grid = pvalues_grid
-    if(verbose){
-      print('time for computing pvalues over grid of hypotheses')
-      print(end.time-start.time)  
-    }
-    bank <<- pvalues_grid$bank
-    pvalues_grid$bank <- NULL
-    #image(t(pvalues_grid$GE.pval.grid))
-    #image(t(pvalues_grid$LE.pval.grid))
-  }
-  
-  
-  
-  if(compute_CI_curves){
-    start.time = Sys.time()
-    computed_curves = mcleod:::compute_CI_curves_function(
-      bank_original = bank,
-      res_mcleod_data = res_mcleod_data,
-      rho_calibration_obj = rho_calibration_obj,
-      median_curve = median_curve,
-      alpha.one.sided = alpha.one.sided,
-      verbose = verbose
-    )
-    end.time = Sys.time()
-    computed_curves$Elapsed_time = end.time-start.time
-    ret$computed_curves = computed_curves
-    if(verbose){
-      print('time for computing CI curves ')
-      print(end.time-start.time)  
-    }
-    #bank <<- computed_curves$bank
-    #computed_curves$bank <- NULL
-  }
-  
-  ret$bank = bank
-  ret$rho_calibration_obj = rho_calibration_obj
-  class(ret) = mcleod:::CLASS.NAME.MCLEOD.CI
-  
-  if(!CI_param$do_serial){
-    stopCluster(cl)
-  }
-  
-  return(ret)
 }
