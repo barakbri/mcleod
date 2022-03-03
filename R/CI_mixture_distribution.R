@@ -264,7 +264,7 @@ mcleod.CI.PV.at_point = function(bank,
   if(do_check_vs_noiseless_case){
     ret = mcleod.CI.lower_bound_PV_for_worst_case(bank = bank,ind_q = ind_q,CDF_value = CDF_value,is_GE = is_GE)
     if(ret>=alpha){
-      print(paste0('Break early by worst case'))
+      #print(paste0('Break early by worst case'))
       return(1)
     }
   }
@@ -281,7 +281,7 @@ mcleod.CI.PV.at_point = function(bank,
                                                                                                                  do_serial = do_serial)
     if(( is_GE & all(null_stat_values_for_quick_test >= CDF_value)) |
        (!is_GE & all(null_stat_values_for_quick_test <= CDF_value))){
-      print(paste0('Break early by iterations'))
+      #print(paste0('Break early by iterations'))
       return(1)
     }
     
@@ -303,7 +303,7 @@ mcleod.CI.PV.at_point = function(bank,
 
 
 mcleod.CI.rho.calibration.constructor = function(
-  bank,
+  bank_original,
   res_mcleod_holdout,
   CDF_holdout,
   alpha.one.sided,
@@ -312,6 +312,7 @@ mcleod.CI.rho.calibration.constructor = function(
   q_for_rho_optimization = c(0.2,0.4,0.6,0.8),
   verbose = F
 ){
+  bank<<- bank_original
   optimal_rho_by_theta_for_GE = rep(NA,length(q_for_rho_optimization))
   optimal_rho_by_theta_for_LE = rep(NA,length(q_for_rho_optimization))
   theta_points = rep(NA,length(q_for_rho_optimization))
@@ -452,14 +453,15 @@ mcleod.CI.rho.calibration.constructor = function(
   
   rho_approx_fun_LE = approxfun(x = theta_points,y = optimal_rho_by_theta_for_LE,method = 'linear',rule = 2)
   rho_approx_fun_GE = approxfun(x = theta_points,y = optimal_rho_by_theta_for_GE,method = 'linear',rule = 2)
-  ret = list(rho_approx_fun_LE = rho_approx_fun_LE,rho_approx_fun_GE = rho_approx_fun_GE)
+  ret = list(rho_approx_fun_LE = rho_approx_fun_LE,rho_approx_fun_GE = rho_approx_fun_GE,bank = bank)
   class(ret) = CLASS.NAME.MCLEOD.CI.RHO
   return(ret)
 }
 
 
 
-compute_P_values_over_grid_function=function(bank,rho_calibration_obj,res_mcleod_data,median_curve,alpha.one.sided,verbose = F){
+compute_P_values_over_grid_function=function(bank_original,rho_calibration_obj,res_mcleod_data,median_curve,alpha.one.sided,verbose = F){
+  bank<<- bank_original
   GE.pval.grid = matrix(NA,ncol = bank$CI_param$n_theta,nrow = bank$CI_param$n_q,
                         dimnames = list(paste0('q = ',bank$CI_param$q_vec),paste0('theta = ',bank$CI_param$theta_vec)))
   LE.pval.grid = matrix(NA,ncol = bank$CI_param$n_theta,nrow = bank$CI_param$n_q,
@@ -515,18 +517,20 @@ compute_P_values_over_grid_function=function(bank,rho_calibration_obj,res_mcleod
   ret = list()
   ret$GE.pval.grid = GE.pval.grid
   ret$LE.pval.grid = LE.pval.grid
+  ret$bank = bank
   return(ret)
 }
 
 
 compute_CI_curves_function = function(
-  bank,
+  bank_original,
   res_mcleod_data ,
   rho_calibration_obj,
   median_curve,
   alpha.one.sided,
   verbose
 ){
+  bank<<- bank_original
   maximal_point_for_GE = rep(NA, bank$CI_param$n_theta)
   minimal_point_for_LE = rep(NA, bank$CI_param$n_theta)
   for(i in 1:bank$CI_param$n_theta){
@@ -669,5 +673,6 @@ compute_CI_curves_function = function(
   ret = list()
   ret$q_star_LE = q_star_LE
   ret$q_star_GE = q_star_GE
+  ret$bank = bank
   return(ret)
 }

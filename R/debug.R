@@ -50,7 +50,7 @@ if(F){
   N = rep(20, n)
   set.seed(1)
   X = rbinom(n = n,size = N,prob = runif(n = 100))
-  compute_P_values_over_grid = F
+  compute_P_values_over_grid = T
   compute_CI_curves = F
   verbose = T
   ratio_holdout = 0.1
@@ -84,7 +84,7 @@ if(F){
   CDF_holdout = mcleod:::compute_medians_curve(res_mcleod_holdout)
   
   start.time = Sys.time()
-  rho_calibration_obj = mcleod.CI.rho.calibration.constructor(bank = bank,
+  rho_calibration_obj = mcleod.CI.rho.calibration.constructor(bank_original = bank,
                                       res_mcleod_holdout = res_mcleod_holdout,
                                       CDF_holdout = CDF_holdout,
                                       alpha.one.sided = alpha.one.sided,
@@ -98,6 +98,8 @@ if(F){
     print('rho calibration time')
     print(end.time-start.time)  
   }
+  bank <<- rho_calibration_obj$bank
+  rho_calibration_obj$bank <- NULL
   
   
   #rho_calibration_obj$rho_approx_fun_LE(seq(-2,2,0.25))
@@ -116,13 +118,16 @@ if(F){
     start.time = Sys.time()
     
     
-    pvalues_grid = compute_P_values_over_grid_function(
-                               bank = bank,
+    pvalues_grid = mcleod:::compute_P_values_over_grid_function(
+                               bank_original = bank,
                                rho_calibration_obj = rho_calibration_obj,
                                res_mcleod_data = res_mcleod_data,
                                median_curve = median_curve,
                                alpha.one.sided = alpha.one.sided,
                                verbose = verbose)
+
+    
+    
     end.time = Sys.time()
     pvalues_grid$Elapsed_time = end.time-start.time
     ret$pvalues_grid = pvalues_grid
@@ -130,7 +135,8 @@ if(F){
       print('time for computing pvalues over grid of hypotheses')
       print(end.time-start.time)  
     }
-    
+    bank <<- pvalues_grid$bank
+    pvalues_grid$bank <- NULL
     #image(t(pvalues_grid$GE.pval.grid))
     #image(t(pvalues_grid$LE.pval.grid))
   }
@@ -139,8 +145,8 @@ if(F){
   
   if(compute_CI_curves){
     start.time = Sys.time()
-    computed_curves = compute_CI_curves_function(
-      bank = bank,
+    computed_curves = mcleod:::compute_CI_curves_function(
+      bank_original = bank,
       res_mcleod_data = res_mcleod_data,
       rho_calibration_obj = rho_calibration_obj,
       median_curve = median_curve,
@@ -154,7 +160,8 @@ if(F){
       print('time for computing CI curves ')
       print(end.time-start.time)  
     }
-    
+    #bank <<- computed_curves$bank
+    #computed_curves$bank <- NULL
   }
   
   ret$bank = bank
