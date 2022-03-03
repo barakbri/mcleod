@@ -456,3 +456,218 @@ mcleod.CI.rho.calibration.constructor = function(
   class(ret) = CLASS.NAME.MCLEOD.CI.RHO
   return(ret)
 }
+
+
+
+compute_P_values_over_grid_function=function(bank,rho_calibration_obj,res_mcleod_data,median_curve,alpha.one.sided,verbose = F){
+  GE.pval.grid = matrix(NA,ncol = bank$CI_param$n_theta,nrow = bank$CI_param$n_q,
+                        dimnames = list(paste0('q = ',bank$CI_param$q_vec),paste0('theta = ',bank$CI_param$theta_vec)))
+  LE.pval.grid = matrix(NA,ncol = bank$CI_param$n_theta,nrow = bank$CI_param$n_q,
+                        dimnames = list(paste0('q = ',bank$CI_param$q_vec),paste0('theta = ',bank$CI_param$theta_vec)))
+  
+  for(i in 1:bank$CI_param$n_q)
+    for(j in 1:bank$CI_param$n_theta){
+      if(verbose)
+        print(paste0('testing GE at q_ind = ',i,'/',bank$CI_param$n_q,' , theta_ind = ',j,'/',bank$CI_param$n_theta))
+      rho_GE = rho_calibration_obj$rho_approx_fun_GE(bank$CI_param$theta_vec[j])
+      rho_LE = rho_calibration_obj$rho_approx_fun_LE(bank$CI_param$theta_vec[j])
+      a_ind_GE = which(res_mcleod_data$parameters_list$a.vec <= bank$CI_param$theta_vec[j] - rho_GE)
+      if(length(a_ind_GE) > 0 ){
+        a_ind_GE = max(a_ind_GE)
+      }else{
+        a_ind_GE = 1
+      }
+      a_ind_LE = which(res_mcleod_data$parameters_list$a.vec >= bank$CI_param$theta_vec[j] + rho_LE)
+      if(length(a_ind_LE) > 0 ){
+        a_ind_LE = min(a_ind_LE)
+      }else{
+        a_ind_LE = length(res_mcleod_data$parameters_list$a.vec)
+      }
+      GE.pval.grid[i,j] = mcleod.CI.PV.at_point(bank = bank,
+                                                ind_theta = j,
+                                                ind_q = i,
+                                                CDF_value = median_curve[a_ind_GE],
+                                                a_index = a_ind_GE,
+                                                alpha = alpha.one.sided,
+                                                nr.perm = CI_param$nr.perms,
+                                                do_check_vs_noiseless_case = T,
+                                                do_check_vs_minimum_number_of_required_iterations = T,
+                                                is_GE = T,
+                                                do_serial = CI_param$do_serial)
+      
+      if(verbose)
+        print(paste0('testing LE at q_ind = ',i,'/',bank$CI_param$n_q,
+                     ' , theta_ind = ',j,'/',bank$CI_param$n_theta))
+      LE.pval.grid[i,j] = mcleod.CI.PV.at_point(bank = bank,
+                                                ind_theta = j,
+                                                ind_q = i,
+                                                CDF_value = median_curve[a_ind_LE],
+                                                a_index = a_ind_LE,
+                                                alpha = alpha.one.sided,
+                                                nr.perm = CI_param$nr.perms,
+                                                do_check_vs_noiseless_case = T,
+                                                do_check_vs_minimum_number_of_required_iterations = T,
+                                                is_GE = F,
+                                                do_serial = CI_param$do_serial)
+      
+    }
+  
+  ret = list()
+  ret$GE.pval.grid = GE.pval.grid
+  ret$LE.pval.grid = LE.pval.grid
+  return(ret)
+}
+
+
+compute_CI_curves_function = function(
+  bank,
+  res_mcleod_data ,
+  rho_calibration_obj,
+  median_curve,
+  alpha.one.sided,
+  verbose
+){
+  maximal_point_for_GE = rep(NA, bank$CI_param$n_theta)
+  minimal_point_for_LE = rep(NA, bank$CI_param$n_theta)
+  for(i in 1:bank$CI_param$n_theta){
+    current_theta = bank$CI_param$theta_vec[i]
+    ai_point_GE = min(which(res_mcleod_data$parameters_list$a.vec >= current_theta))
+    ai_point_LE = max(which(res_mcleod_data$parameters_list$a.vec <= current_theta))
+    maximal_point_for_GE[i] = max(which(bank$CI_param$q_vec<=median_curve[ai_point_GE]),1)
+    minimal_point_for_LE[i] = min(which(bank$CI_param$q_vec>=median_curve[ai_point_LE]),bank$CI_param$n_q)
+  }
+  
+  i_star_GE = rep(NA,bank$CI_param$n_theta)
+  q_star_GE = rep(NA,bank$CI_param$n_theta)
+  for(i in 1:bank$CI_param$n_theta){
+    if(verbose){
+      print(paste0('Computing GE confidence intervals, log.odds = ',bank$CI_param$theta_vec[i]))
+    }
+    #ai = 2
+    if(i == 1){
+      N_21_GE = 1
+    }else{
+      N_21_GE = min(i_star_GE[i-1] + 1,bank$CI_param$n_q)
+    }
+    N_22_GE = maximal_point_for_GE[i]
+    
+    
+    rho_GE = rho_calibration_obj$rho_approx_fun_GE(bank$CI_param$theta_vec[i])
+    a_ind_GE = which(res_mcleod_data$parameters_list$a.vec <= bank$CI_param$theta_vec[i] - rho_GE)
+    if(length(a_ind_GE) > 0 ){
+      a_ind_GE = max(a_ind_GE)
+    }else{
+      a_ind_GE = 1
+    }
+    
+    ind_to_select_from = (max(N_21_GE,1)):N_22_GE
+    rejected_ind = rep(NA,length(ind_to_select_from))
+    for(u in 1:length(rejected_ind)){
+      rejected_ind[u] = mcleod.CI.PV.at_point(bank = bank,
+                                              ind_theta = i,
+                                              ind_q = ind_to_select_from[u],
+                                              CDF_value = median_curve[a_ind_GE],
+                                              a_index = a_ind_GE,
+                                              alpha = alpha.one.sided,
+                                              nr.perm = CI_param$nr.perms,
+                                              do_check_vs_noiseless_case = T,
+                                              do_check_vs_minimum_number_of_required_iterations = T,
+                                              is_GE = T,
+                                              do_serial = CI_param$do_serial) <= alpha.one.sided
+      if(is.na(rejected_ind[u])) #need to handle bounds and shifts better
+        rejected_ind[u] = F  
+      if(u==1 & rejected_ind[u] == F ){
+        rejected_ind = rep(F,length(ind_to_select_from))
+        break
+      }
+      
+    }
+    if(i == 1 & rejected_ind[1] == F){
+      i_star_GE[i] = 0
+    }else if (i == 1){
+      i_star_GE[i] = ind_to_select_from[max(which(rejected_ind))]
+    }
+    
+    if(i >1 & rejected_ind[1] == F){
+      i_star_GE[i] = i_star_GE[i-1]
+    }else if (i >1){
+      i_star_GE[i] = ind_to_select_from[max(which(rejected_ind))]
+    }
+    if(i_star_GE[i] == 0){
+      q_star_GE[i] = 0  
+    }else{
+      q_star_GE[i] = bank$CI_param$q_vec[i_star_GE[i]]   
+    }
+    
+  }
+  
+  #maximum_point_to_consider_for_LE = max(which(is.finite(minimal_point_for_LE)))
+  #maximum_point_to_consider_for_LE = min(maximum_point_to_consider_for_LE,length(a.vec)-1 )
+  i_star_LE = rep(NA,bank$CI_param$n_theta)
+  q_star_LE = rep(NA,bank$CI_param$n_theta)
+  for(i in bank$CI_param$n_theta:1){
+    if(verbose){
+      print(paste0('Computing LE confidence intervals, log.odds = ',bank$CI_param$theta_vec[i]))
+    }
+    if(i == bank$CI_param$n_theta){
+      N_21_LE = bank$CI_param$n_q
+    }else{
+      N_21_LE = max(i_star_LE[i+1] - 1,1)
+    }
+    N_22_LE = minimal_point_for_LE[i]
+    
+    rho_LE = rho_calibration_obj$rho_approx_fun_LE(bank$CI_param$theta_vec[i])
+    a_ind_LE = which(res_mcleod_data$parameters_list$a.vec >= bank$CI_param$theta_vec[i] + rho_LE)
+    if(length(a_ind_LE) > 0 ){
+      a_ind_LE = min(a_ind_LE)
+    }else{
+      a_ind_LE = length(res_mcleod_data$parameters_list$a.vec)
+    }
+    
+    ind_to_select_from = N_22_LE:N_21_LE # (max(N_21_LE,1)):N_22_LE
+    
+    rejected_ind = rep(NA,length(ind_to_select_from))
+    
+    for(u in length(ind_to_select_from):1){
+      rejected_ind[u] = mcleod.CI.PV.at_point(bank = bank,
+                                              ind_theta = i,
+                                              ind_q = ind_to_select_from[u],
+                                              CDF_value = median_curve[a_ind_LE],
+                                              a_index = a_ind_LE,
+                                              alpha = alpha.one.sided,
+                                              nr.perm = CI_param$nr.perms,
+                                              do_check_vs_noiseless_case = T,
+                                              do_check_vs_minimum_number_of_required_iterations = T,
+                                              is_GE = F,
+                                              do_serial = CI_param$do_serial) <= alpha.one.sided
+      
+      if(is.na(rejected_ind[u])) #need to handle bounds and shifts better
+        rejected_ind[u] = F
+      if(u==length(ind_to_select_from) & rejected_ind[u] == F )
+        break
+    }
+    
+    if(i ==  bank$CI_param$n_theta & rejected_ind[length(rejected_ind)] == F){
+      i_star_LE[i] = bank$CI_param$n_q+1
+    }else if (i == bank$CI_param$n_theta){
+      i_star_LE[i] = ind_to_select_from[min(which(rejected_ind))]
+    }
+    
+    if(i < bank$CI_param$n_theta & rejected_ind[length(rejected_ind)] == F){
+      i_star_LE[i] = i_star_LE[i+1]
+    }else if (i < bank$CI_param$n_theta){
+      i_star_LE[i] = ind_to_select_from[min(which(rejected_ind))]
+    }
+    
+    if(i_star_LE[i] == bank$CI_param$n_q+1){
+      q_star_LE[i] = 1  
+    }else{
+      q_star_LE[i] = bank$CI_param$q_vec[i_star_LE[i]]   
+    }
+    
+  }
+  ret = list()
+  ret$q_star_LE = q_star_LE
+  ret$q_star_GE = q_star_GE
+  return(ret)
+}

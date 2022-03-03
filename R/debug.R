@@ -50,17 +50,23 @@ if(F){
   N = rep(20, n)
   set.seed(1)
   X = rbinom(n = n,size = N,prob = runif(n = 100))
+  compute_P_values_over_grid = F
+  compute_CI_curves = F
+  verbose = T
+  ratio_holdout = 0.1
+  
+  ret = list()
   
   CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-2,2,0.5),
                                              do_serial = F,rho.estimation.perm = 50)
   
   alpha.one.sided = (1-CI_param$alpha.CI)/2
-  X_rho = X[1:30]; N_rho = N[1:30]
-  X_test = X[-(1:30)]; N_test = N[-(1:30)]
-  n_test = length(X_rho)
+  n_holdout = ceiling(ratio_holdout * length(X))
+  X_rho = X[1:n_holdout]; N_rho = N[1:n_holdout]
+  X_test = X[-(1:n_holdout)]; N_test = N[-(1:n_holdout)]
   
   
-  bank = mcleod.CI.deconv.bank.constructor(N_test,CI_param)
+  bank <<- mcleod.CI.deconv.bank.constructor(N_test,CI_param)
   
   cl <- NULL
   if(!CI_param$do_serial){
@@ -87,16 +93,15 @@ if(F){
                                       possible_rhos = CI_param$rho.possible.values,
                                       q_for_rho_optimization = CI_param$rho.q_for_calibration)
   end.time = Sys.time()
-  print('rho calibration time')
-  print(end.time-start.time)
+  rho_calibration_obj$Elapsed_time = end.time-start.time
+  if(verbose){
+    print('rho calibration time')
+    print(end.time-start.time)  
+  }
+  
   
   #rho_calibration_obj$rho_approx_fun_LE(seq(-2,2,0.25))
   #rho_calibration_obj$rho_approx_fun_GE(seq(-2,2,0.25))
-  
-  GE.pval.grid = matrix(NA,ncol = bank$CI_param$n_theta,nrow = bank$CI_param$n_q,
-                        dimnames = list(paste0('q = ',bank$CI_param$q_vec),paste0('theta = ',bank$CI_param$theta_vec)))
-  LE.pval.grid = matrix(NA,ncol = bank$CI_param$n_theta,nrow = bank$CI_param$n_q,
-                        dimnames = list(paste0('q = ',bank$CI_param$q_vec),paste0('theta = ',bank$CI_param$theta_vec)))
   
   res_mcleod_data = mcleod(x.smp = X_test,n.smp =N_test,
                            a.limits = bank$CI_param$a.limits,
@@ -107,62 +112,58 @@ if(F){
   median_curve = mcleod:::compute_medians_curve(res_mcleod_data)
   
   
-  start.time = Sys.time()
-  for(i in 1:bank$CI_param$n_q)
-    for(j in 1:bank$CI_param$n_theta){
-      #i=1;j=5
-      print(paste0('testing GE at q_ind = ',i,'/',bank$CI_param$n_q,' , theta_ind = ',j,'/',bank$CI_param$n_theta))
-      rho_GE = rho_calibration_obj$rho_approx_fun_GE(bank$CI_param$theta_vec[j])
-      rho_LE = rho_calibration_obj$rho_approx_fun_LE(bank$CI_param$theta_vec[j])
-      a_ind_GE = which(res_mcleod_data$parameters_list$a.vec <= bank$CI_param$theta_vec[j] - rho_GE)
-      if(length(a_ind_GE) > 0 ){
-        a_ind_GE = max(a_ind_GE)
-      }else{
-        a_ind_GE = 1
-      }
-      a_ind_LE = which(res_mcleod_data$parameters_list$a.vec >= bank$CI_param$theta_vec[j] + rho_LE)
-      if(length(a_ind_LE) > 0 ){
-        a_ind_LE = min(a_ind_LE)
-      }else{
-        a_ind_LE = length(res_mcleod_data$parameters_list$a.vec)
-      }
-      GE.pval.grid[i,j] = mcleod.CI.PV.at_point(bank = bank,
-                                           ind_theta = j,
-                                           ind_q = i,
-                                           CDF_value = median_curve[a_ind_GE],
-                                           a_index = a_ind_GE,
-                                           alpha = alpha.one.sided,
-                                           nr.perm = CI_param$nr.perms,
-                                           do_check_vs_noiseless_case = T,
-                                           do_check_vs_minimum_number_of_required_iterations = T,
-                                           is_GE = T,
-                                           do_serial = CI_param$do_serial)
-      
-      print(paste0('testing LE at q_ind = ',i,'/',bank$CI_param$n_q,
-                   ' , theta_ind = ',j,'/',bank$CI_param$n_theta))
-      LE.pval.grid[i,j] = mcleod.CI.PV.at_point(bank = bank,
-                                                ind_theta = j,
-                                                ind_q = i,
-                                                CDF_value = median_curve[a_ind_LE],
-                                                a_index = a_ind_LE,
-                                                alpha = alpha.one.sided,
-                                                nr.perm = CI_param$nr.perms,
-                                                do_check_vs_noiseless_case = T,
-                                                do_check_vs_minimum_number_of_required_iterations = T,
-                                                is_GE = F,
-                                                do_serial = CI_param$do_serial)
-        
+  if(compute_P_values_over_grid){
+    start.time = Sys.time()
+    
+    
+    pvalues_grid = compute_P_values_over_grid_function(
+                               bank = bank,
+                               rho_calibration_obj = rho_calibration_obj,
+                               res_mcleod_data = res_mcleod_data,
+                               median_curve = median_curve,
+                               alpha.one.sided = alpha.one.sided,
+                               verbose = verbose)
+    end.time = Sys.time()
+    pvalues_grid$Elapsed_time = end.time-start.time
+    ret$pvalues_grid = pvalues_grid
+    if(verbose){
+      print('time for computing pvalues over grid of hypotheses')
+      print(end.time-start.time)  
     }
-  end.time = Sys.time()
-  print('time for computing pvalues over grid of hypotheses')
-  print(end.time-start.time)
+    
+    #image(t(pvalues_grid$GE.pval.grid))
+    #image(t(pvalues_grid$LE.pval.grid))
+  }
+  
+  
+  
+  if(compute_CI_curves){
+    start.time = Sys.time()
+    computed_curves = compute_CI_curves_function(
+      bank = bank,
+      res_mcleod_data = res_mcleod_data,
+      rho_calibration_obj = rho_calibration_obj,
+      median_curve = median_curve,
+      alpha.one.sided = alpha.one.sided,
+      verbose = verbose
+    )
+    end.time = Sys.time()
+    computed_curves$Elapsed_time = end.time-start.time
+    ret$computed_curves = computed_curves
+    if(verbose){
+      print('time for computing CI curves ')
+      print(end.time-start.time)  
+    }
+    
+  }
+  
+  ret$bank = bank
+  ret$rho_calibration_obj = rho_calibration_obj
+  class(ret) = mcleod:::CLASS.NAME.MCLEOD.CI
   
   if(!CI_param$do_serial){
     stopCluster(cl)
   }
   
-  image(t(GE.pval.grid))
-  image(t(LE.pval.grid))
-  #View(LE.pval.grid)
-    
+  return(ret)
 }
