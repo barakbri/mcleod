@@ -1,7 +1,7 @@
 #mcleod package
-#- (Tuesday) create functions for estimating rho, for single theha, then for all theths (interpolation)
-#- (Wednesday) create function for solving the estimation problem.
-#- (Wednesday) create new function for plotting
+#-  create functions for estimating rho, for single theha, then for all theths (interpolation)
+#-  create function for solving the estimation problem.
+#-  create new function for plotting
 
 # Add functions as imports
 # Add checks to this file
@@ -29,7 +29,10 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
                                            alpha.CI = 0.95,
                                            rho.estimation.method = NULL,
                                            rho.possible.values = seq(0.1,0.5,0.1),
-                                           nr.cores = detectCores() - 1){
+                                           rho.estimation.perm = 50,
+                                           rho.q_for_calibration = c(0.2,0.4,0.6,0.8),
+                                           do_serial = F,
+                                           nr.cores = ceiling(detectCores()/2)){
   
   library(doRNG)
   library(doParallel)
@@ -49,6 +52,10 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
   ret$nr.cores = nr.cores
   ret$nr.perms = nr.perms
   ret$alpha.CI = alpha.CI
+  ret$do_serial = do_serial
+  ret$rho.possible.values = rho.possible.values
+  ret$rho.estimation.perm = rho.estimation.perm
+  ret$rho.q_for_calibration = rho.q_for_calibration
   class(ret) = CLASS.NAME.MCLEOD.CI.PARAMETERS
   return(ret)
 }
@@ -263,7 +270,7 @@ mcleod.CI.PV.at_point = function(bank,
   }
   
   if(do_check_vs_minimum_number_of_required_iterations){
-    minimal_required_number_of_iterations = alpha*nr.perm
+    minimal_required_number_of_iterations = ceiling(alpha*nr.perm)
     
     null_stat_values_for_quick_test = mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis_at_point(bank,
                                                                                                                  ind_theta = ind_theta,
@@ -294,3 +301,158 @@ mcleod.CI.PV.at_point = function(bank,
   
 }
 
+
+mcleod.CI.rho.calibration.constructor = function(
+  bank,
+  res_mcleod_holdout,
+  CDF_holdout,
+  alpha.one.sided,
+  nr.perm = 200,
+  possible_rhos = c(0.1,0.2,0.3,0.4,0.5),
+  q_for_rho_optimization = c(0.2,0.4,0.6,0.8),
+  verbose = F
+){
+  optimal_rho_by_theta_for_GE = rep(NA,length(q_for_rho_optimization))
+  optimal_rho_by_theta_for_LE = rep(NA,length(q_for_rho_optimization))
+  theta_points = rep(NA,length(q_for_rho_optimization))
+  for(index_q in 1:length(q_for_rho_optimization)){
+    #index_q = 2
+    current_q = q_for_rho_optimization[index_q]
+    a_ind_for_theta_for_current_q = which.min(abs(CDF_holdout - current_q))
+    theta_current_q = res_mcleod_holdout$parameters_list$a.vec[a_ind_for_theta_for_current_q]
+    theta_current_q_ind = which.min(abs(bank$CI_param$theta_vec - theta_current_q))
+    theta_current_q = bank$CI_param$theta_vec[theta_current_q_ind]
+    theta_points[index_q] = theta_current_q
+    if(verbose)
+      print(paste0('optimizing rho for q=',current_q,', which is equivalent to theta = ',theta_current_q,' in the holdout data'))
+    
+    q_lower_by_rho = rep(NA,length(possible_rhos))
+    point_to_start_testing_GE = qbinom(p = alpha.one.sided,size = length(bank$N_vec),prob = current_q) / length(bank$N_vec)
+    points_to_test_GE = which(bank$CI_param$q_vec<= point_to_start_testing_GE)
+    points_to_test_GE = tail(points_to_test_GE,n = 3)
+    
+    if(length(points_to_test_GE)>=2){
+      if(verbose)
+        print(paste0('selecting rho for GE'))
+      for(index_rho in 1:length(possible_rhos)){
+        
+        current_rho = possible_rhos[index_rho]
+        
+        a_ind_GE = which(res_mcleod_holdout$parameters_list$a.vec <= theta_current_q - current_rho)
+        if(length(a_ind_GE) > 0 ){
+          a_ind_GE = max(a_ind_GE)
+        }else{
+          a_ind_GE = 1
+        }
+        
+        PVs_at_Qs = rep(NA,length(points_to_test_GE))
+        for(i in 1:length(points_to_test_GE)){
+          PVs_at_Qs[i] = mcleod.CI.PV.at_point(bank = bank,
+                                               ind_theta = theta_current_q_ind,
+                                               ind_q = points_to_test_GE[i],
+                                               CDF_value = CDF_holdout[a_ind_GE],
+                                               a_index = a_ind_GE,
+                                               alpha = alpha.one.sided,
+                                               nr.perm = nr.perm,
+                                               do_check_vs_noiseless_case = F,
+                                               do_check_vs_minimum_number_of_required_iterations = F,
+                                               is_GE = T,
+                                               do_serial = bank$CI_param$do_serial)
+        }
+        
+        #create model:
+        if(length(unique(PVs_at_Qs))>1){
+          PVs_at_Qs = PVs_at_Qs*(nr.perm)/(nr.perm+1) #this is to make sure we dont have 1's. 0's are avoided by adding the test statistic to the perms when computing a PV value
+          logits = log.odds(PVs_at_Qs)
+          model = lm(logits~bank$CI_param$q_vec[points_to_test_GE])
+          b0 = model$coefficients[1]
+          b1 = model$coefficients[2]
+          q_lower_by_rho[index_rho] = (log.odds(alpha.one.sided) - b0 )/b1
+        }else{
+          q_lower_by_rho[index_rho] = max(bank$CI_param$q_vec[points_to_test_GE])
+        }
+      }
+      
+      optimal_rho_by_theta_for_GE[index_q] =  which.max(q_lower_by_rho)
+    }
+    
+    
+    q_upper_by_rho = rep(NA,length(possible_rhos))
+    point_to_start_testing_LE = qbinom(p = 1-alpha.one.sided,size = length(bank$N_vec),prob = current_q) / length(bank$N_vec)
+    points_to_test_LE = which(bank$CI_param$q_vec>= point_to_start_testing_LE)
+    points_to_test_LE = head(points_to_test_LE,n = 3)
+    
+    if(length(points_to_test_LE)>=2){
+      if(verbose)
+        print(paste0('selecting rho for LE'))
+      for(index_rho in 1:length(possible_rhos)){
+        
+        current_rho = possible_rhos[index_rho]
+        
+        a_ind_LE = which(res_mcleod_holdout$parameters_list$a.vec >= theta_current_q + current_rho)
+        if(length(a_ind_LE) > 0 ){
+          a_ind_LE = min(a_ind_LE)
+        }else{
+          a_ind_LE = length(res_mcleod_holdout$parameters_list$a.vec)
+        }
+        
+        PVs_at_Qs = rep(NA,length(points_to_test_LE))
+        for(i in 1:length(points_to_test_LE)){
+          PVs_at_Qs[i] = mcleod.CI.PV.at_point(bank = bank,
+                                               ind_theta = theta_current_q_ind,
+                                               ind_q = points_to_test_LE[i],
+                                               CDF_value = CDF_holdout[a_ind_LE],
+                                               a_index = a_ind_LE,
+                                               alpha = alpha.one.sided,
+                                               nr.perm = nr.perm,
+                                               do_check_vs_noiseless_case = F,
+                                               do_check_vs_minimum_number_of_required_iterations = F,
+                                               is_GE = F,
+                                               do_serial = bank$CI_param$do_serial)
+        }
+        
+        #create model:
+        PVs_at_Qs = PVs_at_Qs*(nr.perm)/(nr.perm+1) #this is to make sure we dont have 1's. 0's are avoided by adding the test statistic to the perms when computing a PV value
+        if(length(unique(PVs_at_Qs))>1){
+          logits = log.odds(PVs_at_Qs)
+          model = lm(logits~bank$CI_param$q_vec[points_to_test_LE])
+          b0 = model$coefficients[1]
+          b1 = model$coefficients[2]
+          q_upper_by_rho[index_rho] = (log.odds(alpha.one.sided) - b0 )/b1  
+        }else{
+          q_upper_by_rho[index_rho] = min(bank$CI_param$q_vec[points_to_test_LE])
+        }
+        
+      }
+      optimal_rho_by_theta_for_LE[index_q] = which.min(q_upper_by_rho)
+    }
+    
+  }# end of loop over q
+  
+  for(i in 2:length(optimal_rho_by_theta_for_LE)){
+    if(is.na(optimal_rho_by_theta_for_LE[i]))
+      optimal_rho_by_theta_for_LE[i] = optimal_rho_by_theta_for_LE[i-1]
+  }
+  for(i in (length(optimal_rho_by_theta_for_GE)-1):1){
+    if(is.na(optimal_rho_by_theta_for_GE[i]))
+      optimal_rho_by_theta_for_GE[i] = optimal_rho_by_theta_for_GE[i+1]
+  }
+  optimal_rho_by_theta_for_LE = c(optimal_rho_by_theta_for_LE[1],
+                                  optimal_rho_by_theta_for_LE,
+                                  optimal_rho_by_theta_for_LE[length(optimal_rho_by_theta_for_LE)])
+  optimal_rho_by_theta_for_GE = c(optimal_rho_by_theta_for_GE[1],
+                                  optimal_rho_by_theta_for_GE,
+                                  optimal_rho_by_theta_for_GE[length(optimal_rho_by_theta_for_GE)])
+  
+  optimal_rho_by_theta_for_LE = possible_rhos[optimal_rho_by_theta_for_LE]
+  optimal_rho_by_theta_for_GE = possible_rhos[optimal_rho_by_theta_for_GE]
+  theta_points = c(min(bank$CI_param$theta_vec),
+                   theta_points,
+                   max(bank$CI_param$theta_vec))
+  
+  rho_approx_fun_LE = approxfun(x = theta_points,y = optimal_rho_by_theta_for_LE,method = 'linear',rule = 2)
+  rho_approx_fun_GE = approxfun(x = theta_points,y = optimal_rho_by_theta_for_GE,method = 'linear',rule = 2)
+  ret = list(rho_approx_fun_LE = rho_approx_fun_LE,rho_approx_fun_GE = rho_approx_fun_GE)
+  class(ret) = CLASS.NAME.MCLEOD.CI.RHO
+  return(ret)
+}
