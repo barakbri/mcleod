@@ -1,9 +1,8 @@
-#mcleod package
-#-  create functions for estimating rho, for single theha, then for all theths (interpolation)
-#-  create function for solving the estimation problem.
-#-  create new function for plotting
 
-# Add functions as imports
+# single function for computing ai based on theta and rho
+# functions for confidence intervals, for single theta and rho
+
+# Add packages as imports
 # Add checks to this file
 # Finish package documentation
 # Build a vignette
@@ -27,7 +26,7 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
                                            prior_parameters = mcleod.prior.parameters(),
                                            nr.perms = 200,
                                            alpha.CI = 0.95,
-                                           rho.estimation.method = NULL,
+                                           rho.set.value = NA,
                                            rho.possible.values = seq(0.1,0.5,0.1),
                                            rho.estimation.perm = 50,
                                            rho.q_for_calibration = c(0.2,0.4,0.6,0.8),
@@ -48,7 +47,7 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
   ret$sampling_distribution = sampling_distribution
   ret$comp_parameters = comp_parameters
   ret$prior_parameters = prior_parameters
-  ret$rho.estimation.method = rho.estimation.method
+  ret$rho.set.value = rho.set.value
   ret$nr.cores = nr.cores
   ret$nr.perms = nr.perms
   ret$alpha.CI = alpha.CI
@@ -61,21 +60,27 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
 }
 
 
-mcleod.CI.deconv.bank.constructor = function(N_vec=NULL,CI_param){
+mcleod.CI.deconv.bank.constructor = function(N_vec=NULL,CI_param,Use_Existing_Permutations_From_Object = NULL){
   n_theta = CI_param$n_theta
   n_q = CI_param$n_q
   
-  median_curve_GE = list()
-  median_curve_LE = list()
-  
-  for(i in 1:n_theta){
-    median_curve_GE[[i]] = list()
-    median_curve_LE[[i]] = list()
-    for(j in 1:n_q){
-      median_curve_GE[[i]][[j]] = list()
-      median_curve_LE[[i]][[j]] = list()
-    }
+  if(!is.null(Use_Existing_Permutations_From_Object)){
+    median_curve_GE = Use_Existing_Permutations_From_Object$bank$median_curve_GE
+    median_curve_LE = Use_Existing_Permutations_From_Object$bank$median_curve_LE
+  }else{
+    median_curve_GE = list()
+    median_curve_LE = list()
+    
+    for(i in 1:n_theta){
+      median_curve_GE[[i]] = list()
+      median_curve_LE[[i]] = list()
+      for(j in 1:n_q){
+        median_curve_GE[[i]][[j]] = list()
+        median_curve_LE[[i]][[j]] = list()
+      }
+    }  
   }
+  
   ret = list()
   ret$CI_param = CI_param
   ret$median_curve_GE = median_curve_GE
@@ -685,18 +690,25 @@ mcleod.estimate.CI = function(X,
                               ratio_holdout = 0.1,
                               compute_P_values_over_grid = F,
                               compute_CI_curves = T,
-                              verbose = T ){
+                              verbose = T,Use_Existing_Permutations_From_Object = NULL ){
   
   ret = list()
   
   
   alpha.one.sided = (1-CI_param$alpha.CI)/2
-  n_holdout = ceiling(ratio_holdout * length(X))
-  X_rho = X[1:n_holdout]; N_rho = N[1:n_holdout]
-  X_test = X[-(1:n_holdout)]; N_test = N[-(1:n_holdout)]
+  
+  if(is.na(CI_param$rho.set.value)){
+    n_holdout = ceiling(ratio_holdout * length(X))
+    X_rho = X[1:n_holdout]; N_rho = N[1:n_holdout]
+    X_test = X[-(1:n_holdout)]; N_test = N[-(1:n_holdout)]
+  }else{
+    n_holdout = 0
+    X_rho = NA; N_rho = NA
+    X_test = X; N_test = N
+  }
   
   
-  bank <<- mcleod.CI.deconv.bank.constructor(N_test,CI_param)
+  bank <<- mcleod.CI.deconv.bank.constructor(N_test,CI_param,Use_Existing_Permutations_From_Object)
   
   cl <- NULL
   if(!CI_param$do_serial){
@@ -704,32 +716,55 @@ mcleod.estimate.CI = function(X,
     registerDoParallel(cl)
   }
   
-  
-  res_mcleod_holdout = mcleod(x.smp = X_rho,n.smp =N_rho,
-                              a.limits = bank$CI_param$a.limits,
-                              computational_parameters = bank$CI_param$comp_parameters,
-                              prior_parameters = bank$CI_param$prior_parameters,
-                              exact.numeric.integration = T)
-  
-  CDF_holdout = compute_medians_curve(res_mcleod_holdout)
-  
-  start.time = Sys.time()
-  rho_calibration_obj = mcleod.CI.rho.calibration.constructor(bank_original = bank,
-                                                              res_mcleod_holdout = res_mcleod_holdout,
-                                                              CDF_holdout = CDF_holdout,
-                                                              alpha.one.sided = alpha.one.sided,
-                                                              verbose = T,
-                                                              nr.perm = CI_param$rho.estimation.perm,
-                                                              possible_rhos = CI_param$rho.possible.values,
-                                                              q_for_rho_optimization = CI_param$rho.q_for_calibration)
-  end.time = Sys.time()
-  rho_calibration_obj$Elapsed_time = end.time-start.time
-  if(verbose){
-    print('rho calibration time')
-    print(end.time-start.time)  
+  if(is.na(CI_param$rho.set.value)){
+    res_mcleod_holdout = mcleod(x.smp = X_rho,n.smp =N_rho,
+                                a.limits = bank$CI_param$a.limits,
+                                computational_parameters = bank$CI_param$comp_parameters,
+                                prior_parameters = bank$CI_param$prior_parameters,
+                                exact.numeric.integration = T)
+    
+    CDF_holdout = compute_medians_curve(res_mcleod_holdout)
+    
+    start.time = Sys.time()
+    rho_calibration_obj = mcleod.CI.rho.calibration.constructor(bank_original = bank,
+                                                                res_mcleod_holdout = res_mcleod_holdout,
+                                                                CDF_holdout = CDF_holdout,
+                                                                alpha.one.sided = alpha.one.sided,
+                                                                verbose = T,
+                                                                nr.perm = CI_param$rho.estimation.perm,
+                                                                possible_rhos = CI_param$rho.possible.values,
+                                                                q_for_rho_optimization = CI_param$rho.q_for_calibration)
+    end.time = Sys.time()
+    rho_calibration_obj$Elapsed_time = end.time-start.time
+    if(verbose){
+      print('rho calibration time')
+      print(end.time-start.time)  
+    }
+    bank <<- rho_calibration_obj$bank
+    rho_calibration_obj$bank <- NULL
+    
+  }else{
+    if(verbose){
+      print(paste0('rho set manually to ',CI_param$rho.set.value))
+    }
+    res_mcleod_holdout = NA
+    CDF_holdout = NA
+    rho_calibration_obj = list()
+    theta_points = c(min(CI_param$theta_vec),
+                     0,
+                     max(CI_param$theta_vec))
+    
+    rho_approx_fun_LE = approxfun(x = theta_points,
+                                  y = rep(CI_param$rho.set.value,3),
+                                  method = 'linear',rule = 2)
+    rho_approx_fun_GE = approxfun(x = theta_points,
+                                  y = rep(CI_param$rho.set.value,3),
+                                  method = 'linear',rule = 2)
+    rho_calibration_obj = list(rho_approx_fun_LE = rho_approx_fun_LE,
+                               rho_approx_fun_GE = rho_approx_fun_GE,
+                               bank = bank)
+    class(rho_calibration_obj) = CLASS.NAME.MCLEOD.CI.RHO
   }
-  bank <<- rho_calibration_obj$bank
-  rho_calibration_obj$bank <- NULL
   
   res_mcleod_data = mcleod(x.smp = X_test,n.smp =N_test,
                            a.limits = bank$CI_param$a.limits,
@@ -814,7 +849,7 @@ plot.mcleod.CI=function(mcleod.CI.obj,
                         X_axis_as_Prob = T,
                         add_CI_curves_on_top_of_plot=F,
                         point_estimate_color = 'red',
-                        CI_curves_color = 'black'){
+                        CI_curves_color = 'black',title = ''){
   
   #OBJECT_IS_CLASS.NAME.MCLEOD.CI = (class(mcleod.CI.obj) == CLASS.NAME.MCLEOD.CI)
   
@@ -834,7 +869,7 @@ plot.mcleod.CI=function(mcleod.CI.obj,
   }
   if(!add_CI_curves_on_top_of_plot)
     plot(x_axis,mcleod.CI.obj$CDF_data,
-         col =  point_estimate_color,type = 'b',pch = 20,xlab = x_axis_label,ylab = 'CDF')
+         col =  point_estimate_color,type = 'b',pch = 20,xlab = x_axis_label,ylab = 'CDF',main = title)
   lines(x_axis_theta,curve_obj$q_star_LE,col = CI_curves_color)
   lines(x_axis_theta,curve_obj$q_star_GE,col = CI_curves_color)
 }

@@ -47,11 +47,15 @@ if(F){
 if(F){
   
   n = 300
-  N = rpois(n = n,lambda = 20)
+  N = rep(20,n) #rpois(n = n,lambda = 20)
   shape_1 = 2
   shape_2 = 2
   set.seed(1)
-  X = rbinom(n = n,size = N,prob = rbeta(n = n,shape1 = shape_1,shape2 = shape_2))
+  p = inv.log.odds(rnorm(n,-2,0.5)+3*rbinom(n,1,0.3))
+  #X = rbinom(n = n,size = N,prob = rbeta(n = n,shape1 = shape_1,shape2 = shape_2))
+  X = rbinom(n = n,size = N,prob = p)
+  p_true = inv.log.odds(rnorm(1E6,-2,0.5)+3*rbinom(1E6,1,0.3))
+  
   CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-2.5,2.5,0.25),
                                              q_vec = seq(0.05,0.95,0.05),
                                              do_serial = F,
@@ -66,12 +70,59 @@ if(F){
                                   verbose = T)
   
   
+  
   plot.mcleod.CI(mcleod.CI.obj = CI.est.res,
                  X_axis_as_Prob = T,
                  add_CI_curves_on_top_of_plot = F)
   
   
   oracle_x = seq(0.1,0.9,0.01)
-  lines(oracle_x,pbeta(q = oracle_x,shape1 = shape_1,shape2 = shape_2),col = 'blue',lwd =1.5)
+  #lines(oracle_x,pbeta(q = oracle_x,shape1 = shape_1,shape2 = shape_2),col = 'blue',lwd =1.5)
+  lines(oracle_x,(ecdf(p_true))(oracle_x),col = 'blue',lwd =1.5)
+  
+  
+  
+  CI.est.res.fixed.rho.list = list()
+  fixed_rho_values = seq(0,1,0.2)
+  for(i in 1:length(fixed_rho_values)){
+    print(paste0('Solving for fixed rho = ',fixed_rho_values[i]))
+    CI_param_rho_fixed = mcleod.CI.estimation.parameters(theta_vec = seq(-2.5,2.5,0.25),
+                                               q_vec = seq(0.05,0.95,0.05),
+                                               do_serial = F,
+                                               rho.estimation.perm = 50,
+                                               rho.set.value = fixed_rho_values[i])
+    if(i==1){
+      perm.object = NULL
+    }else{
+      perm.object = CI.est.res.fixed.rho.list[[i-1]]
+    }
+    CI.est.res.fixed.rho.list[[i]] = mcleod.estimate.CI(X = X,
+                                                  N = N,
+                                                  CI_param = CI_param_rho_fixed,
+                                                  ratio_holdout = 0.1,
+                                                  compute_P_values_over_grid = F,
+                                                  compute_CI_curves = T,
+                                                  verbose = F,
+                                                  Use_Existing_Permutations_From_Object = CI.est.res)  
+  }
+  
+  
+  par(mfrow=c(2,3))
+  for(i in 1:length(fixed_rho_values)){
+    plot.mcleod.CI(mcleod.CI.obj = CI.est.res,
+                   X_axis_as_Prob = T,
+                   add_CI_curves_on_top_of_plot = F,title = paste0('rho = ',fixed_rho_values[i]))
+    
+    
+     oracle_x = seq(0.1,0.9,0.01)
+    # lines(oracle_x,pbeta(q = oracle_x,shape1 = shape_1,shape2 = shape_2),col = 'blue',lwd =1.5)
+     lines(oracle_x,(ecdf(p_true))(oracle_x),col = 'blue',lwd =1.5)
+    # 
+    
+    plot.mcleod.CI(mcleod.CI.obj = CI.est.res.fixed.rho.list[[i]],
+                   X_axis_as_Prob = T,
+                   add_CI_curves_on_top_of_plot = T,CI_curves_color = 'orange')  
+  }
+  par(mfrow=c(1,1))
   
 }
