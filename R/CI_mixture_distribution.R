@@ -102,11 +102,11 @@ compute_medians_curve = function(mcleod_for_data){
 
 
 mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
-                                                                      ind_theta,
-                                                                      ind_q,
-                                                                      nr.curves,
-                                                                      is_GE = T,
-                                                                      do_serial = T){
+                                                                           ind_theta,
+                                                                           ind_q,
+                                                                           nr.curves,
+                                                                           is_GE = T,
+                                                                           do_serial = T){
   if(bank$CI_param$sampling_distribution != 'binomial')
     stop('bank only supports binomial')
   
@@ -154,10 +154,10 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
       }else{
         #this assumes a cluster is registered
         res_Binomial = foreach(seed=(nr.computed+1):nr.curves, .options.RNG=1,
-                                  .export = c('ind_theta','ind_q','bank','worker_function_Binomial_GE')) %dorng% {
-                                    worker_function_Binomial_GE(seed)
-                                    
-                                  }
+                               .export = c('ind_theta','ind_q','bank','worker_function_Binomial_GE')) %dorng% {
+                                 worker_function_Binomial_GE(seed)
+                                 
+                               }
       }
       
       #Collecting results
@@ -215,11 +215,11 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis_at_point = fun
                                                                                       is_GE = T,
                                                                                       do_serial = F){
   computed_curves_object = mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis(bank = bank,
-                                                                    ind_theta = ind_theta,
-                                                                    ind_q = ind_q,
-                                                                    nr.curves = nr.perms,
-                                                                    is_GE = is_GE,
-                                                                    do_serial = do_serial)
+                                                                                             ind_theta = ind_theta,
+                                                                                             ind_q = ind_q,
+                                                                                             nr.curves = nr.perms,
+                                                                                             is_GE = is_GE,
+                                                                                             do_serial = do_serial)
   
   ret = unlist(lapply(computed_curves_object,FUN = function(x){x[a_index]}))
   return(ret)    
@@ -368,7 +368,7 @@ mcleod.CI.rho.calibration.constructor = function(
                                                       theta = theta_current_q,
                                                       rho = current_rho,
                                                       is_GE = T)
-          
+        
         PVs_at_Qs = rep(NA,length(points_to_test_GE))
         for(i in 1:length(points_to_test_GE)){
           PVs_at_Qs[i] = mcleod.CI.PV.at_point(bank = bank,
