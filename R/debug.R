@@ -43,16 +43,54 @@ if(F){
   stopCluster(cl)
 }
 
+if(F){
+  
+  n = 300
+  N = rep(20,n)
+  shape_1 = 2
+  shape_2 = 2
+  set.seed(3)
+  X = rbinom(n = n,size = N,prob = rbeta(n = n,shape1 = shape_1,shape2 = shape_2))
+  
+  CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-2.5,2.5,0.25),
+                                             q_vec = seq(0.05,0.95,0.05),
+                                             do_serial = F,
+                                             rho.estimation.perm = 50)
+  
+  CI.est.res = mcleod.estimate.CI(X = X,
+                                  N = N,
+                                  CI_param = CI_param,
+                                  ratio_holdout = 0.2,
+                                  compute_P_values_over_grid = F,
+                                  compute_CI_curves = T,
+                                  verbose = T)
+  
+  
+  
+  plot.mcleod.CI(mcleod.CI.obj = CI.est.res,
+                 X_axis_as_Prob = T,
+                 add_CI_curves_on_top_of_plot = F)
+  
+  
+  oracle_x = seq(0.1,0.9,0.01)
+  lines(oracle_x,pbeta(q = oracle_x,shape1 = shape_1,shape2 = shape_2),col = 'blue',lwd =1.5)
+  
+  #plot rho:
+  x = seq(-3,3,0.1)
+  plot(x = x,y= CI.est.res$rho_calibration_obj$rho_approx_fun_LE(x),ylim = c(0,1),col = 'red',type = 'l')
+  lines(x=x,y=CI.est.res$rho_calibration_obj$rho_approx_fun_GE(x),col = 'blue')
+  
+}
 
 if(F){
   
   n = 300
-  N = rep(20,n) #rpois(n = n,lambda = 20)
+  N = rep(20,n) 
   shape_1 = 2
   shape_2 = 2
   set.seed(1)
   p = inv.log.odds(rnorm(n,-2,0.5)+3*rbinom(n,1,0.3))
-  #X = rbinom(n = n,size = N,prob = rbeta(n = n,shape1 = shape_1,shape2 = shape_2))
+  
   X = rbinom(n = n,size = N,prob = p)
   p_true = inv.log.odds(rnorm(1E6,-2,0.5)+3*rbinom(1E6,1,0.3))
   
@@ -77,8 +115,13 @@ if(F){
   
   
   oracle_x = seq(0.1,0.9,0.01)
-  #lines(oracle_x,pbeta(q = oracle_x,shape1 = shape_1,shape2 = shape_2),col = 'blue',lwd =1.5)
+  
   lines(oracle_x,(ecdf(p_true))(oracle_x),col = 'blue',lwd =1.5)
+  
+  #plot rho:
+  x = seq(-3,3,0.1)
+  plot(x = x,y= CI.est.res$rho_calibration_obj$rho_approx_fun_LE(x),ylim = c(0,1),col = 'red',type = 'l')
+  lines(x=x,y=CI.est.res$rho_calibration_obj$rho_approx_fun_GE(x),col = 'blue')
   
   
   
@@ -115,7 +158,7 @@ if(F){
     
     
      oracle_x = seq(0.1,0.9,0.01)
-    # lines(oracle_x,pbeta(q = oracle_x,shape1 = shape_1,shape2 = shape_2),col = 'blue',lwd =1.5)
+    
      lines(oracle_x,(ecdf(p_true))(oracle_x),col = 'blue',lwd =1.5)
     # 
     

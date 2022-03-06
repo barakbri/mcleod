@@ -60,6 +60,7 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
 }
 
 
+
 mcleod.CI.deconv.bank.constructor = function(N_vec=NULL,CI_param,Use_Existing_Permutations_From_Object = NULL){
   n_theta = CI_param$n_theta
   n_q = CI_param$n_q
@@ -306,6 +307,25 @@ mcleod.CI.PV.at_point = function(bank,
   
 }
 
+mcleod.CI.find.ai.by.theta.and.rho=function(res_mcleod_object, theta, rho, is_GE = T){
+  if(is_GE){
+    a_ind_GE = which(res_mcleod_object$parameters_list$a.vec <= theta - rho)
+    if(length(a_ind_GE) > 0 ){
+      a_ind_GE = max(a_ind_GE)
+    }else{
+      a_ind_GE = 1
+    }
+    return(a_ind_GE)
+  }else{
+    a_ind_LE = which(res_mcleod_object$parameters_list$a.vec >= theta + rho)
+    if(length(a_ind_LE) > 0 ){
+      a_ind_LE = min(a_ind_LE)
+    }else{
+      a_ind_LE = length(res_mcleod_object$parameters_list$a.vec)
+    }
+    return(a_ind_LE)
+  }
+}
 
 mcleod.CI.rho.calibration.constructor = function(
   bank_original,
@@ -344,13 +364,11 @@ mcleod.CI.rho.calibration.constructor = function(
         
         current_rho = possible_rhos[index_rho]
         
-        a_ind_GE = which(res_mcleod_holdout$parameters_list$a.vec <= theta_current_q - current_rho)
-        if(length(a_ind_GE) > 0 ){
-          a_ind_GE = max(a_ind_GE)
-        }else{
-          a_ind_GE = 1
-        }
-        
+        a_ind_GE = mcleod.CI.find.ai.by.theta.and.rho(res_mcleod_object = res_mcleod_holdout,
+                                                      theta = theta_current_q,
+                                                      rho = current_rho,
+                                                      is_GE = T)
+          
         PVs_at_Qs = rep(NA,length(points_to_test_GE))
         for(i in 1:length(points_to_test_GE)){
           PVs_at_Qs[i] = mcleod.CI.PV.at_point(bank = bank,
@@ -395,12 +413,11 @@ mcleod.CI.rho.calibration.constructor = function(
         
         current_rho = possible_rhos[index_rho]
         
-        a_ind_LE = which(res_mcleod_holdout$parameters_list$a.vec >= theta_current_q + current_rho)
-        if(length(a_ind_LE) > 0 ){
-          a_ind_LE = min(a_ind_LE)
-        }else{
-          a_ind_LE = length(res_mcleod_holdout$parameters_list$a.vec)
-        }
+        a_ind_LE = mcleod.CI.find.ai.by.theta.and.rho(res_mcleod_object = res_mcleod_holdout,
+                                                      theta = theta_current_q,
+                                                      rho = current_rho,
+                                                      is_GE = F)
+        
         
         PVs_at_Qs = rep(NA,length(points_to_test_LE))
         for(i in 1:length(points_to_test_LE)){
@@ -478,18 +495,17 @@ compute_P_values_over_grid_function=function(bank_original,rho_calibration_obj,r
         print(paste0('testing GE at q_ind = ',i,'/',bank$CI_param$n_q,' , theta_ind = ',j,'/',bank$CI_param$n_theta))
       rho_GE = rho_calibration_obj$rho_approx_fun_GE(bank$CI_param$theta_vec[j])
       rho_LE = rho_calibration_obj$rho_approx_fun_LE(bank$CI_param$theta_vec[j])
-      a_ind_GE = which(res_mcleod_data$parameters_list$a.vec <= bank$CI_param$theta_vec[j] - rho_GE)
-      if(length(a_ind_GE) > 0 ){
-        a_ind_GE = max(a_ind_GE)
-      }else{
-        a_ind_GE = 1
-      }
-      a_ind_LE = which(res_mcleod_data$parameters_list$a.vec >= bank$CI_param$theta_vec[j] + rho_LE)
-      if(length(a_ind_LE) > 0 ){
-        a_ind_LE = min(a_ind_LE)
-      }else{
-        a_ind_LE = length(res_mcleod_data$parameters_list$a.vec)
-      }
+      
+      a_ind_GE = mcleod.CI.find.ai.by.theta.and.rho(res_mcleod_object = res_mcleod_data,
+                                                    theta = bank$CI_param$theta_vec[j],
+                                                    rho = rho_GE,
+                                                    is_GE = T)
+      
+      a_ind_LE = mcleod.CI.find.ai.by.theta.and.rho(res_mcleod_object = res_mcleod_data,
+                                                    theta = bank$CI_param$theta_vec[j],
+                                                    rho = rho_LE,
+                                                    is_GE = F)
+      
       GE.pval.grid[i,j] = mcleod.CI.PV.at_point(bank = bank,
                                                 ind_theta = j,
                                                 ind_q = i,
@@ -562,12 +578,12 @@ compute_CI_curves_function = function(
     
     
     rho_GE = rho_calibration_obj$rho_approx_fun_GE(bank$CI_param$theta_vec[i])
-    a_ind_GE = which(res_mcleod_data$parameters_list$a.vec <= bank$CI_param$theta_vec[i] - rho_GE)
-    if(length(a_ind_GE) > 0 ){
-      a_ind_GE = max(a_ind_GE)
-    }else{
-      a_ind_GE = 1
-    }
+    
+    
+    a_ind_GE = mcleod.CI.find.ai.by.theta.and.rho(res_mcleod_object = res_mcleod_data,
+                                                  theta = bank$CI_param$theta_vec[i],
+                                                  rho = rho_GE,
+                                                  is_GE = T)
     
     ind_to_select_from = (max(N_21_GE,1)):N_22_GE
     rejected_ind = rep(NA,length(ind_to_select_from))
@@ -626,14 +642,13 @@ compute_CI_curves_function = function(
     N_22_LE = minimal_point_for_LE[i]
     
     rho_LE = rho_calibration_obj$rho_approx_fun_LE(bank$CI_param$theta_vec[i])
-    a_ind_LE = which(res_mcleod_data$parameters_list$a.vec >= bank$CI_param$theta_vec[i] + rho_LE)
-    if(length(a_ind_LE) > 0 ){
-      a_ind_LE = min(a_ind_LE)
-    }else{
-      a_ind_LE = length(res_mcleod_data$parameters_list$a.vec)
-    }
     
-    ind_to_select_from = N_22_LE:N_21_LE # (max(N_21_LE,1)):N_22_LE
+    a_ind_LE = mcleod.CI.find.ai.by.theta.and.rho(res_mcleod_object = res_mcleod_data,
+                                                  theta =  bank$CI_param$theta_vec[i],
+                                                  rho = rho_LE,
+                                                  is_GE = F)
+    
+    ind_to_select_from = N_22_LE:N_21_LE 
     
     rejected_ind = rep(NA,length(ind_to_select_from))
     
