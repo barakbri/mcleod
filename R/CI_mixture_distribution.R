@@ -1,6 +1,9 @@
 
-# single function for computing ai based on theta and rho
 # functions for confidence intervals, for single theta and rho
+#- run Efron data
+#- run example with n=10000
+#- Run binomial(N,P), N<<20, e.g. 2,3,5.
+#- write paragraph on how rho is calibrated.
 
 # Add packages as imports
 # Add checks to this file
@@ -17,6 +20,8 @@ CLASS.NAME.MCLEOD.CI = 'mcleod.CI.obj'
 CLASS.NAME.MCLEOD.CI.RHO = 'mcleod.CI.obj.rho'
 CLASS.NAME.MCLEOD.CI.PARAMETERS = 'mcleod.CI.obj.parameters'
 CLASS.NAME.MCLEOD.CI.DECONV.BANK = 'mcleod.CI.obj.deconv.bank'
+
+
 
 mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
                                            theta_vec = seq(-3,3,0.25),
@@ -337,6 +342,7 @@ mcleod.CI.rho.calibration.constructor = function(
   q_for_rho_optimization = c(0.2,0.4,0.6,0.8),
   verbose = F
 ){
+  NR.POINTS.FOR.PV.EXTERPOLATION.IN.CALIBRATION = 3
   bank<<- bank_original
   optimal_rho_by_theta_for_GE = rep(NA,length(q_for_rho_optimization))
   optimal_rho_by_theta_for_LE = rep(NA,length(q_for_rho_optimization))
@@ -355,7 +361,7 @@ mcleod.CI.rho.calibration.constructor = function(
     q_lower_by_rho = rep(NA,length(possible_rhos))
     point_to_start_testing_GE = qbinom(p = alpha.one.sided,size = length(bank$N_vec),prob = current_q) / length(bank$N_vec)
     points_to_test_GE = which(bank$CI_param$q_vec<= point_to_start_testing_GE)
-    points_to_test_GE = tail(points_to_test_GE,n = 3)
+    points_to_test_GE = tail(points_to_test_GE,n = NR.POINTS.FOR.PV.EXTERPOLATION.IN.CALIBRATION)
     
     if(length(points_to_test_GE)>=2){
       if(verbose)
@@ -404,7 +410,7 @@ mcleod.CI.rho.calibration.constructor = function(
     q_upper_by_rho = rep(NA,length(possible_rhos))
     point_to_start_testing_LE = qbinom(p = 1-alpha.one.sided,size = length(bank$N_vec),prob = current_q) / length(bank$N_vec)
     points_to_test_LE = which(bank$CI_param$q_vec>= point_to_start_testing_LE)
-    points_to_test_LE = head(points_to_test_LE,n = 3)
+    points_to_test_LE = head(points_to_test_LE,n = NR.POINTS.FOR.PV.EXTERPOLATION.IN.CALIBRATION)
     
     if(length(points_to_test_LE)>=2){
       if(verbose)

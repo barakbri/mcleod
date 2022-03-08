@@ -45,17 +45,20 @@ if(F){
 
 if(F){
   
-  n = 300
-  N = rep(20,n)
+  n = 600
+  N = rep(10,n)
   shape_1 = 2
   shape_2 = 2
-  set.seed(3)
+  set.seed(1)
   X = rbinom(n = n,size = N,prob = rbeta(n = n,shape1 = shape_1,shape2 = shape_2))
   
   CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-2.5,2.5,0.25),
                                              q_vec = seq(0.05,0.95,0.05),
                                              do_serial = F,
-                                             rho.estimation.perm = 50)
+                                             rho.estimation.perm = 50,
+                                             nr.perms = 100,alpha.CI = 0.9,
+                                             rho.possible.values = seq(0,1.0,0.1),
+                                             rho.q_for_calibration = seq(0.1,0.9,0.1))
   
   CI.est.res = mcleod.estimate.CI(X = X,
                                   N = N,
@@ -66,25 +69,26 @@ if(F){
                                   verbose = T)
   
   
-  
+
   plot.mcleod.CI(mcleod.CI.obj = CI.est.res,
                  X_axis_as_Prob = T,
                  add_CI_curves_on_top_of_plot = F)
-  
-  
+
+
   oracle_x = seq(0.1,0.9,0.01)
   lines(oracle_x,pbeta(q = oracle_x,shape1 = shape_1,shape2 = shape_2),col = 'blue',lwd =1.5)
-  
+
   #plot rho:
   x = seq(-3,3,0.1)
-  plot(x = x,y= CI.est.res$rho_calibration_obj$rho_approx_fun_LE(x),ylim = c(0,1),col = 'red',type = 'l')
+  plot(x = x,y= CI.est.res$rho_calibration_obj$rho_approx_fun_LE(x),ylim = c(0,1),
+       col = 'red',type = 'l',xlab = 'theta',ylab = 'rho')
   lines(x=x,y=CI.est.res$rho_calibration_obj$rho_approx_fun_GE(x),col = 'blue')
   
 }
 
 if(F){
   
-  n = 300
+  n = 500
   N = rep(20,n) 
   shape_1 = 2
   shape_2 = 2
@@ -97,7 +101,9 @@ if(F){
   CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-2.5,2.5,0.25),
                                              q_vec = seq(0.05,0.95,0.05),
                                              do_serial = F,
-                                             rho.estimation.perm = 50)
+                                             rho.estimation.perm = 50,
+                                             rho.possible.values = seq(0,1.0,0.1),
+                                             rho.q_for_calibration = seq(0.1,0.9,0.1))
   
   CI.est.res = mcleod.estimate.CI(X = X,
                                   N = N,
