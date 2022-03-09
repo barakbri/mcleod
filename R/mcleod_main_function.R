@@ -498,12 +498,13 @@ mcleod	<- function( x.smp,
 #' Title
 #'
 #' @param mcleod.obj 
+#' @param plot_only_point_estimate 
 #'
 #' @return
 #' @export
 #'
 #' @examples
-plot.posterior	<- function(mcleod.obj)
+plot.posterior	<- function(mcleod.obj, plot_only_point_estimate = F)
 {
   library(ggplot2)
  if(class(mcleod.obj) != CLASS.NAME.MCLEOD){
@@ -529,8 +530,12 @@ plot.posterior	<- function(mcleod.obj)
     }
   }
   gg_obj = ggplot(dt_gibbs_cloud)  + ylim(c(0,1)) +
-    geom_line(aes(x = a.vec,y = means_vec),colour = 'red',data = dt_mean_line) +
-    geom_point(aes(x = a.point,y = CDF.value),alpha = 0.25,colour = 'gray',data = dt_gibbs_cloud,size = 0.8, shape = 18)+ xlab('theta')+ylab('CDF')
+    geom_line(aes(x = a.vec,y = means_vec),colour = 'red',data = dt_mean_line) + xlab('theta')+ylab('CDF')
+  
+  if(!plot_only_point_estimate){
+    gg_obj = gg_obj + geom_point(aes(x = a.point,y = CDF.value),alpha = 0.25,colour = 'gray',data = dt_gibbs_cloud,size = 0.8, shape = 18)
+  }
+  
   return(gg_obj)
 
 }

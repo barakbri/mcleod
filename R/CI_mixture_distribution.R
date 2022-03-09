@@ -10,10 +10,10 @@
 # Finish package documentation
 # Build a vignette
 
-library(hash)
-library(doRNG)
-library(doParallel)
-library(parallel)
+
+#library(doRNG)
+#library(doParallel)
+#library(parallel)
 
 
 CLASS.NAME.MCLEOD.CI = 'mcleod.CI.obj'
@@ -35,6 +35,7 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
                                            rho.possible.values = seq(0.1,0.5,0.1),
                                            rho.estimation.perm = 50,
                                            rho.q_for_calibration = c(0.2,0.4,0.6,0.8),
+                                           rho.calibration.nr.points.for.pv.exterpolation = 3,
                                            do_serial = F,
                                            nr.cores = ceiling(detectCores()/2)){
   
@@ -60,6 +61,7 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
   ret$rho.possible.values = rho.possible.values
   ret$rho.estimation.perm = rho.estimation.perm
   ret$rho.q_for_calibration = rho.q_for_calibration
+  ret$rho.calibration.nr.points.for.pv.exterpolation = rho.calibration.nr.points.for.pv.exterpolation
   class(ret) = CLASS.NAME.MCLEOD.CI.PARAMETERS
   return(ret)
 }
@@ -342,8 +344,8 @@ mcleod.CI.rho.calibration.constructor = function(
   q_for_rho_optimization = c(0.2,0.4,0.6,0.8),
   verbose = F
 ){
-  NR.POINTS.FOR.PV.EXTERPOLATION.IN.CALIBRATION = 3
   bank<<- bank_original
+  NR.POINTS.FOR.PV.EXTERPOLATION.IN.CALIBRATION = bank$CI_param$rho.calibration.nr.points.for.pv.exterpolation
   optimal_rho_by_theta_for_GE = rep(NA,length(q_for_rho_optimization))
   optimal_rho_by_theta_for_LE = rep(NA,length(q_for_rho_optimization))
   theta_points = rep(NA,length(q_for_rho_optimization))
@@ -479,9 +481,30 @@ mcleod.CI.rho.calibration.constructor = function(
                    theta_points,
                    max(bank$CI_param$theta_vec))
   
-  rho_approx_fun_LE = approxfun(x = theta_points,y = optimal_rho_by_theta_for_LE,method = 'linear',rule = 2)
-  rho_approx_fun_GE = approxfun(x = theta_points,y = optimal_rho_by_theta_for_GE,method = 'linear',rule = 2)
-  ret = list(rho_approx_fun_LE = rho_approx_fun_LE,rho_approx_fun_GE = rho_approx_fun_GE,bank = bank)
+  x.ks = seq(min(theta_points),max(theta_points),(max(theta_points) - min(theta_points))/1000)
+  optimal_rho_by_theta_for_LE_smoothed = ksmooth(x = theta_points,
+                                                 y = optimal_rho_by_theta_for_LE,
+                                                 x.points = x.ks,
+                                                 kernel = 'normal',bandwidth = 1)
+  optimal_rho_by_theta_for_GE_smoothed = ksmooth(x = theta_points,
+                                                 y = optimal_rho_by_theta_for_GE,
+                                                 x.points = x.ks,
+                                                 kernel = 'normal',bandwidth = 1)
+  
+  rho_approx_fun_LE = approxfun(x = optimal_rho_by_theta_for_LE_smoothed$x,y = optimal_rho_by_theta_for_LE_smoothed$y,
+                                method = 'linear',rule = 2)
+  rho_approx_fun_GE = approxfun(x = optimal_rho_by_theta_for_GE_smoothed$x,y = optimal_rho_by_theta_for_GE_smoothed$y,
+                                method = 'linear',rule = 2)
+  rho_approx_fun_LE_non_smoothed = approxfun(x = theta_points,y = optimal_rho_by_theta_for_LE,method = 'linear',rule = 2)
+  rho_approx_fun_GE_non_smoothed = approxfun(x = theta_points,y = optimal_rho_by_theta_for_GE,method = 'linear',rule = 2)
+  ret = list(rho_approx_fun_LE = rho_approx_fun_LE,
+             rho_approx_fun_GE = rho_approx_fun_GE,
+             bank = bank,
+             rho_approx_fun_LE_non_smoothed = rho_approx_fun_LE_non_smoothed,
+             rho_approx_fun_GE_non_smoothed = rho_approx_fun_GE_non_smoothed,
+             res_mcleod_holdout = res_mcleod_holdout,
+             CDF_holdout = CDF_holdout
+             )
   class(ret) = CLASS.NAME.MCLEOD.CI.RHO
   return(ret)
 }

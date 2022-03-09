@@ -2,12 +2,12 @@ Package: mcleod
 Type: Package
 Title: Monte Carlo methods for Estimating Latent OverDispersion of binomial and Poisson random variables.
 Version: 1.0.1
-Date: 2019-05-17
+Date: 2022-03-09
 Author: Barak Brill, Daniel Yekutieli
 Maintainer: Barak Brill <barakbri@mail.tau.ac.il>
 Description: The package contains several non-parametric Bayesian methods for analyzing overdispersion of binomial and Poisson random variables. Methods include regularized estimators of rate parameters, confidence intervals for the CDF of rate parameters, logistic and Poisson random effect regressions with non-parametric estiamtion of a random intercept.
 License: GPL (>= 2)
-Imports: Rcpp (>= 1.0.0),ggplot2, doRNG,doParallel,hash,parallel
+Imports: Rcpp (>= 1.0.0),ggplot2, doRNG,doParallel,parallel
 LinkingTo: 
     Rcpp,
 Roxygen: list(markdown = TRUE)

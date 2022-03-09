@@ -45,15 +45,15 @@ if(F){
 
 if(F){
   
-  n = 600
+  n = 1000
   N = rep(10,n)
   shape_1 = 2
   shape_2 = 2
   set.seed(1)
   X = rbinom(n = n,size = N,prob = rbeta(n = n,shape1 = shape_1,shape2 = shape_2))
   
-  CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-2.5,2.5,0.25),
-                                             q_vec = seq(0.05,0.95,0.05),
+  CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-3,3,0.25),
+                                             q_vec = seq(0.02,0.98,0.04),
                                              do_serial = F,
                                              rho.estimation.perm = 50,
                                              nr.perms = 100,alpha.CI = 0.9,
@@ -74,15 +74,20 @@ if(F){
                  X_axis_as_Prob = T,
                  add_CI_curves_on_top_of_plot = F)
 
-
-  oracle_x = seq(0.1,0.9,0.01)
+  
+  oracle_x = seq(0.01,0.99,0.01)
   lines(oracle_x,pbeta(q = oracle_x,shape1 = shape_1,shape2 = shape_2),col = 'blue',lwd =1.5)
 
+  plot.posterior(CI.est.res$rho_calibration_obj$res_mcleod_holdout,plot_only_point_estimate = T) + ggtitle('CDF for holdout data')
   #plot rho:
   x = seq(-3,3,0.1)
   plot(x = x,y= CI.est.res$rho_calibration_obj$rho_approx_fun_LE(x),ylim = c(0,1),
        col = 'red',type = 'l',xlab = 'theta',ylab = 'rho')
   lines(x=x,y=CI.est.res$rho_calibration_obj$rho_approx_fun_GE(x),col = 'blue')
+  
+  plot(x = x,y= CI.est.res$rho_calibration_obj$rho_approx_fun_LE_non_smoothed(x),ylim = c(0,1),
+       col = 'red',type = 'l',xlab = 'theta',ylab = 'rho')
+  lines(x=x,y=CI.est.res$rho_calibration_obj$rho_approx_fun_GE_non_smoothed(x),col = 'blue')
   
 }
 
@@ -174,4 +179,9 @@ if(F){
   }
   par(mfrow=c(1,1))
   
+}
+
+
+if(F){
+  ksmooth(x = theta_points,y = optimal_rho_by_theta_for_LE,x.points = x.ks,kernel = 'normal')
 }
