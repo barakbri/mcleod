@@ -45,8 +45,8 @@ if(F){
 
 if(F){
   
-  n = 1000
-  N = rep(10,n)
+  n = 300
+  N = rep(20,n)
   shape_1 = 2
   shape_2 = 2
   set.seed(1)
@@ -56,7 +56,7 @@ if(F){
                                              q_vec = seq(0.02,0.98,0.04),
                                              do_serial = F,
                                              rho.estimation.perm = 50,
-                                             nr.perms = 100,alpha.CI = 0.9,
+                                             nr.perms = 200,alpha.CI = 0.95,
                                              rho.possible.values = seq(0,1.0,0.1),
                                              rho.q_for_calibration = seq(0.1,0.9,0.1))
   
@@ -78,7 +78,7 @@ if(F){
   oracle_x = seq(0.01,0.99,0.01)
   lines(oracle_x,pbeta(q = oracle_x,shape1 = shape_1,shape2 = shape_2),col = 'blue',lwd =1.5)
 
-  plot.posterior(CI.est.res$rho_calibration_obj$res_mcleod_holdout,plot_only_point_estimate = T) + ggtitle('CDF for holdout data')
+  plot.posterior(CI.est.res$res_mcleod_holdout,plot_only_point_estimate = T) + ggtitle('CDF for holdout data')
   #plot rho:
   x = seq(-3,3,0.1)
   plot(x = x,y= CI.est.res$rho_calibration_obj$rho_approx_fun_LE(x),ylim = c(0,1),
@@ -183,5 +183,75 @@ if(F){
 
 
 if(F){
-  ksmooth(x = theta_points,y = optimal_rho_by_theta_for_LE,x.points = x.ks,kernel = 'normal')
+  
+  n = 200
+  N = rep(50,n)
+  shape_1 = 2
+  shape_2 = 2
+  set.seed(1)
+  X = rbinom(n = n,size = N,prob = rbeta(n = n,shape1 = shape_1,shape2 = shape_2))
+  
+  theta_0 = c(-1,1)
+  
+  CI_param = mcleod.CI.estimation.parameters(theta_vec = theta_0,
+                                             q_vec = seq(0.02,0.98,0.04),
+                                             do_serial = F,
+                                             rho.estimation.perm = 50,
+                                             nr.perms = 200,alpha.CI = 0.9,
+                                             rho.possible.values = seq(0,1.0,0.1),
+                                             rho.q_for_calibration = seq(0.1,0.9,0.1),
+                                             rho.theta_for_calibration = theta_0)
+  
+  
+  CI.est.res = mcleod.estimate.CI(X = X,
+                                  N = N,
+                                  CI_param = CI_param,
+                                  ratio_holdout = 0.2,
+                                  compute_P_values_over_grid = F,
+                                  compute_CI_curves = T,
+                                  verbose = T)
+  #CI.est.res$pvalues_grid
+  c(CI.est.res$computed_curves$q_star_GE,CI.est.res$computed_curves$q_star_LE)
+  
+  
+}
+
+
+
+
+if(F){
+  
+  n = 200
+  N = rep(50,n)
+  shape_1 = 2
+  shape_2 = 2
+  set.seed(1)
+  X = rbinom(n = n,size = N,prob = rbeta(n = n,shape1 = shape_1,shape2 = shape_2))
+  
+  q_0 = 0.5#c(0.3,0.7)
+  
+  CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-3,3,0.25),
+                                             q_vec = q_0,
+                                             do_serial = F,
+                                             rho.estimation.perm = 50,
+                                             nr.perms = 200,alpha.CI = 0.95,
+                                             rho.possible.values = seq(0,1.0,0.1),
+                                             rho.q_for_calibration = q_0)
+  
+  
+  CI.est.res = mcleod.estimate.CI(X = X,
+                                  N = N,
+                                  CI_param = CI_param,
+                                  ratio_holdout = 0.2,
+                                  compute_P_values_over_grid = F,
+                                  compute_CI_curves = T,
+                                  verbose = T)
+  
+  c(CI.est.res$computed_curves$q_star_GE,
+    CI.est.res$computed_curves$q_star_LE)
+  
+  
+  # CI.est.res$pvalues_grid$GE.pval.grid
+  # CI.est.res$pvalues_grid$LE.pval.grid
+  
 }

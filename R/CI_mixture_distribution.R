@@ -35,6 +35,7 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
                                            rho.possible.values = seq(0.1,0.5,0.1),
                                            rho.estimation.perm = 50,
                                            rho.q_for_calibration = c(0.2,0.4,0.6,0.8),
+                                           rho.theta_for_calibration = NULL,
                                            rho.calibration.nr.points.for.pv.exterpolation = 3,
                                            do_serial = F,
                                            nr.cores = ceiling(detectCores()/2)){
@@ -61,6 +62,7 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
   ret$rho.possible.values = rho.possible.values
   ret$rho.estimation.perm = rho.estimation.perm
   ret$rho.q_for_calibration = rho.q_for_calibration
+  ret$rho.theta_for_calibration = rho.theta_for_calibration
   ret$rho.calibration.nr.points.for.pv.exterpolation = rho.calibration.nr.points.for.pv.exterpolation
   class(ret) = CLASS.NAME.MCLEOD.CI.PARAMETERS
   return(ret)
@@ -342,23 +344,45 @@ mcleod.CI.rho.calibration.constructor = function(
   nr.perm = 200,
   possible_rhos = c(0.1,0.2,0.3,0.4,0.5),
   q_for_rho_optimization = c(0.2,0.4,0.6,0.8),
+  theta_for_rho_optimization = NULL,
   verbose = F
 ){
   bank<<- bank_original
   NR.POINTS.FOR.PV.EXTERPOLATION.IN.CALIBRATION = bank$CI_param$rho.calibration.nr.points.for.pv.exterpolation
-  optimal_rho_by_theta_for_GE = rep(NA,length(q_for_rho_optimization))
-  optimal_rho_by_theta_for_LE = rep(NA,length(q_for_rho_optimization))
-  theta_points = rep(NA,length(q_for_rho_optimization))
-  for(index_q in 1:length(q_for_rho_optimization)){
+  nr_theta_points_for_optimization = NA
+  if(is.null(theta_for_rho_optimization)){
+    nr_theta_points_for_optimization = length(q_for_rho_optimization)
+    calibration_points_by_q = T
+  }else{
+    nr_theta_points_for_optimization = length(theta_for_rho_optimization)
+    calibration_points_by_q = F
+    
+  }
+  optimal_rho_by_theta_for_GE = rep(NA,nr_theta_points_for_optimization)
+  optimal_rho_by_theta_for_LE = rep(NA,nr_theta_points_for_optimization)
+  theta_points = rep(NA,nr_theta_points_for_optimization)
+  for(index_q in 1:nr_theta_points_for_optimization){
     #index_q = 2
-    current_q = q_for_rho_optimization[index_q]
-    a_ind_for_theta_for_current_q = which.min(abs(CDF_holdout - current_q))
-    theta_current_q = res_mcleod_holdout$parameters_list$a.vec[a_ind_for_theta_for_current_q]
-    theta_current_q_ind = which.min(abs(bank$CI_param$theta_vec - theta_current_q))
-    theta_current_q = bank$CI_param$theta_vec[theta_current_q_ind]
-    theta_points[index_q] = theta_current_q
-    if(verbose)
-      print(paste0('optimizing rho for q=',current_q,', which is equivalent to theta = ',theta_current_q,' in the holdout data'))
+    if(calibration_points_by_q){
+      current_q = q_for_rho_optimization[index_q]
+      a_ind_for_theta_for_current_q = which.min(abs(CDF_holdout - current_q))
+      theta_current_q = res_mcleod_holdout$parameters_list$a.vec[a_ind_for_theta_for_current_q]
+      theta_current_q_ind = which.min(abs(bank$CI_param$theta_vec - theta_current_q))
+      theta_current_q = bank$CI_param$theta_vec[theta_current_q_ind]
+      theta_points[index_q] = theta_current_q
+      if(verbose)
+        print(paste0('optimizing rho for q=',current_q,', which is equivalent to theta = ',theta_current_q,' in the holdout data'))
+    }else{
+      theta_current_q_ind = which.min(abs(bank$CI_param$theta_vec - theta_for_rho_optimization[index_q]))
+      theta_current_q = bank$CI_param$theta_vec[theta_current_q_ind]
+      a_ind_for_theta_for_current_q = which.min(abs(res_mcleod_holdout$parameters_list$a.vec - theta_current_q))
+      current_q = CDF_holdout[a_ind_for_theta_for_current_q]
+      theta_points[index_q] = theta_current_q
+      if(verbose)
+        print(paste0('optimizing rho theta = ',theta_current_q,' in the holdout data'))
+    }
+   
+    
     
     q_lower_by_rho = rep(NA,length(possible_rhos))
     point_to_start_testing_GE = qbinom(p = alpha.one.sided,size = length(bank$N_vec),prob = current_q) / length(bank$N_vec)
@@ -460,14 +484,26 @@ mcleod.CI.rho.calibration.constructor = function(
     
   }# end of loop over q
   
-  for(i in 2:length(optimal_rho_by_theta_for_LE)){
-    if(is.na(optimal_rho_by_theta_for_LE[i]))
-      optimal_rho_by_theta_for_LE[i] = optimal_rho_by_theta_for_LE[i-1]
+  if(nr_theta_points_for_optimization>1){# check this is not a case we are handling confidence intervals
+    for(i in 2:length(optimal_rho_by_theta_for_LE)){
+      if(is.na(optimal_rho_by_theta_for_LE[i]))
+        optimal_rho_by_theta_for_LE[i] = optimal_rho_by_theta_for_LE[i-1]
+    }
+    for(i in (length(optimal_rho_by_theta_for_GE)-1):1){
+      if(is.na(optimal_rho_by_theta_for_GE[i]))
+        optimal_rho_by_theta_for_GE[i] = optimal_rho_by_theta_for_GE[i+1]
+    }  
   }
-  for(i in (length(optimal_rho_by_theta_for_GE)-1):1){
-    if(is.na(optimal_rho_by_theta_for_GE[i]))
-      optimal_rho_by_theta_for_GE[i] = optimal_rho_by_theta_for_GE[i+1]
+  
+  
+  if(any(is.na(optimal_rho_by_theta_for_LE))){
+    optimal_rho_by_theta_for_LE[is.na(optimal_rho_by_theta_for_LE)]=0
   }
+  if(any(is.na(optimal_rho_by_theta_for_GE))){
+    optimal_rho_by_theta_for_GE[is.na(optimal_rho_by_theta_for_GE)]=0
+  }
+  
+  
   optimal_rho_by_theta_for_LE = c(optimal_rho_by_theta_for_LE[1],
                                   optimal_rho_by_theta_for_LE,
                                   optimal_rho_by_theta_for_LE[length(optimal_rho_by_theta_for_LE)])
@@ -480,30 +516,45 @@ mcleod.CI.rho.calibration.constructor = function(
   theta_points = c(min(bank$CI_param$theta_vec),
                    theta_points,
                    max(bank$CI_param$theta_vec))
-  
-  x.ks = seq(min(theta_points),max(theta_points),(max(theta_points) - min(theta_points))/1000)
-  optimal_rho_by_theta_for_LE_smoothed = ksmooth(x = theta_points,
-                                                 y = optimal_rho_by_theta_for_LE,
-                                                 x.points = x.ks,
-                                                 kernel = 'normal',bandwidth = 1)
-  optimal_rho_by_theta_for_GE_smoothed = ksmooth(x = theta_points,
-                                                 y = optimal_rho_by_theta_for_GE,
-                                                 x.points = x.ks,
-                                                 kernel = 'normal',bandwidth = 1)
+  if(nr_theta_points_for_optimization>1){
+    x.ks = seq(min(theta_points),max(theta_points),(max(theta_points) - min(theta_points))/1000)
+    optimal_rho_by_theta_for_LE_smoothed = ksmooth(x = theta_points,
+                                                   y = optimal_rho_by_theta_for_LE,
+                                                   x.points = x.ks,
+                                                   kernel = 'normal',bandwidth = 1)
+    optimal_rho_by_theta_for_GE_smoothed = ksmooth(x = theta_points,
+                                                   y = optimal_rho_by_theta_for_GE,
+                                                   x.points = x.ks,
+                                                   kernel = 'normal',bandwidth = 1)
+    
+  }else{
+    optimal_rho_by_theta_for_LE_smoothed = list(x = c(theta_points-1,theta_points+1), y = rep(optimal_rho_by_theta_for_LE,2))
+    optimal_rho_by_theta_for_GE_smoothed = list(x = c(theta_points-1,theta_points+1), y = rep(optimal_rho_by_theta_for_GE,2))
+    
+  }
   
   rho_approx_fun_LE = approxfun(x = optimal_rho_by_theta_for_LE_smoothed$x,y = optimal_rho_by_theta_for_LE_smoothed$y,
                                 method = 'linear',rule = 2)
   rho_approx_fun_GE = approxfun(x = optimal_rho_by_theta_for_GE_smoothed$x,y = optimal_rho_by_theta_for_GE_smoothed$y,
                                 method = 'linear',rule = 2)
-  rho_approx_fun_LE_non_smoothed = approxfun(x = theta_points,y = optimal_rho_by_theta_for_LE,method = 'linear',rule = 2)
-  rho_approx_fun_GE_non_smoothed = approxfun(x = theta_points,y = optimal_rho_by_theta_for_GE,method = 'linear',rule = 2)
+  
+  if(nr_theta_points_for_optimization>1){
+    
+    rho_approx_fun_LE_non_smoothed = approxfun(x = theta_points,y = optimal_rho_by_theta_for_LE,method = 'linear',rule = 2)
+    rho_approx_fun_GE_non_smoothed = approxfun(x = theta_points,y = optimal_rho_by_theta_for_GE,method = 'linear',rule = 2)
+
+  }else{
+    rho_approx_fun_LE_non_smoothed = optimal_rho_by_theta_for_LE_smoothed
+    rho_approx_fun_GE_non_smoothed = optimal_rho_by_theta_for_GE_smoothed
+  }
+  
+  
+  
   ret = list(rho_approx_fun_LE = rho_approx_fun_LE,
              rho_approx_fun_GE = rho_approx_fun_GE,
              bank = bank,
              rho_approx_fun_LE_non_smoothed = rho_approx_fun_LE_non_smoothed,
-             rho_approx_fun_GE_non_smoothed = rho_approx_fun_GE_non_smoothed,
-             res_mcleod_holdout = res_mcleod_holdout,
-             CDF_holdout = CDF_holdout
+             rho_approx_fun_GE_non_smoothed = rho_approx_fun_GE_non_smoothed
              )
   class(ret) = CLASS.NAME.MCLEOD.CI.RHO
   return(ret)
@@ -777,15 +828,17 @@ mcleod.estimate.CI = function(X,
                                                                 verbose = T,
                                                                 nr.perm = CI_param$rho.estimation.perm,
                                                                 possible_rhos = CI_param$rho.possible.values,
-                                                                q_for_rho_optimization = CI_param$rho.q_for_calibration)
+                                                                q_for_rho_optimization = CI_param$rho.q_for_calibration,
+                                                                theta_for_rho_optimization = CI_param$rho.theta_for_calibration)
     end.time = Sys.time()
     rho_calibration_obj$Elapsed_time = end.time-start.time
+    bank <<- rho_calibration_obj$bank
+    rho_calibration_obj$bank <- NULL
     if(verbose){
       print('rho calibration time')
       print(end.time-start.time)  
     }
-    bank <<- rho_calibration_obj$bank
-    rho_calibration_obj$bank <- NULL
+    
     
   }else{
     if(verbose){
@@ -835,13 +888,14 @@ mcleod.estimate.CI = function(X,
     
     end.time = Sys.time()
     pvalues_grid$Elapsed_time = end.time-start.time
+    bank <<- pvalues_grid$bank
+    pvalues_grid$bank <- NULL
     ret$pvalues_grid = pvalues_grid
     if(verbose){
       print('time for computing pvalues over grid of hypotheses')
       print(end.time-start.time)  
     }
-    bank <<- pvalues_grid$bank
-    pvalues_grid$bank <- NULL
+    
   }
   
   
@@ -858,13 +912,13 @@ mcleod.estimate.CI = function(X,
     )
     end.time = Sys.time()
     computed_curves$Elapsed_time = end.time-start.time
+    bank <<- computed_curves$bank
+    computed_curves$bank <- NULL
     ret$computed_curves = computed_curves
     if(verbose){
       print('time for computing CI curves ')
       print(end.time-start.time)  
     }
-    #bank <<- computed_curves$bank
-    #computed_curves$bank <- NULL
   }
   
   ret$bank = bank
@@ -905,7 +959,7 @@ plot.mcleod.CI=function(mcleod.CI.obj,
   
   x_axis = mcleod.CI.obj$res_mcleod_data$parameters_list$a.vec
   x_axis_label = 'theta'
-  x_axis_theta = curve_obj$bank$CI_param$theta_vec
+  x_axis_theta = mcleod.CI.obj$bank$CI_param$theta_vec
   if(X_axis_as_Prob){
     x_axis = inv.log.odds(x_axis)
     x_axis_label = 'P'
