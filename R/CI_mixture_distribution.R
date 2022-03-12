@@ -37,12 +37,22 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
                                            rho.q_for_calibration = c(0.2,0.4,0.6,0.8),
                                            rho.theta_for_calibration = NULL,
                                            rho.calibration.nr.points.for.pv.exterpolation = 3,
+                                           q_vec_for_computation = NULL,
+                                           theta_vec_for_computation = NULL,
+                                           P_values_grid_compute_univariate_CI = F,
                                            do_serial = F,
                                            nr.cores = ceiling(detectCores()/2)){
   
   library(doRNG)
   library(doParallel)
   library(parallel)
+  
+  if(is.null(q_vec_for_computation)){
+    q_vec_for_computation = q_vec
+  }
+  if(is.null(theta_vec_for_computation)){
+    theta_vec_for_computation = theta_vec
+  }
   
   # need to add checks
   ret = list()
@@ -64,6 +74,9 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
   ret$rho.q_for_calibration = rho.q_for_calibration
   ret$rho.theta_for_calibration = rho.theta_for_calibration
   ret$rho.calibration.nr.points.for.pv.exterpolation = rho.calibration.nr.points.for.pv.exterpolation
+  ret$q_vec_for_computation = q_vec_for_computation
+  ret$theta_vec_for_computation = theta_vec_for_computation
+  ret$P_values_grid_compute_univariate_CI = P_values_grid_compute_univariate_CI
   class(ret) = CLASS.NAME.MCLEOD.CI.PARAMETERS
   return(ret)
 }
@@ -569,22 +582,28 @@ compute_P_values_over_grid_function=function(bank_original,rho_calibration_obj,r
   LE.pval.grid = matrix(NA,ncol = bank$CI_param$n_theta,nrow = bank$CI_param$n_q,
                         dimnames = list(paste0('q = ',bank$CI_param$q_vec),paste0('theta = ',bank$CI_param$theta_vec)))
   
-  for(i in 1:bank$CI_param$n_q)
-    for(j in 1:bank$CI_param$n_theta){
+  
+  #Compute GE Grid:
+  P_values_grid_compute_univariate_CI = bank$CI_param$P_values_grid_compute_univariate_CI
+  
+  CI_for_single_Q_need_to_break = F
+  
+  for(j in 1:bank$CI_param$n_theta){
+    for(i in (bank$CI_param$n_q):1){
+      
+      if(!(bank$CI_param$theta_vec[j] %in% bank$CI_param$theta_vec_for_computation &
+           bank$CI_param$q_vec[i] %in% bank$CI_param$q_vec_for_computation)){
+        next
+      }
+      
       if(verbose)
         print(paste0('testing GE at q_ind = ',i,'/',bank$CI_param$n_q,' , theta_ind = ',j,'/',bank$CI_param$n_theta))
       rho_GE = rho_calibration_obj$rho_approx_fun_GE(bank$CI_param$theta_vec[j])
-      rho_LE = rho_calibration_obj$rho_approx_fun_LE(bank$CI_param$theta_vec[j])
       
       a_ind_GE = mcleod.CI.find.ai.by.theta.and.rho(res_mcleod_object = res_mcleod_data,
                                                     theta = bank$CI_param$theta_vec[j],
                                                     rho = rho_GE,
                                                     is_GE = T)
-      
-      a_ind_LE = mcleod.CI.find.ai.by.theta.and.rho(res_mcleod_object = res_mcleod_data,
-                                                    theta = bank$CI_param$theta_vec[j],
-                                                    rho = rho_LE,
-                                                    is_GE = F)
       
       GE.pval.grid[i,j] = mcleod.CI.PV.at_point(bank = bank,
                                                 ind_theta = j,
@@ -598,9 +617,44 @@ compute_P_values_over_grid_function=function(bank_original,rho_calibration_obj,r
                                                 is_GE = T,
                                                 do_serial = CI_param$do_serial)
       
+      if(P_values_grid_compute_univariate_CI & GE.pval.grid[i,j]<=alpha.one.sided){
+        if(length(bank$CI_param$q_vec_for_computation) == 1)
+          CI_for_single_Q_need_to_break = T
+        
+        break
+      }
+
+    }#end of loop over q's
+    
+    if(CI_for_single_Q_need_to_break)
+      break
+    
+  }# end of loop over theta's
+    
+  
+  #Compute LE Grid:
+  CI_for_single_Q_need_to_break = F
+  for(j in (bank$CI_param$n_theta):1){
+    for(i in 1:bank$CI_param$n_q){
+      
+      if(!(bank$CI_param$theta_vec[j] %in% bank$CI_param$theta_vec_for_computation &
+           bank$CI_param$q_vec[i] %in% bank$CI_param$q_vec_for_computation)){
+        next
+      }
+      
       if(verbose)
         print(paste0('testing LE at q_ind = ',i,'/',bank$CI_param$n_q,
                      ' , theta_ind = ',j,'/',bank$CI_param$n_theta))
+      
+      
+      rho_LE = rho_calibration_obj$rho_approx_fun_LE(bank$CI_param$theta_vec[j])
+      
+      a_ind_LE = mcleod.CI.find.ai.by.theta.and.rho(res_mcleod_object = res_mcleod_data,
+                                                    theta = bank$CI_param$theta_vec[j],
+                                                    rho = rho_LE,
+                                                    is_GE = F)
+      
+      
       LE.pval.grid[i,j] = mcleod.CI.PV.at_point(bank = bank,
                                                 ind_theta = j,
                                                 ind_q = i,
@@ -613,7 +667,23 @@ compute_P_values_over_grid_function=function(bank_original,rho_calibration_obj,r
                                                 is_GE = F,
                                                 do_serial = CI_param$do_serial)
       
-    }
+      if(P_values_grid_compute_univariate_CI & LE.pval.grid[i,j]<=alpha.one.sided){
+        if(length(bank$CI_param$q_vec_for_computation) == 1)
+          CI_for_single_Q_need_to_break = T
+        
+        break
+      }
+        
+      
+    }#end of loop of over q's  
+    
+    
+    if(CI_for_single_Q_need_to_break)
+      break
+    
+    
+  }#end of loop over thetas
+  
   
   ret = list()
   ret$GE.pval.grid = GE.pval.grid
@@ -645,6 +715,7 @@ compute_CI_curves_function = function(
   i_star_GE = rep(NA,bank$CI_param$n_theta)
   q_star_GE = rep(NA,bank$CI_param$n_theta)
   for(i in 1:bank$CI_param$n_theta){
+    
     if(verbose){
       print(paste0('Computing GE confidence intervals, log.odds = ',bank$CI_param$theta_vec[i]))
     }

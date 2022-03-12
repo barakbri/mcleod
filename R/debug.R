@@ -191,27 +191,31 @@ if(F){
   set.seed(1)
   X = rbinom(n = n,size = N,prob = rbeta(n = n,shape1 = shape_1,shape2 = shape_2))
   
-  theta_0 = c(-1,1)
+  theta_0 = c(-1)
   
-  CI_param = mcleod.CI.estimation.parameters(theta_vec = theta_0,
+  CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-3,3,0.25),
                                              q_vec = seq(0.02,0.98,0.04),
                                              do_serial = F,
                                              rho.estimation.perm = 50,
                                              nr.perms = 200,alpha.CI = 0.9,
                                              rho.possible.values = seq(0,1.0,0.1),
                                              rho.q_for_calibration = seq(0.1,0.9,0.1),
-                                             rho.theta_for_calibration = theta_0)
+                                             rho.theta_for_calibration = theta_0,
+                                             theta_vec_for_computation = theta_0,
+                                             P_values_grid_compute_univariate_CI = T)
   
   
   CI.est.res = mcleod.estimate.CI(X = X,
                                   N = N,
                                   CI_param = CI_param,
                                   ratio_holdout = 0.2,
-                                  compute_P_values_over_grid = F,
-                                  compute_CI_curves = T,
+                                  compute_P_values_over_grid = T,
+                                  compute_CI_curves = F,
                                   verbose = T)
-  #CI.est.res$pvalues_grid
-  c(CI.est.res$computed_curves$q_star_GE,CI.est.res$computed_curves$q_star_LE)
+  
+  CI.est.res$pvalues_grid$GE.pval.grid[,which(CI_param$theta_vec == theta_0)]
+  CI.est.res$pvalues_grid$LE.pval.grid[,which(CI_param$theta_vec == theta_0)]
+  
   
   
 }
@@ -228,30 +232,29 @@ if(F){
   set.seed(1)
   X = rbinom(n = n,size = N,prob = rbeta(n = n,shape1 = shape_1,shape2 = shape_2))
   
-  q_0 = 0.5#c(0.3,0.7)
+  q_0 = 0.34
   
   CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-3,3,0.25),
-                                             q_vec = q_0,
+                                             q_vec = seq(0.02,0.98,0.04),
                                              do_serial = F,
                                              rho.estimation.perm = 50,
                                              nr.perms = 200,alpha.CI = 0.95,
                                              rho.possible.values = seq(0,1.0,0.1),
-                                             rho.q_for_calibration = q_0)
-  
+                                             rho.q_for_calibration = q_0,
+                                             q_vec_for_computation = q_0,
+                                             P_values_grid_compute_univariate_CI = T)
   
   CI.est.res = mcleod.estimate.CI(X = X,
                                   N = N,
                                   CI_param = CI_param,
                                   ratio_holdout = 0.2,
-                                  compute_P_values_over_grid = F,
-                                  compute_CI_curves = T,
+                                  compute_P_values_over_grid = T,
+                                  compute_CI_curves = F,
                                   verbose = T)
   
-  c(CI.est.res$computed_curves$q_star_GE,
-    CI.est.res$computed_curves$q_star_LE)
   
   
-  # CI.est.res$pvalues_grid$GE.pval.grid
-  # CI.est.res$pvalues_grid$LE.pval.grid
+  CI.est.res$pvalues_grid$GE.pval.grid[which(CI_param$q_vec == q_0),]
+  CI.est.res$pvalues_grid$LE.pval.grid[which(CI_param$q_vec == q_0),]
   
 }
