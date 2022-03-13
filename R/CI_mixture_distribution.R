@@ -1,5 +1,4 @@
 
-# Add packages as imports
 # document code inside functions
 
 #- run Efron data
@@ -7,13 +6,9 @@
 #- Run binomial(N,P), N<<20, e.g. 2,3,5.
 #- write paragraph on how rho is calibrated.
 
+# add check on number of available interpolation points.
 # Finish package documentation
 # Build a vignette
-
-
-#library(doRNG)
-#library(doParallel)
-#library(parallel)
 
 
 CLASS.NAME.MCLEOD.CI = 'mcleod.CI.obj'
@@ -31,6 +26,11 @@ verify_q_and_theta_vec = function(q_vec,q_vec_for_computation,theta_vec,theta_ve
   }else if (sampling_distribution == 'poisson'){
     #nothing to do for now...
   }
+  
+  if(any(q_vec<0) | any(q_vec>1)){
+    stop('q_vec and q_vec_for_computation must be between 0 and 1')
+  }
+  
   
   return(list(q_vec = q_vec,
               q_vec_for_computation = q_vec_for_computation,
@@ -93,10 +93,6 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
   if(sampling_distribution == 'binomial'){
     if(a.limits[1] != -1* a.limits[2])
       stop('for binomial sampling distribution, a.limits must be symmetric around 0')
-  }
-  
-  if(any(q_vec<0) | any(q_vec>1)){
-    stop('q_vec and q_vec_for_computation must be between 0 and 1')
   }
   
   if(alpha.CI <0 | alpha.CI > 1 ){
@@ -954,6 +950,10 @@ mcleod.estimate.CI = function(X,
                               Use_Existing_Permutations_From_Object = NULL ){
   
   
+  if(class(CI_param) != CLASS.NAME.MCLEOD.CI.PARAMETERS){
+    stop('CI_param must be a result returned from mcleod.CI.estimation.parameters(...)')
+  }
+  
   if(ratio_holdout>1 | ratio_holdout<0)
     stop('ratio_holdout must be strictly between 0 and 1')
   
@@ -1142,11 +1142,14 @@ plot.mcleod.CI=function(mcleod.CI.obj,
                         point_estimate_color = 'red',
                         CI_curves_color = 'black',title = ''){
   
-  #OBJECT_IS_CLASS.NAME.MCLEOD.CI = (class(mcleod.CI.obj) == CLASS.NAME.MCLEOD.CI)
+  not_valid_object_error_msg = 'mcleod.CI.obj must be a result returned from mcleod.estimate.CI(...), run with parameter compute_CI_curves set to true.'
+  if(class(mcleod.CI.obj) != CLASS.NAME.MCLEOD.CI){
+    stop(not_valid_object_error_msg)
+  }
+  if(!('computed_curves' %in% names(mcleod.CI.obj))){
+    stop(not_valid_object_error_msg)
+  }
   
-  #if(!OBJECT_IS_CLASS.NAME.MCLEOD.CI & !OBJECT_IS_CLASS.NAME.MCLEOD.CI.MEDIAN.BASED.STATISTIC){
-  #  stop('mcleod.CI.obj must be a result returned from mcleod.estimate.CI or mcleod.estimate.CI.based.on.medians')
-  #}
   curve_obj = mcleod.CI.obj$computed_curves
   
   

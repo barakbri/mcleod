@@ -1,50 +1,5 @@
 if(F){
   
-  CI_param = mcleod.CI.estimation.parameters()
-  CI_param$nr.perms
-  
-  bank = mcleod.CI.deconv.bank.constructor(rep(20,100),CI_param)
-  
-  cl <- makeCluster(8)
-  registerDoParallel(cl)
-  
-  
-  temp = mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis(bank = bank,
-                                                                      ind_theta = 13,
-                                                                      ind_q = 5,
-                                                                      nr.curves = 1000,
-                                                                      is_GE = T,
-                                                                      do_serial = F)
-  length(bank$median_curve_LE[[13]][[5]])
-  plot(bank$median_curve_GE[[13]][[5]][[1]])
-  plot(bank$median_curve_LE[[13]][[5]][[1]])
-  
-  
-  system.time({temp = mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis(bank = bank,
-                                                                                   ind_theta = 13,
-                                                                                   ind_q = 5,
-                                                                                   nr.curves = 1000,
-                                                                                   is_GE = T,
-                                                                                   do_serial = F)})
-  
-  mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis_at_point(bank, ind_theta = 13,
-                                                                             ind_q = 5,a_index = 5,
-                                                                             nr.perms = 100,
-                                                                             is_GE = T,
-                                                                             do_serial = F)
-  
-  mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis_at_point(bank, ind_theta = 13,
-                                                                             ind_q = 5,a_index = 5,
-                                                                             nr.perms = 100,
-                                                                             is_GE = F,
-                                                                             do_serial = F)
-  
-  
-  stopCluster(cl)
-}
-
-if(F){
-  
   n = 300
   N = rep(20,n)
   shape_1 = 2
