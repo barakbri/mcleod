@@ -1,12 +1,12 @@
 
-# functions for confidence intervals, for single theta and rho
+# Add packages as imports
+# document code inside functions
+
 #- run Efron data
 #- run example with n=10000
 #- Run binomial(N,P), N<<20, e.g. 2,3,5.
 #- write paragraph on how rho is calibrated.
 
-# Add packages as imports
-# Add checks to this file
 # Finish package documentation
 # Build a vignette
 
@@ -21,7 +21,24 @@ CLASS.NAME.MCLEOD.CI.RHO = 'mcleod.CI.obj.rho'
 CLASS.NAME.MCLEOD.CI.PARAMETERS = 'mcleod.CI.obj.parameters'
 CLASS.NAME.MCLEOD.CI.DECONV.BANK = 'mcleod.CI.obj.deconv.bank'
 
-
+verify_q_and_theta_vec = function(q_vec,q_vec_for_computation,theta_vec,theta_vec_for_computation,sampling_distribution){
+  q_vec = sort(unique(c(q_vec,q_vec_for_computation)))
+  theta_vec = sort(unique(c(theta_vec,theta_vec_for_computation)))
+  
+  if(sampling_distribution == 'binomial'){
+    q_vec = sort(unique(c(q_vec, 1 - q_vec)))
+    theta_vec = sort(unique(c(theta_vec,-theta_vec)))
+  }else if (sampling_distribution == 'poisson'){
+    #nothing to do for now...
+  }
+  
+  return(list(q_vec = q_vec,
+              q_vec_for_computation = q_vec_for_computation,
+              theta_vec = theta_vec,
+              theta_vec_for_computation = theta_vec_for_computation,
+              n_q = length(q_vec),
+              n_theta = length(theta_vec)))
+}
 
 mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
                                            theta_vec = seq(-3,3,0.25),
@@ -47,14 +64,91 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
   library(doParallel)
   library(parallel)
   
+  if(!(sampling_distribution %in% c('binomial','poisson'))){
+    stop('parameter sampling_distribution must be either \'binomial\' or \'poisson\'')
+  }
+  
   if(is.null(q_vec_for_computation)){
     q_vec_for_computation = q_vec
   }
   if(is.null(theta_vec_for_computation)){
     theta_vec_for_computation = theta_vec
   }
+
+  verified_q_and_theta_vectors = verify_q_and_theta_vec(q_vec = q_vec,
+                         q_vec_for_computation = q_vec_for_computation,
+                         theta_vec = theta_vec,
+                         theta_vec_for_computation = theta_vec_for_computation,
+                         sampling_distribution = sampling_distribution)
   
-  # need to add checks
+  q_vec = verified_q_and_theta_vectors$q_vec
+  q_vec_for_computation = verified_q_and_theta_vectors$q_vec_for_computation
+  theta_vec = verified_q_and_theta_vectors$theta_vec
+  theta_vec_for_computation = verified_q_and_theta_vectors$theta_vec_for_computation
+  
+  if(length(a.limits)!=2 | is.unsorted(a.limits)){
+    stop('a.limits must be an ordered numeric vector of size 2')
+  }
+  
+  if(sampling_distribution == 'binomial'){
+    if(a.limits[1] != -1* a.limits[2])
+      stop('for binomial sampling distribution, a.limits must be symmetric around 0')
+  }
+  
+  if(any(q_vec<0) | any(q_vec>1)){
+    stop('q_vec and q_vec_for_computation must be between 0 and 1')
+  }
+  
+  if(alpha.CI <0 | alpha.CI > 1 ){
+    stop('coverage rating must be a number between 0 and 1')
+  }
+  if(alpha.CI<0.5){
+    warning('alpha.CI sets the coverage probability, typical values are 0.95, 0.9')
+  }
+  if(nr.perms != as.integer(nr.perms))
+    stop('nr.perms must be integer, larger than 0 (typical values are 200 and above)')
+  if(nr.perms<0){
+    stop('nr.perms must be positive')
+  }
+  if(nr.perms<100){
+    warning('nr.perms smaller than 100 - typical values are 200 and above...')
+  }
+  
+  if(!is.logical(do_serial))
+    stop('do_serial must be a logical variable')
+  
+  if(!is.logical(P_values_grid_compute_univariate_CI))
+    stop('P_values_grid_compute_univariate_CI must be a logical variable')
+  
+  if(!is.na(rho.set.value)){
+    if(rho.set.value<0)
+      stop('when setting rho manually using rho.set.value, it must be larger than 0. Typical values are 0.1-0.5 .')
+  }
+  
+  if(any(rho.possible.values<0)){
+    stop('possible values in rho.possible.values must be larger than 0')
+  }
+  
+  if(any(rho.possible.values>1)){
+    warning('typical values in rho.possible.values should by 0.1-1.0, we optimal values ususally set in the range 0.1-1.0')
+  }
+  
+  if(rho.estimation.perm != as.integer(rho.estimation.perm))
+    stop('rho.estimation.perm must be integer, larger than 0 (typical values are 50-100)')
+  if(rho.estimation.perm<0){
+    stop('rho.estimation.perm must be positive')
+  }
+  if(rho.estimation.perm>100){
+    warning('rho.estimation.perm larger than 100 - ussually values in the range 50-100 are sufficient.')
+  }
+  
+  if(rho.calibration.nr.points.for.pv.exterpolation != as.integer(rho.calibration.nr.points.for.pv.exterpolation))
+    stop('rho.calibration.nr.points.for.pv.exterpolation must be an integer, larger than 2. Typical values are in the range [3,5].')
+  
+  if(rho.calibration.nr.points.for.pv.exterpolation > 5)
+    stop('rho.calibration.nr.points.for.pv.exterpolation is typically in the range [3,5], make sure this value was set correctly...')
+  
+  
   ret = list()
   ret$q_vec = q_vec
   ret$n_q = length(q_vec)
@@ -856,7 +950,35 @@ mcleod.estimate.CI = function(X,
                               ratio_holdout = 0.1,
                               compute_P_values_over_grid = F,
                               compute_CI_curves = T,
-                              verbose = T,Use_Existing_Permutations_From_Object = NULL ){
+                              verbose = T,
+                              Use_Existing_Permutations_From_Object = NULL ){
+  
+  
+  if(ratio_holdout>1 | ratio_holdout<0)
+    stop('ratio_holdout must be strictly between 0 and 1')
+  
+  if(!is.logical(compute_P_values_over_grid))
+    stop('compute_P_values_over_grid must be logical variable')
+  
+  if(!is.logical(compute_CI_curves))
+    stop('compute_CI_curves must be logical variable')
+  
+  if(!is.logical(verbose))
+    stop('verbose must be a logical variable')
+  
+  if(compute_CI_curves & compute_P_values_over_grid)
+    warning('generally you need only one of compute_CI_curves and compute_P_values_over_grid to be set to true, please make sure function parameters are specificed correctly. ')
+  
+  if(!compute_CI_curves & !compute_P_values_over_grid)
+    warning('generally you need at least one of compute_CI_curves and compute_P_values_over_grid to be set to true, please make sure function parameters are specificed correctly. ')
+  
+  if(!is.null(Use_Existing_Permutations_From_Object ))
+    if(class(Use_Existing_Permutations_From_Object) != CLASS.NAME.MCLEOD.CI)
+      stop('Use_Existing_Permutations_From_Object must be a result of mcleod.estimate.CI()')
+  
+  if(!is.null(Use_Existing_Permutations_From_Object)){
+    warning('Use_Existing_Permutations_From_Object was set to a non null value: note that you must use an object constructed using the same CI.parameters file, and having the same value of N')
+  }
   
   ret = list()
   
@@ -896,7 +1018,7 @@ mcleod.estimate.CI = function(X,
                                                                 res_mcleod_holdout = res_mcleod_holdout,
                                                                 CDF_holdout = CDF_holdout,
                                                                 alpha.one.sided = alpha.one.sided,
-                                                                verbose = T,
+                                                                verbose = verbose,
                                                                 nr.perm = CI_param$rho.estimation.perm,
                                                                 possible_rhos = CI_param$rho.possible.values,
                                                                 q_for_rho_optimization = CI_param$rho.q_for_calibration,
@@ -1041,4 +1163,122 @@ plot.mcleod.CI=function(mcleod.CI.obj,
          col =  point_estimate_color,type = 'b',pch = 20,xlab = x_axis_label,ylab = 'CDF',main = title)
   lines(x_axis_theta,curve_obj$q_star_LE,col = CI_curves_color)
   lines(x_axis_theta,curve_obj$q_star_GE,col = CI_curves_color)
+}
+
+
+
+
+mcleod.estimate.CI.single.theta = function(X, N, theta,
+                                           CI_param = mcleod.CI.estimation.parameters(),
+                                           ratio_holdout = 0.1,verbose = F){
+  
+  CI_param$rho.theta_for_calibration = theta
+  CI_param$theta_vec_for_computation = theta
+  CI_param$P_values_grid_compute_univariate_CI = T
+  
+  
+  verified_q_and_theta_vectors = verify_q_and_theta_vec(q_vec = CI_param$q_vec,
+                                                        q_vec_for_computation = CI_param$q_vec_for_computation,
+                                                        theta_vec = CI_param$theta_vec,
+                                                        theta_vec_for_computation = CI_param$theta_vec_for_computation,
+                                                        sampling_distribution = CI_param$sampling_distribution)
+  
+  CI_param$n_q = verified_q_and_theta_vectors$n_q
+  CI_param$n_theta = verified_q_and_theta_vectors$n_theta
+  CI_param$q_vec = verified_q_and_theta_vectors$q_vec
+  CI_param$q_vec_for_computation = verified_q_and_theta_vectors$q_vec_for_computation
+  CI_param$theta_vec = verified_q_and_theta_vectors$theta_vec
+  CI_param$theta_vec_for_computation = verified_q_and_theta_vectors$theta_vec_for_computation
+  
+  
+  CI.est.res = mcleod.estimate.CI(X = X,
+                                  N = N,
+                                  CI_param = CI_param,
+                                  ratio_holdout = ratio_holdout,
+                                  compute_P_values_over_grid = T,
+                                  compute_CI_curves = F,
+                                  verbose = verbose)
+  
+  
+  alpha.one.sided = (1-CI.est.res$bank$CI_param$alpha.CI)/2
+  
+  #Lower end:
+  pvals_GE = CI.est.res$pvalues_grid$GE.pval.grid[,which(CI_param$theta_vec == theta_0)]
+  ind_GE_lower_than_alpha_one_sided = which(pvals_GE <= alpha.one.sided)
+  if(length(ind_GE_lower_than_alpha_one_sided)==0){
+    Lower = 0  
+  }else{
+    Lower = CI.est.res$bank$CI_param$q_vec[max(ind_GE_lower_than_alpha_one_sided)]
+  }
+  
+  #Higher end:
+  pvals_LE = CI.est.res$pvalues_grid$LE.pval.grid[,which(CI_param$theta_vec == theta_0)]
+  ind_LE_lower_than_alpha_one_sided = which(pvals_LE <= alpha.one.sided)
+  if(length(ind_LE_lower_than_alpha_one_sided)==0){
+    Upper = 0  
+  }else{
+    Upper = CI.est.res$bank$CI_param$q_vec[min(ind_LE_lower_than_alpha_one_sided)]
+  }
+  
+  ret = c('Lower' = Lower,'Upper' = Upper)
+  return(ret)
+}
+
+
+
+
+mcleod.estimate.CI.single.q = function(X, N, q,
+                                       CI_param = mcleod.CI.estimation.parameters(),
+                                       ratio_holdout = 0.1,verbose = F){
+  
+  CI_param$rho.theta_for_calibration = NULL
+  CI_param$rho.q_for_calibration = q
+  CI_param$q_vec_for_computation = q
+  CI_param$P_values_grid_compute_univariate_CI = T
+  
+  
+  verified_q_and_theta_vectors = verify_q_and_theta_vec(q_vec = CI_param$q_vec,
+                                                        q_vec_for_computation = CI_param$q_vec_for_computation,
+                                                        theta_vec = CI_param$theta_vec,
+                                                        theta_vec_for_computation = CI_param$theta_vec_for_computation,
+                                                        sampling_distribution = CI_param$sampling_distribution)
+  
+  CI_param$n_q = verified_q_and_theta_vectors$n_q
+  CI_param$n_theta = verified_q_and_theta_vectors$n_theta
+  CI_param$q_vec = verified_q_and_theta_vectors$q_vec
+  CI_param$q_vec_for_computation = verified_q_and_theta_vectors$q_vec_for_computation
+  CI_param$theta_vec = verified_q_and_theta_vectors$theta_vec
+  CI_param$theta_vec_for_computation = verified_q_and_theta_vectors$theta_vec_for_computation
+  
+  CI.est.res = mcleod.estimate.CI(X = X,
+                                  N = N,
+                                  CI_param = CI_param,
+                                  ratio_holdout = ratio_holdout,
+                                  compute_P_values_over_grid = T,
+                                  compute_CI_curves = F,
+                                  verbose = verbose)
+  
+  
+  alpha.one.sided = (1-CI.est.res$bank$CI_param$alpha.CI)/2
+  
+  #Right end:
+  pvals_GE = CI.est.res$pvalues_grid$GE.pval.grid[which(CI_param$q_vec == q),]
+  ind_GE_lower_than_alpha_one_sided = which(pvals_GE <= alpha.one.sided)
+  if(length(ind_GE_lower_than_alpha_one_sided)==0){
+    Upper = Inf
+  }else{
+    Upper = CI.est.res$bank$CI_param$theta_vec[min(ind_GE_lower_than_alpha_one_sided)]
+  }
+  
+  #Left end:
+  pvals_LE = CI.est.res$pvalues_grid$LE.pval.grid[which(CI_param$q_vec == q),]
+  ind_LE_lower_than_alpha_one_sided = which(pvals_LE <= alpha.one.sided)
+  if(length(ind_LE_lower_than_alpha_one_sided)==0){
+    Lower = -Inf
+  }else{
+    Lower = CI.est.res$bank$CI_param$theta_vec[max(ind_LE_lower_than_alpha_one_sided)]
+  }
+  
+  ret = c('Lower' = Lower,'Upper' = Upper)
+  return(ret)
 }
