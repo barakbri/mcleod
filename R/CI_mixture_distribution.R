@@ -1,12 +1,13 @@
 #Tasks:
-# I mixed quantile and percentile, need to check in documentation.
-# document code inside functions
-# Finish package documentation
 
 #- run Efron data
 #- run example with n=10000
 #- Run binomial(N,P), N<<20, e.g. 2,3,5.
 #- write paragraph on how rho is calibrated.
+
+# I mixed quantile and percentile, need to check in documentation.
+# document code inside functions
+# Finish package documentation
 
 # add check on number of available interpolation points.
 # Build a vignette
@@ -36,12 +37,13 @@ CLASS.NAME.MCLEOD.CI.DECONV.BANK = 'mcleod.CI.obj.deconv.bank' # this object con
 #'
 #' @examples see internal code usages
 verify_q_and_theta_vec = function(q_vec,q_vec_for_computation,theta_vec,theta_vec_for_computation,sampling_distribution){
-  q_vec = sort(unique(c(q_vec,q_vec_for_computation)))
-  theta_vec = sort(unique(c(theta_vec,theta_vec_for_computation)))
+  rounding_nr_digits = 6
+  q_vec = sort(unique(round(c(q_vec,q_vec_for_computation),digits = rounding_nr_digits)))
+  theta_vec = sort(unique(round(c(theta_vec,theta_vec_for_computation),digits = rounding_nr_digits)))
   
   if(sampling_distribution == 'binomial'){
-    q_vec = sort(unique(c(q_vec, 1 - q_vec)))
-    theta_vec = sort(unique(c(theta_vec,-theta_vec)))
+    q_vec = sort(unique(round(c(q_vec, 1 - q_vec),digits = rounding_nr_digits)))
+    theta_vec = sort(unique(round(c(theta_vec,-theta_vec),digits = rounding_nr_digits)))
   }else if (sampling_distribution == 'poisson'){
     #nothing to do for now...
   }
@@ -236,6 +238,70 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
 
 
 
+#' Title
+#'
+#' @param n.vec 
+#' @param a.max 
+#' @param prior_param 
+#' @param comp_param 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+generate_P_k_i_matrix_cache = function(n.vec,a.max,prior_param,comp_param){
+  
+  sorted_n_data = sort(unique(n.vec))
+  
+  n_to_P_k_i_generator_index = hash()
+  for(i in 1:length(sorted_n_data))
+    n_to_P_k_i_generator_index[ as.character(sorted_n_data[i]) ] = i
+  
+  generate_P_k_i_generator_list = function(n_vec = 1:20){
+    P_k_i_generator_list = hash() #list()
+    for(n_i in 1:length(n_vec)){
+      n = n_vec[n_i]
+      n.smp = rep(n,n+1)
+      x.smp = c(0:n)
+      
+      P_k_i_for_n = mcleod(x.smp = x.smp,n.smp = n.smp,
+                           a.limits = c(-a.max,a.max),
+                           computational_parameters = mcleod.computational.parameters(nr.gibbs = 2,
+                                                                                      nr.gibbs.burnin = 1,
+                                                                                      integration_step_size = comp_param$integration_step_size,
+                                                                                      Fast.Gamma.Used = comp_param$Fast.Gamma.Used,
+                                                                                      Fast.Gamma.Bank.Size = comp_param$Fast.Gamma.Bank.Size),
+                           prior_parameters = prior_param)
+      P_k_i_generator_list[[as.character(n_i)]] = P_k_i_for_n$additional$original_stat_res$p_k_i
+    }
+    return(P_k_i_generator_list)
+  }
+  
+  
+  generator_list = suppressWarnings(generate_P_k_i_generator_list(n_vec = sorted_n_data)) 
+  
+  generate_P_k_i = function(x_to_generate_for,n.dim,n.vec){
+    K=length(n.vec)
+    P_k_i_generated = matrix(NA,nrow = K,ncol = n.dim)
+    for(k in 1:K){
+      P_k_i_generated[k,] = (generator_list[[ 
+        as.character(
+          n_to_P_k_i_generator_index[[   as.character(n.vec[k])  ]]
+        )
+      ]])[ x_to_generate_for[k] + 1, ]
+    }
+    return(P_k_i_generated)
+  }
+  
+  ret = list()
+  ret$sorted_n_data = sorted_n_data
+  ret$n_to_P_k_i_generator_index = n_to_P_k_i_generator_index
+  ret$generate_P_k_i_generator_list = generate_P_k_i_generator_list
+  ret$generator_list = generator_list
+  ret$generate_P_k_i = generate_P_k_i
+  return(ret)
+}
+
 #' Generate a cache for estiamted CDFs of the mixing distributions, computed for worstcase (GE/LE) data generaitons
 #'
 #' The object is used to cache the estimated CDFs by value of (theta,q). The values median_curve_GE/median_curve_LE (returned inside the object) are double-nested lists by theta and then q, holding samples of the estimated CDFs (across mcleod's a.vec representation), by value of theta,q.
@@ -318,6 +384,10 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
   if(bank$CI_param$sampling_distribution != 'binomial')
     stop('bank only supports binomial')
   
+  gen_object = NULL
+  if("gen_object" %in% names(bank))
+    gen_object = bank$gen_object
+  
   if(is_GE)
     nr.computed = length(bank$median_curve_GE[[ind_theta]][[ind_q]])
   else
@@ -346,11 +416,28 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
         
         library(mcleod)
         
+        # sorted_n_data = gen_object$sorted_n_data
+        # n_to_P_k_i_generator_index = gen_object$n_to_P_k_i_generator_index
+        # generate_P_k_i_generator_list = gen_object$generate_P_k_i_generator_list
+        # generator_list = gen_object$generator_list
+        # generate_P_k_i = gen_object$generate_P_k_i
+        
+        generated_P_k_i_matrix = NULL
+        if(!is.null(gen_object)){
+          sorted_n_data = gen_object$sorted_n_data
+          n_to_P_k_i_generator_index = gen_object$n_to_P_k_i_generator_index
+          generate_P_k_i_generator_list = gen_object$generate_P_k_i_generator_list
+          generator_list = gen_object$generator_list
+          generate_P_k_i = gen_object$generate_P_k_i
+          a.vec = gen_object$a.vec
+          generated_P_k_i_matrix = generate_P_k_i(X_sampled,length(a.vec)-1,N_vec)
+        }
+        
         temp_mcleod = mcleod(x.smp = X_sampled,n.smp = N_vec,
                              a.limits = bank$CI_param$a.limits,
                              exact.numeric.integration = T,
                              computational_parameters = bank$CI_param$comp_parameters,
-                             prior_parameters = bank$CI_param$prior_parameters)
+                             prior_parameters = bank$CI_param$prior_parameters,input_P_k_i = generated_P_k_i_matrix)
         
         return(compute_medians_curve(temp_mcleod))
       }
@@ -362,7 +449,7 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
       }else{
         #this assumes a cluster is registered
         res_Binomial = foreach(seed=(nr.computed+1):nr.curves, .options.RNG=1,
-                               .export = c('ind_theta','ind_q','bank','worker_function_Binomial_GE')) %dorng% {
+                               .export = c('ind_theta','ind_q','bank','worker_function_Binomial_GE','gen_object')) %dorng% {
                                  worker_function_Binomial_GE(seed)
                                  
                                }
@@ -880,11 +967,11 @@ compute_P_values_over_grid_function=function(bank_original,rho_calibration_obj,r
                                                 CDF_value = median_curve[a_ind_GE],
                                                 a_index = a_ind_GE,
                                                 alpha = alpha.one.sided,
-                                                nr.perm = CI_param$nr.perms,
+                                                nr.perm = bank$CI_param$nr.perms,
                                                 do_check_vs_noiseless_case = T,
                                                 do_check_vs_minimum_number_of_required_iterations = T,
                                                 is_GE = T,
-                                                do_serial = CI_param$do_serial)
+                                                do_serial = bank$CI_param$do_serial)
       
       if(P_values_grid_compute_univariate_CI & GE.pval.grid[i,j]<=alpha.one.sided){
         if(length(bank$CI_param$q_vec_for_computation) == 1)
@@ -930,11 +1017,11 @@ compute_P_values_over_grid_function=function(bank_original,rho_calibration_obj,r
                                                 CDF_value = median_curve[a_ind_LE],
                                                 a_index = a_ind_LE,
                                                 alpha = alpha.one.sided,
-                                                nr.perm = CI_param$nr.perms,
+                                                nr.perm = bank$CI_param$nr.perms,
                                                 do_check_vs_noiseless_case = T,
                                                 do_check_vs_minimum_number_of_required_iterations = T,
                                                 is_GE = F,
-                                                do_serial = CI_param$do_serial)
+                                                do_serial = bank$CI_param$do_serial)
       
       if(P_values_grid_compute_univariate_CI & LE.pval.grid[i,j]<=alpha.one.sided){
         if(length(bank$CI_param$q_vec_for_computation) == 1)
@@ -1021,23 +1108,29 @@ compute_CI_curves_function = function(
     ind_to_select_from = (max(N_21_GE,1)):N_22_GE
     rejected_ind = rep(NA,length(ind_to_select_from))
     for(u in 1:length(rejected_ind)){
+      if(verbose){
+        print(paste0('Testing at q with index ',ind_to_select_from[u],' which is equivalent to ',bank$CI_param$q_vec[ind_to_select_from[u]]))
+      }
       rejected_ind[u] = mcleod.CI.PV.at_point(bank = bank,
                                               ind_theta = i,
                                               ind_q = ind_to_select_from[u],
                                               CDF_value = median_curve[a_ind_GE],
                                               a_index = a_ind_GE,
                                               alpha = alpha.one.sided,
-                                              nr.perm = CI_param$nr.perms,
+                                              nr.perm = bank$CI_param$nr.perms,
                                               do_check_vs_noiseless_case = T,
                                               do_check_vs_minimum_number_of_required_iterations = T,
                                               is_GE = T,
-                                              do_serial = CI_param$do_serial) <= alpha.one.sided
+                                              do_serial = bank$CI_param$do_serial) <= alpha.one.sided
       if(is.na(rejected_ind[u])) #need to handle bounds and shifts better
         rejected_ind[u] = F  
-      if(u==1 & rejected_ind[u] == F ){
-        rejected_ind = rep(F,length(ind_to_select_from))
+      
+      # if(u==1 & rejected_ind[u] == F ){
+      #   rejected_ind = rep(F,length(ind_to_select_from))
+      #   break
+      # }
+      if(!rejected_ind[u])
         break
-      }
       
     }
     if(i == 1 & rejected_ind[1] == F){
@@ -1086,22 +1179,27 @@ compute_CI_curves_function = function(
     rejected_ind = rep(NA,length(ind_to_select_from))
     
     for(u in length(ind_to_select_from):1){
+      if(verbose){
+        print(paste0('Testing at q with index ',ind_to_select_from[u],' which is equivalent to ',bank$CI_param$q_vec[ind_to_select_from[u]]))
+      }
       rejected_ind[u] = mcleod.CI.PV.at_point(bank = bank,
                                               ind_theta = i,
                                               ind_q = ind_to_select_from[u],
                                               CDF_value = median_curve[a_ind_LE],
                                               a_index = a_ind_LE,
                                               alpha = alpha.one.sided,
-                                              nr.perm = CI_param$nr.perms,
+                                              nr.perm = bank$CI_param$nr.perms,
                                               do_check_vs_noiseless_case = T,
                                               do_check_vs_minimum_number_of_required_iterations = T,
                                               is_GE = F,
-                                              do_serial = CI_param$do_serial) <= alpha.one.sided
+                                              do_serial = bank$CI_param$do_serial) <= alpha.one.sided
       
       if(is.na(rejected_ind[u])) #need to handle bounds and shifts better
         rejected_ind[u] = F
-      if(u==length(ind_to_select_from) & rejected_ind[u] == F )
-        break
+      # if(u==length(ind_to_select_from) & rejected_ind[u] == F )
+      #   break
+      if(!rejected_ind[u])
+         break
     }
     
     if(i ==  bank$CI_param$n_theta & rejected_ind[length(rejected_ind)] == F){
@@ -1156,6 +1254,10 @@ mcleod.estimate.CI = function(X,
                               verbose = T,
                               Use_Existing_Permutations_From_Object = NULL ){
   
+  library(doRNG)
+  library(doParallel)
+  library(parallel)
+  library(hash)
   
   if(class(CI_param) != CLASS.NAME.MCLEOD.CI.PARAMETERS){
     stop('CI_param must be a result returned from mcleod.CI.estimation.parameters(...)')
@@ -1202,8 +1304,35 @@ mcleod.estimate.CI = function(X,
     X_test = X; N_test = N
   }
   
-  
   bank <<- mcleod.CI.deconv.bank.constructor(N_test,CI_param,Use_Existing_Permutations_From_Object)
+  
+  res_mcleod_data = mcleod(x.smp = X_test,n.smp =N_test,
+                           a.limits = bank$CI_param$a.limits,
+                           computational_parameters = bank$CI_param$comp_parameters,
+                           prior_parameters = bank$CI_param$prior_parameters,
+                           exact.numeric.integration = T)
+  
+  median_curve = compute_medians_curve(res_mcleod_data)
+  
+  #Part I: functions for generating P_k_i based on precomputed values:
+  Use_P_k_i_generator = T
+  if(Use_P_k_i_generator){
+    if(verbose){
+      print(paste0('Starting construction of P_k_i generator'))
+      start = Sys.time()
+      
+      gen_object = generate_P_k_i_matrix_cache(N_test,
+                                               max(bank$CI_param$a.limits),
+                                               CI_param$prior_parameters,
+                                               CI_param$comp_parameters)
+      gen_object$a.vec = res_mcleod_data$parameters_list$a.vec
+      bank$gen_object = gen_object
+      end = Sys.time()
+      print(paste0('Ending construction of P_k_i generator'))
+      print(end-start)
+      
+    }
+  }
   
   cl <- NULL
   if(!CI_param$do_serial){
@@ -1262,14 +1391,6 @@ mcleod.estimate.CI = function(X,
                                bank = bank)
     class(rho_calibration_obj) = CLASS.NAME.MCLEOD.CI.RHO
   }
-  
-  res_mcleod_data = mcleod(x.smp = X_test,n.smp =N_test,
-                           a.limits = bank$CI_param$a.limits,
-                           computational_parameters = bank$CI_param$comp_parameters,
-                           prior_parameters = bank$CI_param$prior_parameters,
-                           exact.numeric.integration = T)
-  
-  median_curve = compute_medians_curve(res_mcleod_data)
   
   
   if(compute_P_values_over_grid){
