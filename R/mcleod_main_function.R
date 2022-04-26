@@ -231,7 +231,10 @@ mcleod.covariates.estimation.parameters = function(proposal_sd = c(0.05),
 #' @param prior_parameters 
 #' @param computational_parameters 
 #' @param covariates_estimation_parameters 
-#' @param input_P_k_i 
+#' @param input_P_k_i
+#' @param exact.numeric.integration
+#' @param offset_vec
+#' @param nr_threads 
 #'
 #' @return
 #' > names(res$parameters_list)
@@ -257,7 +260,8 @@ mcleod	<- function( x.smp,
                      covariates_estimation_parameters = NULL,
                      input_P_k_i = NULL,
                      exact.numeric.integration = TRUE,
-                     offset_vec = rep(0,length(x.smp))
+                     offset_vec = rep(0,length(n.smp)),
+                     nr_threads = 1
                      )
 {
   
@@ -338,20 +342,33 @@ mcleod	<- function( x.smp,
     else
       stop('beta_init must be of length ncol(covariates)')
   }
-  if(!all(is.numeric(offset_vec)) & length(offset_vec)!=length(x.smp)){
-    stop('offset_vec must be numric and same length as x.smp')
+  if(!all(is.numeric(offset_vec)) & length(offset_vec)!=length(n.smp)){
+    stop('offset_vec must be numric and same length as n.smp')
   }
   #%%% Function settings
   
   
   if(is.null(input_P_k_i)){
     P_k_i_is_given = 0L
-    P_k_i_precomputed = matrix(1,nrow = 1)
+    temp_matrix = matrix(1,nrow = 1)
+    if(!is.list(x.smp)){
+      P_k_i_precomputed = temp_matrix
+    }else{
+      P_k_i_precomputed = list()
+      for(i in 1:length(x.smp)){
+        P_k_i_precomputed[[i]] = temp_matrix
+      }
+    }
     K			<- length(x.smp)
   }else{
     P_k_i_is_given = 1L
     P_k_i_precomputed = input_P_k_i
-    K			<- nrow(P_k_i_precomputed)
+    if(is.list(P_k_i_precomputed)){
+      K			<- nrow(P_k_i_precomputed[[1]])
+    }else{
+      K			<- nrow(P_k_i_precomputed)  
+    }
+    
   }
   
   #checks
@@ -360,7 +377,12 @@ mcleod	<- function( x.smp,
     stop('Noise_Type must be either set to MCLEOD.BINOMIAL.ERRORS or MCLEOD.POISSON.ERRORS')
   }
   if(!P_k_i_is_given & Noise_Type == MCLEOD.BINOMIAL.ERRORS){
-   if(length(x.smp) != length(n.smp)){
+    if(is.list(x.smp)){
+      length_x_smp = length(x.smp[[1]])
+    }else{
+      length_x_smp = length(x.smp)
+    }
+   if(length_x_smp != length(n.smp)){
      stop('For binomial errors, x.smp and n.smp must be of equal length')
    } 
   }
@@ -368,7 +390,12 @@ mcleod	<- function( x.smp,
     if(!is.null(n.smp)){
       stop('For poisson errors, n.smp must be set to NULL')
     }
-    n.smp = x.smp
+    if(is.list(x.smp)){
+      n.smp = x.smp[[1]]  
+    }else{
+      n.smp = x.smp
+    }
+    
   }
   if(a.limits[2]<=a.limits[1]){
     stop('a.limits must be vector of size 2: c(lower,upper) for natural parameter')
@@ -402,22 +429,22 @@ mcleod	<- function( x.smp,
   a.vec.used		<- seq(a.min,a.max,length = I+1)  
   
   if(P_k_i_is_given){
-    #check precomputed P_k_i is same size as a.vec - this can be done in Wrapper_rcpp_Gibbs
-    if(ncol(P_k_i_precomputed) != I){
-      stop(paste0(' P_k_i contains ',ncol(P_k_i_precomputed),' columns, but prior definitions has ',I,' intervals'))
+    if(!is.list(P_k_i_precomputed)){
+      #check precomputed P_k_i is same size as a.vec - this can be done in Wrapper_rcpp_Gibbs
+      if(ncol(P_k_i_precomputed) != I){
+        stop(paste0(' P_k_i contains ',ncol(P_k_i_precomputed),' columns, but prior definitions has ',I,' intervals'))
+      }
+      if(nrow(P_k_i_precomputed) != K){
+        stop(paste0(' P_k_i contains ',nrow(P_k_i_precomputed),' rows, but x.smp is of length ',K))
+      }
+      #check that if Precomputed P_k_i - there are no covariates given!
+      if(P_k_i_is_given & covariates_given){
+        stop('covariates can be given only for Binomial or Poisson errors. A custom P_k_i must be given without covariates')
+      }
+    }else{
+      #need to implement check for list precomputed P_k_i
     }
-    if(nrow(P_k_i_precomputed) != K){
-      stop(paste0(' P_k_i contains ',nrow(P_k_i_precomputed),' rows, but x.smp is of length ',K))
-    }
-    #check that if Precomputed P_k_i - there are no covariates given!
-    if(P_k_i_is_given & covariates_given){
-      stop('covariates can be given only for Binomial or Poisson errors. A custom P_k_i must be given without covariates')
-    }
-    # if(P_k_i_is_given & !(is.null(x.smp) & is.null(n.smp))){
-    # stop('if P_k_i is given, x.smp and n.smp must be set to NULL')  
-    # }
-    # x.smp = 1 # replace to numeric value - instead of null type
-    # n.smp = 1
+    
   }
   
   #handle manual priors:
@@ -434,44 +461,81 @@ mcleod	<- function( x.smp,
     
   }
     
-    
-  #%%% call Rcpp wrapper
-  res = Wrapper_rcpp_Gibbs(x.smp,
-                           n.smp,
-                           a.vec.used,
-                           nr.gibbs,
-                           nr.gibbs.burnin,
-                           as.integer(exact.numeric.integration),
-                           as.integer(0), #verbose - turned off
-                           L,
-                           Prior_Hyper_Parameters_BetaH_L,
-                           Prior_Hyper_Parameters_BetaH_U,
-                           Prior_Hyper_Parameters_2LDT,
-                           Fast.Gamma.Used.p,
-                           Fast.Gamma.Bank,
-                           PriorType = Prior_Type,
-                           I1 = I1,
-                           covariates_given = covariates_given,
-                           covariates = covariates,
-                           proposal_sd = proposal_sd,
-                           beta_prior_sd = beta_prior_sd,
-                           beta_init = beta_init,
-                           integration_step_size = integration_step_size,
-                           Noise_Type = Noise_Type,
-                           P_k_i_is_given = P_k_i_is_given,
-                           P_k_i_precomputed = P_k_i_precomputed,
-                           Manual_Prior_Given = Manual_Prior_Given,
-                           Manual_Prior_Values = Manual_Prior_Values,
-                           Manual_Prior_Probs = Manual_Prior_Probs,
-                           do_P_k_i_hashing = covariates_estimation_parameters$do_P_k_i_hashing,
-                           P_k_i_hashing_resolution = covariates_estimation_parameters$P_k_i_hashing_resolution_by_theta,
-                           offset_vec = offset_vec
-                           )
+  if(!is.list(x.smp)){
+    #%%% call Rcpp wrapper
+    res = Wrapper_rcpp_Gibbs(x.smp,
+                             n.smp,
+                             a.vec.used,
+                             nr.gibbs,
+                             nr.gibbs.burnin,
+                             as.integer(exact.numeric.integration),
+                             as.integer(0), #verbose - turned off
+                             L,
+                             Prior_Hyper_Parameters_BetaH_L,
+                             Prior_Hyper_Parameters_BetaH_U,
+                             Prior_Hyper_Parameters_2LDT,
+                             Fast.Gamma.Used.p,
+                             Fast.Gamma.Bank,
+                             PriorType = Prior_Type,
+                             I1 = I1,
+                             covariates_given = covariates_given,
+                             covariates = covariates,
+                             proposal_sd = proposal_sd,
+                             beta_prior_sd = beta_prior_sd,
+                             beta_init = beta_init,
+                             integration_step_size = integration_step_size,
+                             Noise_Type = Noise_Type,
+                             P_k_i_is_given = P_k_i_is_given,
+                             P_k_i_precomputed = P_k_i_precomputed,
+                             Manual_Prior_Given = Manual_Prior_Given,
+                             Manual_Prior_Values = Manual_Prior_Values,
+                             Manual_Prior_Probs = Manual_Prior_Probs,
+                             do_P_k_i_hashing = covariates_estimation_parameters$do_P_k_i_hashing,
+                             P_k_i_hashing_resolution = covariates_estimation_parameters$P_k_i_hashing_resolution_by_theta,
+                             offset_vec = offset_vec
+    )
+  }else{
+    #%%% call Rcpp wrapper
+    res = Wrapper_rcpp_Gibbs_list(x.smp,
+                             n.smp,
+                             a.vec.used,
+                             nr.gibbs,
+                             nr.gibbs.burnin,
+                             as.integer(exact.numeric.integration),
+                             as.integer(0), #verbose - turned off
+                             L,
+                             Prior_Hyper_Parameters_BetaH_L,
+                             Prior_Hyper_Parameters_BetaH_U,
+                             Prior_Hyper_Parameters_2LDT,
+                             Fast.Gamma.Used.p,
+                             Fast.Gamma.Bank,
+                             PriorType = Prior_Type,
+                             I1 = I1,
+                             covariates_given = covariates_given,
+                             covariates = covariates,
+                             proposal_sd = proposal_sd,
+                             beta_prior_sd = beta_prior_sd,
+                             beta_init = beta_init,
+                             integration_step_size = integration_step_size,
+                             Noise_Type = Noise_Type,
+                             P_k_i_is_given = P_k_i_is_given,
+                             P_k_i_precomputed = P_k_i_precomputed,
+                             Manual_Prior_Given = Manual_Prior_Given,
+                             Manual_Prior_Values = Manual_Prior_Values,
+                             Manual_Prior_Probs = Manual_Prior_Probs,
+                             do_P_k_i_hashing = covariates_estimation_parameters$do_P_k_i_hashing,
+                             P_k_i_hashing_resolution = covariates_estimation_parameters$P_k_i_hashing_resolution_by_theta,
+                             offset_vec = offset_vec
+    )
+  }
+  
   
   #%%% Wrap results
   
   ret = list()
   class(ret) = CLASS.NAME.MCLEOD
+  if(is.list(x.smp))
+    class(ret) = paste0(class(ret),'_MULTIPLE') # this is so print functions wont send an error
   
   ret$parameters_list = list(
     a.vec = a.vec.used,

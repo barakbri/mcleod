@@ -13,3 +13,7 @@ rcpp_Generate_Gamma_from_Fast_Gamma_Bank <- function(x, Bank) {
     .Call(`_mcleod_rcpp_Generate_Gamma_from_Fast_Gamma_Bank`, x, Bank)
 }
 
+rcpp_Gibbs_Prob_Results_Multiple <- function(threadpool_size, x_vec_list, n_vec, a_vec, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, Prior_Hyper_Parameters_BetaH_L, Prior_Hyper_Parameters_BetaH_U, Prior_Hyper_Parameters_2LDT, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed_list, Pki_Integration_Stepsize, Prior_Type, Two_Layer_Dirichlet_I1, covariates_given, covariates, proposal_sd, beta_prior_sd, beta_init, Noise_Type, manual_beta_dist_given, manual_beta_dist_values, manual_beta_dist_Probs, do_P_k_i_hashing, P_k_i_hashing_resolution, offset_vec) {
+    .Call(`_mcleod_rcpp_Gibbs_Prob_Results_Multiple`, threadpool_size, x_vec_list, n_vec, a_vec, n_gibbs, n_gibbs_burnin, IsExact, Verbose, L, Prior_Hyper_Parameters_BetaH_L, Prior_Hyper_Parameters_BetaH_U, Prior_Hyper_Parameters_2LDT, InitGiven, Init, Sample_Gamma_From_Bank, Bank, P_k_i_is_given, P_k_i_precomputed_list, Pki_Integration_Stepsize, Prior_Type, Two_Layer_Dirichlet_I1, covariates_given, covariates, proposal_sd, beta_prior_sd, beta_init, Noise_Type, manual_beta_dist_given, manual_beta_dist_values, manual_beta_dist_Probs, do_P_k_i_hashing, P_k_i_hashing_resolution, offset_vec)
+}
+

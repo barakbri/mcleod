@@ -323,20 +323,3 @@ res = mcleod(x, n, covariates = covariates,
 ```{r, cache=TRUE,eval=FALSE}
 mcleod::results.covariate.coefficients.posterior(res,plot.posterior = F)
 ```
-
-# Interval censoring
-```{r, cache=TRUE,eval=FALSE}
-suppressWarnings(library(icenReg)) 
-data(miceData)
-  
-  
-miceData.mat	<- cbind(miceData$l,miceData$u)
-fit.all <- ic_np(miceData.mat)
-  
-  
-a	<- mcleod.interval.censoring.density.estimation(miceData.mat,
-                                                  a.rng = c(0,1200),n.gbbs = 200)
-  
-plot.posterior.interval.censoring(a)
-  
-```

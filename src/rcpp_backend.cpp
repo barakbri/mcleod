@@ -2,6 +2,7 @@
 #include <math.h>
 #include <Rmath.h>
 #include <ctime>
+#include <RcppThread.h>
 
 #include <sstream>
 
@@ -1200,3 +1201,113 @@ NumericVector rcpp_Generate_Gamma_from_Fast_Gamma_Bank(NumericVector x,NumericMa
   return(_res);
 }
 
+// [[Rcpp::export]]
+List rcpp_Gibbs_Prob_Results_Multiple(IntegerVector threadpool_size,
+                                      List x_vec_list,
+                                      NumericVector n_vec,
+                                      NumericVector a_vec,
+                                      IntegerVector n_gibbs,
+                                      IntegerVector n_gibbs_burnin,
+                                      IntegerVector IsExact,
+                                      IntegerVector Verbose,
+                                      IntegerVector L,
+                                      NumericMatrix Prior_Hyper_Parameters_BetaH_L,
+                                      NumericMatrix Prior_Hyper_Parameters_BetaH_U,
+                                      NumericMatrix Prior_Hyper_Parameters_2LDT,
+                                      IntegerVector InitGiven,
+                                      NumericVector Init,
+                                      IntegerVector Sample_Gamma_From_Bank,
+                                      NumericMatrix Bank,
+                                      IntegerVector P_k_i_is_given,
+                                      List P_k_i_precomputed_list,
+                                      NumericVector Pki_Integration_Stepsize,
+                                      IntegerVector Prior_Type,
+                                      IntegerVector Two_Layer_Dirichlet_I1,
+                                      IntegerVector covariates_given,
+                                      NumericMatrix covariates,
+                                      NumericVector proposal_sd,
+                                      NumericVector beta_prior_sd,
+                                      NumericVector beta_init,
+                                      IntegerVector Noise_Type,
+                                      IntegerVector manual_beta_dist_given,   // zero or 1, for placing a manual distribution for beta
+                                      NumericVector manual_beta_dist_values,  // R+1 values of the distribution
+                                      NumericMatrix manual_beta_dist_Probs,   // R values of probabilities for bins.
+                                      IntegerVector do_P_k_i_hashing,
+                                      NumericVector P_k_i_hashing_resolution,
+                                      NumericVector offset_vec)
+{
+  
+   using namespace RcppThread;
+   ThreadPool pool(threadpool_size[0]);
+   auto task = [x_vec_list,n_vec,a_vec,n_gibbs,n_gibbs_burnin,IsExact,Verbose,L,
+                Prior_Hyper_Parameters_BetaH_L,
+                Prior_Hyper_Parameters_BetaH_U,
+                Prior_Hyper_Parameters_2LDT,
+                InitGiven,
+                Init,
+                Sample_Gamma_From_Bank,
+                Bank,
+                P_k_i_is_given,
+                P_k_i_precomputed_list,
+                Pki_Integration_Stepsize,
+                Prior_Type,
+                Two_Layer_Dirichlet_I1,
+                covariates_given,
+                covariates,
+                proposal_sd,
+                beta_prior_sd,
+                beta_init,
+                Noise_Type,
+                manual_beta_dist_given,
+                manual_beta_dist_values,
+                manual_beta_dist_Probs,
+                do_P_k_i_hashing,
+                P_k_i_hashing_resolution,
+                offset_vec] (int i) {
+   RcppThread::Rcout << i << " started" << std::endl;
+   List _res = rcpp_Gibbs_Prob_Results( x_vec_list[i],
+                                        n_vec,
+                                        a_vec,
+                                        n_gibbs,
+                                        n_gibbs_burnin,
+                                        IsExact,
+                                        Verbose,
+                                        L,
+                                        Prior_Hyper_Parameters_BetaH_L,
+                                        Prior_Hyper_Parameters_BetaH_U,
+                                        Prior_Hyper_Parameters_2LDT,
+                                        InitGiven,
+                                        Init,
+                                        Sample_Gamma_From_Bank,
+                                        Bank,
+                                        P_k_i_is_given,
+                                        P_k_i_precomputed_list[i],
+                                        Pki_Integration_Stepsize,
+                                        Prior_Type,
+                                        Two_Layer_Dirichlet_I1,
+                                        covariates_given,
+                                        covariates,
+                                        proposal_sd,
+                                        beta_prior_sd,
+                                        beta_init,
+                                        Noise_Type,
+                                        manual_beta_dist_given,   // zero or 1, for placing a manual distribution for beta
+                                        manual_beta_dist_values,  // R+1 values of the distribution
+                                        manual_beta_dist_Probs,   // R values of probabilities for bins.
+                                        do_P_k_i_hashing,
+                                        P_k_i_hashing_resolution,
+                                        offset_vec);
+   
+   return _res;
+   };
+   int _nr_reps = x_vec_list.length();
+   std::vector<std::future<List>> futures(_nr_reps);
+   List results(_nr_reps);
+   for (int i = 0; i < _nr_reps; ++i)
+    futures[i] = pool.pushReturn(task, i);
+   for (int i = 0; i < _nr_reps; ++i)
+    results[i] = (futures[i].get());
+   pool.join();
+  return(results);
+  //return(x);
+}

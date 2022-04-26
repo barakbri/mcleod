@@ -1,15 +1,11 @@
 #Tasks:
-
-#- run Efron data
-#- run example with n=10000
-#- Run binomial(N,P), N<<20, e.g. 2,3,5.
-#- write paragraph on how rho is calibrated.
+# - sample holdout data at random
 
 # I mixed quantile and percentile, need to check in documentation.
 # document code inside functions
 # Finish package documentation
 
-# add check on number of available interpolation points.
+# add check on number of available interpolation points.d
 # Build a vignette
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -104,6 +100,7 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
                                            rho.estimation.perm = 50,
                                            rho.q_for_calibration = c(0.2,0.4,0.6,0.8),
                                            rho.theta_for_calibration = NULL,
+                                           rho.alpha.CI = alpha.CI,
                                            rho.calibration.nr.points.for.pv.exterpolation = 3,
                                            q_vec_for_computation = NULL,
                                            theta_vec_for_computation = NULL,
@@ -151,6 +148,11 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
   if(alpha.CI <0 | alpha.CI > 1 ){
     stop('coverage rating must be a number between 0 and 1')
   }
+  if(rho.alpha.CI <0 | rho.alpha.CI > 1 ){
+    stop('rho.alpha.CI - coverage rating must be a number between 0 and 1')
+  }
+  
+  
   if(alpha.CI<0.5){
     warning('alpha.CI sets the coverage probability, typical values are 0.95, 0.9')
   }
@@ -227,6 +229,7 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
   ret$rho.estimation.perm = rho.estimation.perm
   ret$rho.q_for_calibration = rho.q_for_calibration
   ret$rho.theta_for_calibration = rho.theta_for_calibration
+  ret$rho.alpha.CI = rho.alpha.CI
   ret$rho.calibration.nr.points.for.pv.exterpolation = rho.calibration.nr.points.for.pv.exterpolation
   ret$q_vec_for_computation = q_vec_for_computation
   ret$theta_vec_for_computation = theta_vec_for_computation
@@ -381,6 +384,8 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
                                                                            nr.curves,
                                                                            is_GE = T,
                                                                            do_serial = T){
+  #print(paste0('DEBUG - ind_theta:',ind_theta,' ind_q:',ind_q))
+  
   if(bank$CI_param$sampling_distribution != 'binomial')
     stop('bank only supports binomial')
   
@@ -483,6 +488,8 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
       
     }# end of case binomial
   }else{ # if there are none to compute, we can just take from bank
+    bank_sizes = unlist(lapply(bank$median_curve_GE,function(x){unlist(lapply(x,length))}))
+    #print(paste0('CACHE_HIT, bank size: ',sum(bank_sizes)))
     ret = list()
     if(is_GE){
       for(k in 1:nr.curves){
@@ -906,8 +913,8 @@ mcleod.CI.rho.calibration.constructor = function(
   
   
   
-  ret = list(rho_approx_fun_LE = rho_approx_fun_LE,
-             rho_approx_fun_GE = rho_approx_fun_GE,
+  ret = list(rho_approx_fun_LE = rho_approx_fun_LE_non_smoothed,#rho_approx_fun_LE,
+             rho_approx_fun_GE = rho_approx_fun_GE_non_smoothed,#rho_approx_fun_GE,
              bank = bank,
              rho_approx_fun_LE_non_smoothed = rho_approx_fun_LE_non_smoothed,
              rho_approx_fun_GE_non_smoothed = rho_approx_fun_GE_non_smoothed
@@ -1109,7 +1116,7 @@ compute_CI_curves_function = function(
     rejected_ind = rep(NA,length(ind_to_select_from))
     for(u in 1:length(rejected_ind)){
       if(verbose){
-        print(paste0('Testing at q with index ',ind_to_select_from[u],' which is equivalent to ',bank$CI_param$q_vec[ind_to_select_from[u]]))
+        #print(paste0('Testing at q with index ',ind_to_select_from[u],' which is equivalent to ',bank$CI_param$q_vec[ind_to_select_from[u]]))
       }
       rejected_ind[u] = mcleod.CI.PV.at_point(bank = bank,
                                               ind_theta = i,
@@ -1180,7 +1187,7 @@ compute_CI_curves_function = function(
     
     for(u in length(ind_to_select_from):1){
       if(verbose){
-        print(paste0('Testing at q with index ',ind_to_select_from[u],' which is equivalent to ',bank$CI_param$q_vec[ind_to_select_from[u]]))
+        #print(paste0('Testing at q with index ',ind_to_select_from[u],' which is equivalent to ',bank$CI_param$q_vec[ind_to_select_from[u]]))
       }
       rejected_ind[u] = mcleod.CI.PV.at_point(bank = bank,
                                               ind_theta = i,
@@ -1296,12 +1303,14 @@ mcleod.estimate.CI = function(X,
   
   if(is.na(CI_param$rho.set.value)){
     n_holdout = ceiling(ratio_holdout * length(X))
+    ind_selected_for_test = sample(1:length(X),size = length(X)-n_holdout,replace = F)
     X_rho = X[1:n_holdout]; N_rho = N[1:n_holdout]
     X_test = X[-(1:n_holdout)]; N_test = N[-(1:n_holdout)]
   }else{
     n_holdout = 0
     X_rho = NA; N_rho = NA
     X_test = X; N_test = N
+    ind_selected_for_test = 1:length(X)
   }
   
   bank <<- mcleod.CI.deconv.bank.constructor(N_test,CI_param,Use_Existing_Permutations_From_Object)
@@ -1315,13 +1324,13 @@ mcleod.estimate.CI = function(X,
   median_curve = compute_medians_curve(res_mcleod_data)
   
   #Part I: functions for generating P_k_i based on precomputed values:
-  Use_P_k_i_generator = T
+  Use_P_k_i_generator = F
   if(Use_P_k_i_generator){
     if(verbose){
       print(paste0('Starting construction of P_k_i generator'))
       start = Sys.time()
       
-      gen_object = generate_P_k_i_matrix_cache(N_test,
+      gen_object = generate_P_k_i_matrix_cache(N,
                                                max(bank$CI_param$a.limits),
                                                CI_param$prior_parameters,
                                                CI_param$comp_parameters)
@@ -1353,7 +1362,7 @@ mcleod.estimate.CI = function(X,
     rho_calibration_obj = mcleod.CI.rho.calibration.constructor(bank_original = bank,
                                                                 res_mcleod_holdout = res_mcleod_holdout,
                                                                 CDF_holdout = CDF_holdout,
-                                                                alpha.one.sided = alpha.one.sided,
+                                                                alpha.one.sided = (1-CI_param$rho.alpha.CI)/2,
                                                                 verbose = verbose,
                                                                 nr.perm = CI_param$rho.estimation.perm,
                                                                 possible_rhos = CI_param$rho.possible.values,
@@ -1454,6 +1463,7 @@ mcleod.estimate.CI = function(X,
   ret$CDF_holdout = CDF_holdout
   ret$res_mcleod_data = res_mcleod_data
   ret$CDF_data = median_curve
+  ret$ind_selected_for_test = ind_selected_for_test
   class(ret) = CLASS.NAME.MCLEOD.CI
   
   if(!CI_param$do_serial){
