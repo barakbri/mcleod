@@ -8,7 +8,7 @@
 # add check on number of available interpolation points.d
 # Build a vignette
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+WORK_WITH_THREADS = F
 
 # Classes related to CI estimation of the mixing distribution:
 CLASS.NAME.MCLEOD.CI = 'mcleod.CI.obj' # this is the resulting object, when estimating the mixing distribution
@@ -356,8 +356,12 @@ mcleod.CI.deconv.bank.constructor = function(N_vec=NULL,CI_param,Use_Existing_Pe
 #' @export
 #'
 #' @examples
-compute_medians_curve = function(mcleod_for_data){
-  pi_smp_for_data = (t(mcleod_for_data$additional$original_stat_res$pi_smp))
+compute_medians_curve = function(mcleod_for_data,list_ind = NA){
+  if(is.na(list_ind)){
+    pi_smp_for_data = (t(mcleod_for_data$additional$original_stat_res$pi_smp))
+  }else{
+    pi_smp_for_data = (t(mcleod_for_data$additional$original_stat_res[[list_ind]]$pi_smp))
+  }
   pi_smp_for_data = pi_smp_for_data[-(1:mcleod_for_data$parameters_list$nr.gibbs.burnin),]
   cumulative_pi_smp_for_data = t(apply(pi_smp_for_data,1,cumsum))
   median_cumulative_pi_smp_for_data = c(0,apply(cumulative_pi_smp_for_data,2,median))
@@ -404,8 +408,7 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
     
     if(bank$CI_param$sampling_distribution == 'binomial'){
       
-      worker_function_Binomial_GE = function(seed){
-        set.seed(seed)
+      if(WORK_WITH_THREADS){
         
         if(is_GE){
           current_theta = bank$CI_param$theta_vec[ind_theta]
@@ -416,18 +419,15 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
         }
         
         N_vec = bank$N_vec
-        P_sample = rbinom(n = length(N_vec),size = 1,1-current_q) * inv.log.odds(current_theta)
-        X_sampled = rbinom(n = length(N_vec),size = N_vec,prob = P_sample)
-        
-        library(mcleod)
-        
-        # sorted_n_data = gen_object$sorted_n_data
-        # n_to_P_k_i_generator_index = gen_object$n_to_P_k_i_generator_index
-        # generate_P_k_i_generator_list = gen_object$generate_P_k_i_generator_list
-        # generator_list = gen_object$generator_list
-        # generate_P_k_i = gen_object$generate_P_k_i
+        X_sampled_list = list()
+        for(k in 1:nr.to.compute){
+          P_sample = rbinom(n = length(N_vec),size = 1,1-current_q) * inv.log.odds(current_theta)
+          X_sampled = rbinom(n = length(N_vec),size = N_vec,prob = P_sample)
+          X_sampled_list[[k]] = X_sampled
+        }
         
         generated_P_k_i_matrix = NULL
+        
         if(!is.null(gen_object)){
           sorted_n_data = gen_object$sorted_n_data
           n_to_P_k_i_generator_index = gen_object$n_to_P_k_i_generator_index
@@ -435,30 +435,89 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
           generator_list = gen_object$generator_list
           generate_P_k_i = gen_object$generate_P_k_i
           a.vec = gen_object$a.vec
-          generated_P_k_i_matrix = generate_P_k_i(X_sampled,length(a.vec)-1,N_vec)
+          generated_P_k_i_matrix = list()
+          for(k in 1:nr.to.compute){
+            generated_P_k_i_matrix[[k]] = generate_P_k_i(X_sampled_list[[k]],length(a.vec)-1,N_vec)  
+          }
         }
         
-        temp_mcleod = mcleod(x.smp = X_sampled,n.smp = N_vec,
+        nr_threads = 1
+        if(!do_serial)
+          nr_threads = bank$CI_param$nr.cores
+        
+        gc(reset = TRUE)
+        
+        temp_mcleod = mcleod(x.smp = X_sampled_list,n.smp = N_vec,
                              a.limits = bank$CI_param$a.limits,
                              exact.numeric.integration = T,
                              computational_parameters = bank$CI_param$comp_parameters,
-                             prior_parameters = bank$CI_param$prior_parameters,input_P_k_i = generated_P_k_i_matrix)
+                             prior_parameters = bank$CI_param$prior_parameters,input_P_k_i = generated_P_k_i_matrix,
+                             nr_threads = nr_threads)
+        gc(reset = TRUE)
         
-        return(compute_medians_curve(temp_mcleod))
-      }
-      if(do_serial){
         res_Binomial = list()
         for(k in 1:nr.to.compute){
-          res_Binomial[[k]] = worker_function_Binomial_GE(k)
+          res_Binomial[[k]] = compute_medians_curve(temp_mcleod,list_ind = k)
         }
-      }else{
-        #this assumes a cluster is registered
-        res_Binomial = foreach(seed=(nr.computed+1):nr.curves, .options.RNG=1,
-                               .export = c('ind_theta','ind_q','bank','worker_function_Binomial_GE','gen_object')) %dorng% {
-                                 worker_function_Binomial_GE(seed)
-                                 
-                               }
-      }
+      }else{#do parallel processes
+        
+        worker_function_Binomial_GE = function(seed){
+          set.seed(seed)
+          
+          if(is_GE){
+            current_theta = bank$CI_param$theta_vec[ind_theta]
+            current_q = bank$CI_param$q_vec[ind_q]  
+          }else{ # we compute the corresponding GE hypothesis and revert the curves afterwords
+            current_theta = bank$CI_param$theta_vec[bank$CI_param$n_theta - ind_theta + 1]
+            current_q = bank$CI_param$q_vec[bank$CI_param$n_q - ind_q +1]  
+          }
+          
+          N_vec = bank$N_vec
+          P_sample = rbinom(n = length(N_vec),size = 1,1-current_q) * inv.log.odds(current_theta)
+          X_sampled = rbinom(n = length(N_vec),size = N_vec,prob = P_sample)
+          
+          library(mcleod)
+          
+          # sorted_n_data = gen_object$sorted_n_data
+          # n_to_P_k_i_generator_index = gen_object$n_to_P_k_i_generator_index
+          # generate_P_k_i_generator_list = gen_object$generate_P_k_i_generator_list
+          # generator_list = gen_object$generator_list
+          # generate_P_k_i = gen_object$generate_P_k_i
+          
+          generated_P_k_i_matrix = NULL
+          if(!is.null(gen_object)){
+            sorted_n_data = gen_object$sorted_n_data
+            n_to_P_k_i_generator_index = gen_object$n_to_P_k_i_generator_index
+            generate_P_k_i_generator_list = gen_object$generate_P_k_i_generator_list
+            generator_list = gen_object$generator_list
+            generate_P_k_i = gen_object$generate_P_k_i
+            a.vec = gen_object$a.vec
+            generated_P_k_i_matrix = generate_P_k_i(X_sampled,length(a.vec)-1,N_vec)
+          }
+          
+          temp_mcleod = mcleod(x.smp = X_sampled,n.smp = N_vec,
+                               a.limits = bank$CI_param$a.limits,
+                               exact.numeric.integration = T,
+                               computational_parameters = bank$CI_param$comp_parameters,
+                               prior_parameters = bank$CI_param$prior_parameters,input_P_k_i = generated_P_k_i_matrix)
+          
+          return(compute_medians_curve(temp_mcleod))
+        }
+        if(do_serial){
+          res_Binomial = list()
+          for(k in 1:nr.to.compute){
+            res_Binomial[[k]] = worker_function_Binomial_GE(k)
+          }
+        }else{
+          #this assumes a cluster is registered
+          res_Binomial = foreach(seed=(nr.computed+1):nr.curves, .options.RNG=1,
+                                 .export = c('ind_theta','ind_q','bank','worker_function_Binomial_GE','gen_object')) %dorng% {
+                                   worker_function_Binomial_GE(seed)
+                                   
+                                 }
+        }
+      }#end of parallel processes
+      
       
       #Collecting results
       ret = list()
@@ -1342,10 +1401,13 @@ mcleod.estimate.CI = function(X,
       
     }
   }
-  
+
   cl <- NULL
-  if(!CI_param$do_serial){
-    cl <- makeCluster(CI_param$nr.cores)
+  if(!CI_param$do_serial & !WORK_WITH_THREADS){
+    cluster_type = 'PSOCK'
+    if(Sys.info()['sysname']!='Windows')
+      cluster_type = 'FORK'
+    cl <- makeCluster(CI_param$nr.cores,type = cluster_type,setup_strategy = 'parallel')
     registerDoParallel(cl)
   }
   
@@ -1465,8 +1527,8 @@ mcleod.estimate.CI = function(X,
   ret$CDF_data = median_curve
   ret$ind_selected_for_test = ind_selected_for_test
   class(ret) = CLASS.NAME.MCLEOD.CI
-  
-  if(!CI_param$do_serial){
+
+  if(!CI_param$do_serial & !WORK_WITH_THREADS){
     stopCluster(cl)
   }
   

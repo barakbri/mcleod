@@ -1,19 +1,19 @@
 if(F){
   
-  n = 300
+  n = 500
   N = rep(20,n)
   shape_1 = 2
   shape_2 = 2
   set.seed(1)
   X = rbinom(n = n,size = N,prob = rbeta(n = n,shape1 = shape_1,shape2 = shape_2))
   
-  CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-3,3,0.25),
-                                             q_vec = seq(0.02,0.98,0.04),
+  CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-3,3,0.1),
+                                             q_vec = seq(0.02,0.98,0.02),
                                              do_serial = F,
                                              rho.estimation.perm = 50,
                                              nr.perms = 200,alpha.CI = 0.95,
                                              rho.possible.values = seq(0,1.0,0.1),
-                                             rho.q_for_calibration = seq(0.1,0.9,0.1))
+                                             rho.q_for_calibration = seq(0.1,0.9,0.1),nr.cores = 8)
   
   CI.est.res = mcleod.estimate.CI(X = X,
                                   N = N,

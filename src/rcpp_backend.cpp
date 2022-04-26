@@ -1264,7 +1264,9 @@ List rcpp_Gibbs_Prob_Results_Multiple(IntegerVector threadpool_size,
                 do_P_k_i_hashing,
                 P_k_i_hashing_resolution,
                 offset_vec] (int i) {
-   RcppThread::Rcout << i << " started" << std::endl;
+   //RcppThread::Rcout << i << " started" << std::endl;
+   std::this_thread::sleep_for(std::chrono::milliseconds(10));
+   
    List _res = rcpp_Gibbs_Prob_Results( x_vec_list[i],
                                         n_vec,
                                         a_vec,
@@ -1300,6 +1302,8 @@ List rcpp_Gibbs_Prob_Results_Multiple(IntegerVector threadpool_size,
    
    return _res;
    };
+   
+   //Rprintf("\n\r nr threads : %ld \n\r",std::thread::hardware_concurrency());
    int _nr_reps = x_vec_list.length();
    std::vector<std::future<List>> futures(_nr_reps);
    List results(_nr_reps);
