@@ -12,6 +12,7 @@ if(F){
                                              do_serial = F,
                                              rho.estimation.perm = 50,
                                              nr.perms = 200,alpha.CI = 0.95,
+                                             rho.calibration.method = 'sum',
                                              rho.possible.values = seq(0,1.0,0.1),
                                              rho.q_for_calibration = seq(0.1,0.9,0.1),nr.cores = 8)
   
