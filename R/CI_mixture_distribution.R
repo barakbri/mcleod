@@ -829,7 +829,9 @@ mcleod.CI.rho.calibration.constructor = function(
                                                       is_GE = T)
         
         PVs_at_Qs = rep(NA,length(points_to_test_GE))
-        for(i in 1:length(points_to_test_GE)){
+        
+         q_lower_by_rho[index_rho] = 0
+        for(i in length(points_to_test_GE):1){
           PVs_at_Qs[i] = mcleod.CI.PV.at_point(bank = bank,
                                                ind_theta = theta_current_q_ind,
                                                ind_q = points_to_test_GE[i],
@@ -841,8 +843,12 @@ mcleod.CI.rho.calibration.constructor = function(
                                                do_check_vs_minimum_number_of_required_iterations = F,
                                                is_GE = T,
                                                do_serial = bank$CI_param$do_serial)
+          # if(PVs_at_Qs[i]<=alpha.one.sided){
+          #   q_lower_by_rho[index_rho] = bank$CI_param$q_vec[points_to_test_GE[i]]
+          #   break
+          # }
         }
-        
+        # 
         #create model:
         if(length(unique(PVs_at_Qs))>1){
           PVs_at_Qs = PVs_at_Qs*(nr.perm)/(nr.perm+1) #this is to make sure we dont have 1's. 0's are avoided by adding the test statistic to the perms when computing a PV value
@@ -852,9 +858,9 @@ mcleod.CI.rho.calibration.constructor = function(
           b1 = model$coefficients[2]
           q_lower_by_rho[index_rho] = (log.odds(alpha.one.sided) - b0 )/b1
         }else{
-          q_lower_by_rho[index_rho] = max(bank$CI_param$q_vec[points_to_test_GE])
+          #q_lower_by_rho[index_rho] = max(bank$CI_param$q_vec[points_to_test_GE])
         }
-        
+         
         q_lower_by_rho[index_rho] = max(q_lower_by_rho[index_rho],0)
         curve_GE_q_by_theta_and_rho[index_q,index_rho] = q_lower_by_rho[index_rho]
       }
@@ -880,7 +886,7 @@ mcleod.CI.rho.calibration.constructor = function(
                                                       rho = current_rho,
                                                       is_GE = F)
         
-        
+        q_upper_by_rho[index_rho] =  1
         PVs_at_Qs = rep(NA,length(points_to_test_LE))
         for(i in 1:length(points_to_test_LE)){
           PVs_at_Qs[i] = mcleod.CI.PV.at_point(bank = bank,
@@ -894,6 +900,10 @@ mcleod.CI.rho.calibration.constructor = function(
                                                do_check_vs_minimum_number_of_required_iterations = F,
                                                is_GE = F,
                                                do_serial = bank$CI_param$do_serial)
+          # if(PVs_at_Qs[i]<=alpha.one.sided){
+          #   q_upper_by_rho[index_rho] = bank$CI_param$q_vec[points_to_test_LE[i]]
+          #   break
+          # }
         }
         
         #create model:
@@ -903,9 +913,9 @@ mcleod.CI.rho.calibration.constructor = function(
           model = lm(logits~bank$CI_param$q_vec[points_to_test_LE])
           b0 = model$coefficients[1]
           b1 = model$coefficients[2]
-          q_upper_by_rho[index_rho] = (log.odds(alpha.one.sided) - b0 )/b1  
+          q_upper_by_rho[index_rho] = (log.odds(alpha.one.sided) - b0 )/b1
         }else{
-          q_upper_by_rho[index_rho] = min(bank$CI_param$q_vec[points_to_test_LE])
+          # q_upper_by_rho[index_rho] = min(bank$CI_param$q_vec[points_to_test_LE])
         }
         q_upper_by_rho[index_rho] = min(q_upper_by_rho[index_rho],1)
         curve_LE_q_by_theta_and_rho[index_q,index_rho] = q_upper_by_rho[index_rho]
