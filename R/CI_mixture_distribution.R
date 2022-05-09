@@ -860,8 +860,10 @@ mcleod.CI.rho.calibration.constructor = function(
         }else{
           #q_lower_by_rho[index_rho] = max(bank$CI_param$q_vec[points_to_test_GE])
         }
-         
-        q_lower_by_rho[index_rho] = max(q_lower_by_rho[index_rho],0)
+        
+        if(q_lower_by_rho[index_rho]<0 | q_lower_by_rho[index_rho]>1){#by exterpolation or bug
+          q_lower_by_rho[index_rho] = 0
+        }
         curve_GE_q_by_theta_and_rho[index_q,index_rho] = q_lower_by_rho[index_rho]
       }
       
@@ -917,7 +919,9 @@ mcleod.CI.rho.calibration.constructor = function(
         }else{
           # q_upper_by_rho[index_rho] = min(bank$CI_param$q_vec[points_to_test_LE])
         }
-        q_upper_by_rho[index_rho] = min(q_upper_by_rho[index_rho],1)
+        if(q_upper_by_rho[index_rho]<0 | q_upper_by_rho[index_rho]>1){ #by exterpolation or bug
+          q_upper_by_rho[index_rho] = 1
+        }
         curve_LE_q_by_theta_and_rho[index_q,index_rho] = q_upper_by_rho[index_rho]
       }
       optimal_rho_by_theta_for_LE[index_q] = which.min(q_upper_by_rho)
