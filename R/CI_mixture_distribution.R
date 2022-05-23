@@ -8,7 +8,7 @@
 # add check on number of available interpolation points.d
 # Build a vignette
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-WORK_WITH_THREADS = F
+WORK_WITH_THREADS = F # A constant setting if computation of the CIs for the mixing distribution should be done in a multithreaded computation. Currently, this is disabled, since the open/close times of many threads are slower than simply holding multiple R processes open and sendig commands to them.
 
 # Classes related to CI estimation of the mixing distribution:
 CLASS.NAME.MCLEOD.CI = 'mcleod.CI.obj' # this is the resulting object, when estimating the mixing distribution
@@ -96,14 +96,14 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
                                            prior_parameters = mcleod.prior.parameters(),
                                            nr.perms = 200,
                                            alpha.CI = 0.95,
-                                           rho.calibration.method = 'max', #'max', 'sum', 'specific'
+                                           rho.calibration.method = 'sum', #'max', 'sum', 'specific'
                                            rho.set.value = NA,
                                            rho.possible.values = seq(0.1,0.5,0.1),
-                                           rho.estimation.perm = 50,
-                                           rho.q_for_calibration = c(0.2,0.4,0.6,0.8),
+                                           rho.estimation.perm = 200,
+                                           rho.q_for_calibration = seq(0.1,0.9,0.1),
                                            rho.theta_for_calibration = NULL,
                                            rho.alpha.CI = alpha.CI,
-                                           rho.calibration.nr.points.for.pv.exterpolation = 3,
+                                           rho.calibration.nr.points.for.pv.exterpolation = 5,
                                            q_vec_for_computation = NULL,
                                            theta_vec_for_computation = NULL,
                                            P_values_grid_compute_univariate_CI = F,
@@ -312,7 +312,7 @@ generate_P_k_i_matrix_cache = function(n.vec,a.max,prior_param,comp_param){
   return(ret)
 }
 
-#' Generate a cache for estiamted CDFs of the mixing distributions, computed for worstcase (GE/LE) data generaitons
+#' Generate a cache for estimated CDFs of the mixing distributions, computed for worstcase (GE/LE) data generaitons
 #'
 #' The object is used to cache the estimated CDFs by value of (theta,q). The values median_curve_GE/median_curve_LE (returned inside the object) are double-nested lists by theta and then q, holding samples of the estimated CDFs (across mcleod's a.vec representation), by value of theta,q.
 #' This object is then used throughout the pipeline to also hold CI_param.
