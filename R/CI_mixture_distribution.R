@@ -34,9 +34,11 @@ CLASS.NAME.MCLEOD.CI.DECONV.BANK = 'mcleod.CI.obj.deconv.bank' # this object con
 #' @examples see internal code usages
 verify_q_and_theta_vec = function(q_vec,q_vec_for_computation,theta_vec,theta_vec_for_computation,sampling_distribution){
   rounding_nr_digits = 6
+  #check that q_vec and theta_vec include q_vec_for_computation and theta_vec_for_computation, respectively. We enforce that , by adding required values.
   q_vec = sort(unique(round(c(q_vec,q_vec_for_computation),digits = rounding_nr_digits)))
   theta_vec = sort(unique(round(c(theta_vec,theta_vec_for_computation),digits = rounding_nr_digits)))
   
+  #for binomial sampling, q must contain same values as 1-q, and theta must have same values as -theta. We enforce that as well, by adding required values.
   if(sampling_distribution == 'binomial'){
     q_vec = sort(unique(round(c(q_vec, 1 - q_vec),digits = rounding_nr_digits)))
     theta_vec = sort(unique(round(c(theta_vec,-theta_vec),digits = rounding_nr_digits)))
@@ -1464,10 +1466,13 @@ mcleod.estimate.CI = function(X,
                               verbose = T,
                               Use_Existing_Permutations_From_Object = NULL ){
   
+  # load libraries (they are suggested and not required)
   library(doRNG)
   library(doParallel)
   library(parallel)
   library(hash)
+  
+  #perform checks on parameters
   
   if(class(CI_param) != CLASS.NAME.MCLEOD.CI.PARAMETERS){
     stop('CI_param must be a result returned from mcleod.CI.estimation.parameters(...)')
@@ -1499,11 +1504,13 @@ mcleod.estimate.CI = function(X,
     warning('Use_Existing_Permutations_From_Object was set to a non null value: note that you must use an object constructed using the same CI.parameters file, and having the same value of N')
   }
   
-  ret = list()
+  ret = list() #returned results will go here
   
   
-  alpha.one.sided = (1-CI_param$alpha.CI)/2
+  alpha.one.sided = (1-CI_param$alpha.CI)/2 #one sided alpha, used for tests
   
+  # if the user supplied a fixed value of rho, we  use it, and there is no need to split the data.
+  # else, we perform a data split (the first case)
   if(is.na(CI_param$rho.set.value)){
     n_holdout = ceiling(ratio_holdout * length(X))
     ind_selected_for_test = sample(1:length(X),size = length(X)-n_holdout,replace = F)
@@ -1516,18 +1523,21 @@ mcleod.estimate.CI = function(X,
     ind_selected_for_test = 1:length(X)
   }
   
+  #generate a bank, using the nr.draws of the test set, parameters, and previous permutations if available
   bank <<- mcleod.CI.deconv.bank.constructor(N_test,CI_param,Use_Existing_Permutations_From_Object)
   
+  # perform deconvolution for the test data
   res_mcleod_data = mcleod(x.smp = X_test,n.smp =N_test,
                            a.limits = bank$CI_param$a.limits,
                            computational_parameters = bank$CI_param$comp_parameters,
                            prior_parameters = bank$CI_param$prior_parameters,
                            exact.numeric.integration = T)
   
+  #compute the median of the posterior CDF for the data 
   median_curve = compute_medians_curve(res_mcleod_data)
   
   #Part I: functions for generating P_k_i based on precomputed values:
-  Use_P_k_i_generator = F
+  Use_P_k_i_generator = F #currently this mechanism is disabled, since the generation of matrices is slower compared to numerical integration. We need to move parts of the generation to C code in order to speed them up.
   if(Use_P_k_i_generator){
     if(verbose){
       print(paste0('Starting construction of P_k_i generator'))
@@ -1547,15 +1557,18 @@ mcleod.estimate.CI = function(X,
   }
 
   cl <- NULL
-  if(!CI_param$do_serial & !WORK_WITH_THREADS){
-    cluster_type = 'PSOCK'
+  if(!CI_param$do_serial & !WORK_WITH_THREADS){ #if computation is not serial, and we are working with processes, we are working the doRNG
+    cluster_type = 'PSOCK' #windows has only PSOCK
     if(Sys.info()['sysname']!='Windows')
-      cluster_type = 'FORK'
-    cl <- makeCluster(CI_param$nr.cores,type = cluster_type,setup_strategy = 'parallel')
+      cluster_type = 'FORK' #however mac and linux have 'FORK' based clusters, which are faster!
+    cl <- makeCluster(CI_param$nr.cores,type = cluster_type,setup_strategy = 'parallel') # we generate the cluster. All computations will be done with this cluster.
     registerDoParallel(cl)
   }
   
+  
+  #if rho isn't given by the user, we run a calibration procedure
   if(is.na(CI_param$rho.set.value)){
+    #we perform deconvolution for the holdout data
     res_mcleod_holdout = mcleod(x.smp = X_rho,n.smp =N_rho,
                                 a.limits = bank$CI_param$a.limits,
                                 computational_parameters = bank$CI_param$comp_parameters,
@@ -1564,6 +1577,7 @@ mcleod.estimate.CI = function(X,
     
     CDF_holdout = compute_medians_curve(res_mcleod_holdout)
     
+    #we run the calbration proceudre. All parameters are found in CI.params and given by the user.
     start.time = Sys.time()
     rho_calibration_obj = mcleod.CI.rho.calibration.constructor(bank_original = bank,
                                                                 res_mcleod_holdout = res_mcleod_holdout,
@@ -1576,15 +1590,15 @@ mcleod.estimate.CI = function(X,
                                                                 theta_for_rho_optimization = CI_param$rho.theta_for_calibration)
     end.time = Sys.time()
     rho_calibration_obj$Elapsed_time = end.time-start.time
-    bank <<- rho_calibration_obj$bank
-    rho_calibration_obj$bank <- NULL
+    bank <<- rho_calibration_obj$bank #after computation has ended, we return update the bank for next function, using the bank returned from this function
+    rho_calibration_obj$bank <- NULL #erase the bank inside the object so it doesnt take space
     if(verbose){
       print('rho calibration time')
       print(end.time-start.time)  
     }
     
     
-  }else{
+  }else{ #if rho was set manually, we generate functions that return a constant value of rho
     if(verbose){
       print(paste0('rho set manually to ',CI_param$rho.set.value))
     }
@@ -1607,11 +1621,11 @@ mcleod.estimate.CI = function(X,
     class(rho_calibration_obj) = CLASS.NAME.MCLEOD.CI.RHO
   }
   
-  
+  #in case the user requested to compute P-value across the entire grid
   if(compute_P_values_over_grid){
     start.time = Sys.time()
     
-    
+    # the results from computation
     pvalues_grid = compute_P_values_over_grid_function(
       bank_original = bank,
       rho_calibration_obj = rho_calibration_obj,
@@ -1624,8 +1638,8 @@ mcleod.estimate.CI = function(X,
     
     end.time = Sys.time()
     pvalues_grid$Elapsed_time = end.time-start.time
-    bank <<- pvalues_grid$bank
-    pvalues_grid$bank <- NULL
+    bank <<- pvalues_grid$bank #after computation has ended, we return update the bank for next function, using the bank returned from this function
+    pvalues_grid$bank <- NULL #and erase the bank inside the object, so it doesnt take space
     ret$pvalues_grid = pvalues_grid
     if(verbose){
       print('time for computing pvalues over grid of hypotheses')
@@ -1635,7 +1649,7 @@ mcleod.estimate.CI = function(X,
   }
   
   
-  
+  #in case the user requested to compute the CI curves (upper and lower)
   if(compute_CI_curves){
     start.time = Sys.time()
     computed_curves = compute_CI_curves_function(
@@ -1648,8 +1662,8 @@ mcleod.estimate.CI = function(X,
     )
     end.time = Sys.time()
     computed_curves$Elapsed_time = end.time-start.time
-    bank <<- computed_curves$bank
-    computed_curves$bank <- NULL
+    bank <<- computed_curves$bank #after computation has ended, we return update the bank for next function, using the bank returned from this function
+    computed_curves$bank <- NULL #and erase the bank inside the object, so it doesnt take space
     ret$computed_curves = computed_curves
     if(verbose){
       print('time for computing CI curves ')
@@ -1657,6 +1671,7 @@ mcleod.estimate.CI = function(X,
     }
   }
   
+  #return results
   ret$bank = bank
   ret$rho_calibration_obj = rho_calibration_obj
   ret$n_holdout = n_holdout
@@ -1672,6 +1687,7 @@ mcleod.estimate.CI = function(X,
   ret$ind_selected_for_test = ind_selected_for_test
   class(ret) = CLASS.NAME.MCLEOD.CI
 
+  #stop cluster if needed
   if(!CI_param$do_serial & !WORK_WITH_THREADS){
     stopCluster(cl)
   }
@@ -1709,18 +1725,22 @@ plot.mcleod.CI=function(mcleod.CI.obj,
   
   curve_obj = mcleod.CI.obj$computed_curves
   
-  
+  #the x axis is theta...
   x_axis = mcleod.CI.obj$res_mcleod_data$parameters_list$a.vec
   x_axis_label = 'theta'
   x_axis_theta = mcleod.CI.obj$bank$CI_param$theta_vec
-  if(X_axis_as_Prob){
+  #unless the user asked to change it to P
+  if(X_axis_as_Prob){ 
     x_axis = inv.log.odds(x_axis)
     x_axis_label = 'P'
     x_axis_theta = inv.log.odds(x_axis_theta)
   }
+  #if this is not an added plot, we plot the point estimate for the data
   if(!add_CI_curves_on_top_of_plot)
     plot(x_axis,mcleod.CI.obj$CDF_data,
          col =  point_estimate_color,type = 'b',pch = 20,xlab = x_axis_label,ylab = 'CDF',main = title)
+  
+  #plot the CI lines, in the color the user requested
   lines(x_axis_theta,curve_obj$q_star_LE,col = CI_curves_color)
   lines(x_axis_theta,curve_obj$q_star_GE,col = CI_curves_color)
 }
@@ -1744,12 +1764,12 @@ plot.mcleod.CI=function(mcleod.CI.obj,
 mcleod.estimate.CI.single.theta = function(X, N, theta,
                                            CI_param = mcleod.CI.estimation.parameters(),
                                            ratio_holdout = 0.1,verbose = F){
+  #computing a CI for q, at a single theta
+  CI_param$rho.theta_for_calibration = theta #we calibrate at a single theta. NOTE: this parameter takes precedence over CI_param$rho.q_for_calibration
+  CI_param$theta_vec_for_computation = theta #and we compute Pvalues for this theta as well.
+  CI_param$P_values_grid_compute_univariate_CI = T #we also notify CI param that we compute a univariate P-value. This allows for a faster stopping condition.
   
-  CI_param$rho.theta_for_calibration = theta
-  CI_param$theta_vec_for_computation = theta
-  CI_param$P_values_grid_compute_univariate_CI = T
-  
-  
+  # verify inputs and extract the verified inputs
   verified_q_and_theta_vectors = verify_q_and_theta_vec(q_vec = CI_param$q_vec,
                                                         q_vec_for_computation = CI_param$q_vec_for_computation,
                                                         theta_vec = CI_param$theta_vec,
@@ -1763,7 +1783,7 @@ mcleod.estimate.CI.single.theta = function(X, N, theta,
   CI_param$theta_vec = verified_q_and_theta_vectors$theta_vec
   CI_param$theta_vec_for_computation = verified_q_and_theta_vectors$theta_vec_for_computation
   
-  
+  #estimate CI, as grid.
   CI.est.res = mcleod.estimate.CI(X = X,
                                   N = N,
                                   CI_param = CI_param,
@@ -1774,6 +1794,7 @@ mcleod.estimate.CI.single.theta = function(X, N, theta,
   
   
   alpha.one.sided = (1-CI.est.res$bank$CI_param$alpha.CI)/2
+  #go over the grid and extract the lower and upper q-values for the CI (at the single theta required by the user)
   
   #Lower end:
   pvals_GE = CI.est.res$pvalues_grid$GE.pval.grid[,which(CI_param$theta_vec == theta_0)]
@@ -1788,7 +1809,7 @@ mcleod.estimate.CI.single.theta = function(X, N, theta,
   pvals_LE = CI.est.res$pvalues_grid$LE.pval.grid[,which(CI_param$theta_vec == theta_0)]
   ind_LE_lower_than_alpha_one_sided = which(pvals_LE <= alpha.one.sided)
   if(length(ind_LE_lower_than_alpha_one_sided)==0){
-    Upper = 0  
+    Upper = 1  
   }else{
     Upper = CI.est.res$bank$CI_param$q_vec[min(ind_LE_lower_than_alpha_one_sided)]
   }
@@ -1816,12 +1837,13 @@ mcleod.estimate.CI.single.theta = function(X, N, theta,
 mcleod.estimate.CI.single.q = function(X, N, q,
                                        CI_param = mcleod.CI.estimation.parameters(),
                                        ratio_holdout = 0.1,verbose = F){
+  #computing a CI for theta, at a single q
+  CI_param$rho.theta_for_calibration = NULL # no thetas are given, you have to find this d
+  CI_param$rho.q_for_calibration = q #we calibrate at a single q
+  CI_param$q_vec_for_computation = q #and we compute Pvalues for this q as well.
+  CI_param$P_values_grid_compute_univariate_CI = T #we also notify CI param that we compute a univariate P-value. This allows for a faster stopping condition.
   
-  CI_param$rho.theta_for_calibration = NULL
-  CI_param$rho.q_for_calibration = q
-  CI_param$q_vec_for_computation = q
-  CI_param$P_values_grid_compute_univariate_CI = T
-  
+  # verify inputs and extract the verified inputs
   
   verified_q_and_theta_vectors = verify_q_and_theta_vec(q_vec = CI_param$q_vec,
                                                         q_vec_for_computation = CI_param$q_vec_for_computation,
@@ -1836,6 +1858,7 @@ mcleod.estimate.CI.single.q = function(X, N, q,
   CI_param$theta_vec = verified_q_and_theta_vectors$theta_vec
   CI_param$theta_vec_for_computation = verified_q_and_theta_vectors$theta_vec_for_computation
   
+  #estimate CI, as grid.
   CI.est.res = mcleod.estimate.CI(X = X,
                                   N = N,
                                   CI_param = CI_param,
@@ -1846,6 +1869,8 @@ mcleod.estimate.CI.single.q = function(X, N, q,
   
   
   alpha.one.sided = (1-CI.est.res$bank$CI_param$alpha.CI)/2
+  
+  #go over the grid and extract the lower and upper theta values for the CI (at the single q required by the user)
   
   #Right end:
   pvals_GE = CI.est.res$pvalues_grid$GE.pval.grid[which(CI_param$q_vec == q),]
