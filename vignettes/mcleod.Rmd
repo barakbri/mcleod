@@ -25,6 +25,7 @@ Here we discuss the structure of the document, what the method is about and wher
 
 # The generative model
    
+   ![Diagram](./Diagram.png)
    
 # Sampling from the posterior distribution
    
@@ -116,6 +117,10 @@ res = mcleod(x, n.smp = NULL,a.limits = c(-2,8),
 
 ```
 # Constructing confidence intervals for the CDF of rate parameters
+
+## Method
+
+![Diagram_2](./Diagram_2.png)
 
 ## Confidence intervals for CDF, binomial noise
 ```{r,cache=TRUE,eval=FALSE}
