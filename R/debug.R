@@ -147,7 +147,7 @@ if(F){
   set.seed(1)
   X = rbinom(n = n,size = N,prob = rbeta(n = n,shape1 = shape_1,shape2 = shape_2))
   
-  theta_0 = c(-1)
+  theta_0 = c(0)
   
   CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-3,3,0.25),
                                              q_vec = seq(0.02,0.98,0.04),

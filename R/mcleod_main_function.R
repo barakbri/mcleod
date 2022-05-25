@@ -9,10 +9,10 @@ library(ggplot2)
 #Constants and definitions:
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-CLASS.NAME.MCLEOD = 'mcleod.obj'
-CLASS.NAME.PRIOR.DEFINITION = 'mcleod.prior.def.obj'
-CLASS.NAME.COMPUTATIONAL.PARAMETERS.DEFINITION = 'mcleod.computational.parameters.obj'
-CLASS.NAME.COVARIATES.ESTIMATION.PARAMETERS.DEFINITION = 'mcleod.covariates.estimation.parameters.obj'
+CLASS.NAME.MCLEOD = 'mcleod.obj' # Class for the objectr returned from the main function. This is the result of deconvolution
+CLASS.NAME.PRIOR.DEFINITION = 'mcleod.prior.def.obj' #object defining the prior: Hbeta (polya tree) or dirichlet tree, and hyperparameters
+CLASS.NAME.COMPUTATIONAL.PARAMETERS.DEFINITION = 'mcleod.computational.parameters.obj' #Object holding definitions for the MCMC algorithm
+CLASS.NAME.COVARIATES.ESTIMATION.PARAMETERS.DEFINITION = 'mcleod.covariates.estimation.parameters.obj' #object holding parameters to when covariates are also supplied to the deconvolition problem.
 
 MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL = 1L
 MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET = 0L
@@ -612,6 +612,7 @@ plot.posterior	<- function(mcleod.obj, plot_only_point_estimate = F)
   means_vec = apply(gibbs_pi_plot,2,mean)
   median_vec = apply(gibbs_pi_plot,2,median)
   
+  #construct the line of means, and the point cloud for the posterior distribution at each point of a.vec
   a.vec = mcleod.obj$parameters_list$a.vec
   
   dt_mean_line = data.frame(a.vec = a.vec,means_vec = means_vec,median_vec = median_vec)
@@ -624,6 +625,8 @@ plot.posterior	<- function(mcleod.obj, plot_only_point_estimate = F)
       dt_gibbs_cloud[pointer,] = c(a.vec[j],gibbs_pi_plot[i,j]); pointer = pointer + 1
     }
   }
+  
+  #perform the actual plots. mean line and then point (if needed)
   gg_obj = ggplot(dt_gibbs_cloud)  + ylim(c(0,1)) +
     geom_line(aes(x = a.vec,y = means_vec),colour = 'red',data = dt_mean_line) + xlab('theta')+ylab('CDF')
   
@@ -654,10 +657,14 @@ results.covariate.coefficients.posterior = function(mcleod.obj, plot.posterior =
   if(mcleod.obj$parameters_list$covariates_given != 1L){
     stop('covariates were not given, no coefficients estimated')
   }
+  #extract the values aof covariates, their number, and the number of burnin samples
   covariates = mcleod.obj$parameters_list$covariates
   burnin = mcleod.obj$parameters_list$nr.gibbs.burnin
   nr.covariates = ncol(covariates)
   mean_vec = rep(NA,nr.covariates)
+  
+  #if we are required, plot for each covariate, in a seperate frame, the distribution of gibbs samples.
+  #Gibbs samples in the burinin are marked in red
   
   if(plot.posterior){
     col_vec = rep(1,mcleod.obj$parameters_list$nr.gibbs)
@@ -669,8 +676,10 @@ results.covariate.coefficients.posterior = function(mcleod.obj, plot.posterior =
     par(mfrow=c(1,1))
   }
   
+  #compute the posterior means, after exclusing the burnin
   posterior_mean_vec = apply(mcleod.obj$additional$original_stat_res$beta_smp[,-c(1:burnin),drop=F],1,mean)
   
+  # plot for each covariate, in a seperate frame, the distribution of suggested proposals. Accepted proposals are marked in red (note that a proposal is for all slope variables simultanuesly)
   if(plot.MH.proposal.by.iteration){
     par(mfrow=c(nr.covariates,1))  
     for(i in 1:nr.covariates){
@@ -680,6 +689,7 @@ results.covariate.coefficients.posterior = function(mcleod.obj, plot.posterior =
     par(mfrow=c(1,1))
   }
   
+  #return the posterior means and the acceptance rate
   ret = list()
   ret$posterior.means = posterior_mean_vec
   ret$acceptance.rate = mean(mcleod.obj$additional$original_stat_res$proposal_approved)

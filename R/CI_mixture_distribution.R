@@ -261,12 +261,16 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
 #' @examples
 generate_P_k_i_matrix_cache = function(n.vec,a.max,prior_param,comp_param){
   
+  #these are the unique values for the number of draws
   sorted_n_data = sort(unique(n.vec))
   
+  #we form a hash table, indexing the sorted unique number of draws. For each unique n -> index. Due to a technical constraint we have to use characters as keys
   n_to_P_k_i_generator_index = hash()
   for(i in 1:length(sorted_n_data))
     n_to_P_k_i_generator_index[ as.character(sorted_n_data[i]) ] = i
   
+  # this is a function called once for the data, that generate for each n a matrix of size (n+1, length(a.vec)-1), giving the probabilities for X to recive a value between 0 and n (by row), given that the random effect deviate is in the segment associated with the column.
+  # the different matrices are returned as a list.
   generate_P_k_i_generator_list = function(n_vec = 1:20){
     P_k_i_generator_list = hash() #list()
     for(n_i in 1:length(n_vec)){
@@ -287,9 +291,11 @@ generate_P_k_i_matrix_cache = function(n.vec,a.max,prior_param,comp_param){
     return(P_k_i_generator_list)
   }
   
-  
+  #compute the generator list (using the above function). 
   generator_list = suppressWarnings(generate_P_k_i_generator_list(n_vec = sorted_n_data)) 
   
+  # This function will receive x.smp, the number of segments in a.vec (i.e., length(a.vec)-1), and the number of draws
+  # and will generate a P_ki matrix.
   generate_P_k_i = function(x_to_generate_for,n.dim,n.vec){
     K=length(n.vec)
     P_k_i_generated = matrix(NA,nrow = K,ncol = n.dim)
@@ -302,6 +308,17 @@ generate_P_k_i_matrix_cache = function(n.vec,a.max,prior_param,comp_param){
     }
     return(P_k_i_generated)
   }
+  
+  #return the hashtables, precomputed entries and functions to the user.
+  # the user can now generate a PKI matrix more efficiently using 
+  # (with gen_object being the object returned from this function)
+  #sorted_n_data = gen_object$sorted_n_data
+  #n_to_P_k_i_generator_index = gen_object$n_to_P_k_i_generator_index
+  #generate_P_k_i_generator_list = gen_object$generate_P_k_i_generator_list
+  #generator_list = gen_object$generator_list
+  #generate_P_k_i = gen_object$generate_P_k_i
+  #a.vec = gen_object$a.vec
+  #generated_P_k_i_matrix = generate_P_k_i(X_sampled,length(a.vec)-1,N_vec)
   
   ret = list()
   ret$sorted_n_data = sorted_n_data
@@ -325,28 +342,32 @@ generate_P_k_i_matrix_cache = function(n.vec,a.max,prior_param,comp_param){
 #'
 #' @examples
 mcleod.CI.deconv.bank.constructor = function(N_vec=NULL,CI_param,Use_Existing_Permutations_From_Object = NULL){
-  n_theta = CI_param$n_theta
-  n_q = CI_param$n_q
+  n_theta = CI_param$n_theta #number of theta values
+  n_q = CI_param$n_q #number of q values
   
-  if(!is.null(Use_Existing_Permutations_From_Object)){
+  if(!is.null(Use_Existing_Permutations_From_Object)){ #check if the user supplied an existing object to copy the deconvolution results from
     median_curve_GE = Use_Existing_Permutations_From_Object$bank$median_curve_GE
     median_curve_LE = Use_Existing_Permutations_From_Object$bank$median_curve_LE
   }else{
-    median_curve_GE = list()
+    #This will hold a list of lists of lists of median curves. The first index (for the greater list) will index values of theta.
+    #The second index will be by values of q. We hold two seperate lists for LE and GE hypotheses. for the binomial case one can be computed from the other, but generally (e.g., in the poisson case), this is not possible and will require two diffrent computations. Hence, we need curves for both LE and GE hypotheses.
+    # The third entry will index repetitions
+    median_curve_GE = list()  #init first index, for values of theta
     median_curve_LE = list()
     
     for(i in 1:n_theta){
-      median_curve_GE[[i]] = list()
+      median_curve_GE[[i]] = list() #init second index, for value of each value of q
       median_curve_LE[[i]] = list()
       for(j in 1:n_q){
-        median_curve_GE[[i]][[j]] = list()
+        median_curve_GE[[i]][[j]] = list() #init third index, for the sampling replicates.
         median_curve_LE[[i]][[j]] = list()
       }
     }  
   }
   
+  #return the bank, along with its parameters.
   ret = list()
-  ret$CI_param = CI_param
+  ret$CI_param = CI_param #this will serve as a holder for all deconvolution and CI parameters, for the remainder of the computation.
   ret$median_curve_GE = median_curve_GE
   ret$median_curve_LE = median_curve_LE
   ret$N_vec = N_vec
@@ -364,13 +385,18 @@ mcleod.CI.deconv.bank.constructor = function(N_vec=NULL,CI_param,Use_Existing_Pe
 #'
 #' @examples
 compute_medians_curve = function(mcleod_for_data,list_ind = NA){
-  if(is.na(list_ind)){
+  #extract the matrix givein for MCMC replicates, the probability for each segment of the distribution
+  if(is.na(list_ind)){ #if mcleod_for_data contains only a single result, we extract the matrix and transpower (so after transpose MCMC samples are rows, and segments of the distribution are columns)
     pi_smp_for_data = (t(mcleod_for_data$additional$original_stat_res$pi_smp))
-  }else{
+  }else{ #if mcleod_for_data contains multiple entries, than we extract the relevant entry from original_stat_res by index
     pi_smp_for_data = (t(mcleod_for_data$additional$original_stat_res[[list_ind]]$pi_smp))
   }
+  #remove burnin samples
   pi_smp_for_data = pi_smp_for_data[-(1:mcleod_for_data$parameters_list$nr.gibbs.burnin),]
+  #convert the probability distributions to CDFs, by cumsuming each MCMC sample.
   cumulative_pi_smp_for_data = t(apply(pi_smp_for_data,1,cumsum))
+  # compute the median per a.vec point. We add an entry of zero for the leftmost point in the support
+  # (so the returned result is of size length(a.vec))
   median_cumulative_pi_smp_for_data = c(0,apply(cumulative_pi_smp_for_data,2,median))
   return(median_cumulative_pi_smp_for_data)
 }
@@ -395,29 +421,33 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
                                                                            nr.curves,
                                                                            is_GE = T,
                                                                            do_serial = T){
-  #print(paste0('DEBUG - ind_theta:',ind_theta,' ind_q:',ind_q))
-  
+  # currently we only support one sampling distribution
   if(bank$CI_param$sampling_distribution != 'binomial')
     stop('bank only supports binomial')
   
+  # used for fast generation of Pki matrices
   gen_object = NULL
   if("gen_object" %in% names(bank))
     gen_object = bank$gen_object
   
+  #check how many permutations were already computed (and are available in the bank)
   if(is_GE)
     nr.computed = length(bank$median_curve_GE[[ind_theta]][[ind_q]])
   else
     nr.computed = length(bank$median_curve_LE[[ind_theta]][[ind_q]])
   
+  #check how many more we need to compute
   nr.to.compute = nr.curves - nr.computed 
   
-  if(nr.to.compute>0){
+  if(nr.to.compute>0){ # if we need to compute
     
     if(bank$CI_param$sampling_distribution == 'binomial'){
       
-      if(WORK_WITH_THREADS){
+      if(WORK_WITH_THREADS){ #one option we support is parallerl computation of MCMCs by threads. THe other option is by processes and by foreach/forRNG
         
-        if(is_GE){
+        #the code works so that it only generates GE Worst case curves. Due to the binomial nature, solving one GE curve gives us another LE curve
+        # Hence, if the user asked for an LE hypothesis, we solve the deconvolution problem for the corresponding GE deconvolution hypothesis.
+        if(is_GE){ #find thetha and q by indices requested by user
           current_theta = bank$CI_param$theta_vec[ind_theta]
           current_q = bank$CI_param$q_vec[ind_q]  
         }else{ # we compute the corresponding GE hypothesis and revert the curves afterwords
@@ -425,6 +455,7 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
           current_q = bank$CI_param$q_vec[bank$CI_param$n_q - ind_q +1]  
         }
         
+        #sample multiple values of the data.
         N_vec = bank$N_vec
         X_sampled_list = list()
         for(k in 1:nr.to.compute){
@@ -433,6 +464,7 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
           X_sampled_list[[k]] = X_sampled
         }
         
+        #generate Pki if needed. Note that for the thread based solution, Pki is passed as a list of matrices.
         generated_P_k_i_matrix = NULL
         
         if(!is.null(gen_object)){
@@ -452,6 +484,7 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
         if(!do_serial)
           nr_threads = bank$CI_param$nr.cores
         
+        #this is needed since the garbage collection may lag begind (due to many Cpp level objects), and cause R to crash
         gc(reset = TRUE)
         
         temp_mcleod = mcleod(x.smp = X_sampled_list,n.smp = N_vec,
@@ -462,15 +495,18 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
                              nr_threads = nr_threads)
         gc(reset = TRUE)
         
+        # collect and return result
         res_Binomial = list()
         for(k in 1:nr.to.compute){
-          res_Binomial[[k]] = compute_medians_curve(temp_mcleod,list_ind = k)
+          res_Binomial[[k]] = compute_medians_curve(temp_mcleod,list_ind = k) # compute the median curve for each result. 
         }
       }else{#do parallel processes
         
+        #This function solves the deconvolution problem for a single data sample, generated for a GE hypothesis.
         worker_function_Binomial_GE = function(seed){
           set.seed(seed)
           
+          #get the theta and q for the GE deconvolution problem to be solved, by index requsted by the user. Again, if the user requested an LE curve, we solve for the corresponding GE deconvolution problem
           if(is_GE){
             current_theta = bank$CI_param$theta_vec[ind_theta]
             current_q = bank$CI_param$q_vec[ind_q]  
@@ -479,12 +515,14 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
             current_q = bank$CI_param$q_vec[bank$CI_param$n_q - ind_q +1]  
           }
           
+          #generate worst case GE data          
           N_vec = bank$N_vec
           P_sample = rbinom(n = length(N_vec),size = 1,1-current_q) * inv.log.odds(current_theta)
           X_sampled = rbinom(n = length(N_vec),size = N_vec,prob = P_sample)
           
           library(mcleod)
           
+          #compute Pki matrices efficiently, using the pregeneration mechanism.
           generated_P_k_i_matrix = NULL
           if(!is.null(gen_object)){
             sorted_n_data = gen_object$sorted_n_data
@@ -496,6 +534,7 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
             generated_P_k_i_matrix = generate_P_k_i(X_sampled,length(a.vec)-1,N_vec)
           }
           
+          #solve the deconvolution problem.          
           temp_mcleod = mcleod(x.smp = X_sampled,n.smp = N_vec,
                                a.limits = bank$CI_param$a.limits,
                                exact.numeric.integration = T,
@@ -504,13 +543,14 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
           
           return(compute_medians_curve(temp_mcleod))
         }
-        if(do_serial){
+        #call for deconvolution, across the required number of times.
+        if(do_serial){ #serial solution
           res_Binomial = list()
           for(k in 1:nr.to.compute){
             res_Binomial[[k]] = worker_function_Binomial_GE(k)
           }
-        }else{
-          #this assumes a cluster is registered
+        }else{ #parallel solution
+          #this assumes a cluster is registered in the function mcleod.estimate.CI(...)
           res_Binomial = foreach(seed=(nr.computed+1):nr.curves, .options.RNG=1,
                                  .export = c('ind_theta','ind_q','bank','worker_function_Binomial_GE','gen_object')) %dorng% {
                                    worker_function_Binomial_GE(seed)
@@ -521,25 +561,26 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
       
       
       #Collecting results
-      ret = list()
+      ret = list() # we generate an objected with the returned curves
       if(is_GE){
-        if(nr.computed>0){
+        if(nr.computed>0){ #start by filling the returned object with previously computed solutions
           for(k in 1:nr.computed){
             ret[[k]] = bank$median_curve_GE[[ind_theta]][[ind_q]][[k]]
           }
         }
         for(k in 1:length(res_Binomial)){
+          #we store both the GE and the LE solutions. Note that (a) the LE solution has to be inverted. (b) we use <<- since we are working with a global object
           ret[[k + nr.computed]] = res_Binomial[[k]]
-          bank$median_curve_GE[[ind_theta]][[ind_q]][[k + nr.computed]] <<- res_Binomial[[k]]
+          bank$median_curve_GE[[ind_theta]][[ind_q]][[k + nr.computed]] <<- res_Binomial[[k]] 
           bank$median_curve_LE[[bank$CI_param$n_theta - ind_theta + 1]][[bank$CI_param$n_q - ind_q +1]][[k + nr.computed]] <<- rev(1- res_Binomial[[k]])
         }  
       }else{
-        if(nr.computed>0){
+        if(nr.computed>0){ #start by filling the returned object with previously computed solutions
           for(k in 1:nr.computed){
             ret[[k]] = bank$median_curve_LE[[ind_theta]][[ind_q]][[k]]
           }
         }
-        for(k in 1:length(res_Binomial)){
+        for(k in 1:length(res_Binomial)){ #handle storing in the case we solved an LE deconvolution problem
           ret[[k + nr.computed]] = rev(1- res_Binomial[[k]])
           bank$median_curve_GE[[bank$CI_param$n_theta - ind_theta + 1]][[bank$CI_param$n_q - ind_q +1]][[k + nr.computed]] <<- res_Binomial[[k]]
           bank$median_curve_LE[[ind_theta]][[ind_q]][[k + nr.computed]] <<- rev(1- res_Binomial[[k]])
@@ -590,6 +631,8 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis_at_point = fun
                                                                                       nr.perms,
                                                                                       is_GE = T,
                                                                                       do_serial = F){
+  
+  #We get the required number of CDF median curves, from a WC LE/GE hypothesis, at grid point (ind_theta,ind_q)
   computed_curves_object = mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis(bank = bank,
                                                                                              ind_theta = ind_theta,
                                                                                              ind_q = ind_q,
@@ -597,6 +640,7 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis_at_point = fun
                                                                                              is_GE = is_GE,
                                                                                              do_serial = do_serial)
   
+  # we extract the values of the CDF median curves at the required point (given by index a_index)
   ret = unlist(lapply(computed_curves_object,FUN = function(x){x[a_index]}))
   return(ret)    
 }
@@ -620,10 +664,14 @@ mcleod.CI.lower_bound_PV_for_worst_case=function(bank,
                                                  CDF_value,
                                                  is_GE = F){
   
+  # the q for the H0 for which a PV is computed is computed 
   current_q = bank$CI_param$q_vec[ind_q]
-  n = length(bank$N_vec)
-  t_value = n*CDF_value
+  n = length(bank$N_vec) #total number of tries
+  t_value = n*CDF_value #total number of successes
+  
   prob_at_t_value = 0
+  
+  #handle the two cases where n*CDF_value in an integer, and there is a probability mass to get the value at  t_value
   if(is_GE & t_value == round(t_value)){
     prob_at_t_value = dbinom(x = t_value,size = n,prob = current_q)
   }
@@ -631,6 +679,7 @@ mcleod.CI.lower_bound_PV_for_worst_case=function(bank,
     prob_at_t_value = dbinom(x = n-t_value,size = n,prob = 1-current_q)
   }
   
+  #add the probability for value greater/lower than t_value
   if(is_GE)
     return(pbinom(q = t_value,size = n,prob = current_q,lower.tail = F)+prob_at_t_value)
   return(pbinom(q = n-t_value,size = n,prob = 1-current_q,lower.tail = F)+prob_at_t_value)
@@ -667,19 +716,24 @@ mcleod.CI.PV.at_point = function(bank,
                                  is_GE = F,
                                  do_serial = F){
   
+  # the (theta,q) for the WC hypothesis to be computed
   current_q = bank$CI_param$q_vec[ind_q]
   current_theta = bank$CI_param$theta_vec[ind_theta]
-  n = length(bank$N_vec)
+  n = length(bank$N_vec) #the number of samples
   
   ret = NA
+  
+  # if asked by the user, we check if it is even possible to reject the null hypothesis for the no-noise (binomial) case
+  # if we cant reject for the no-noise case (infinite number of draws per observation), then we cant reject for the case with noise (finite number of draws for observations)
   if(do_check_vs_noiseless_case){
     ret = mcleod.CI.lower_bound_PV_for_worst_case(bank = bank,ind_q = ind_q,CDF_value = CDF_value,is_GE = is_GE)
     if(ret>=alpha){
-      #print(paste0('Break early by worst case'))
-      return(1)
+      return(1) # we can just return 1, since the PV computed doesn't matter.
     }
   }
   
+  #another possible check we can do, is run a small number of iterations (alpha*nr.perm) and check if all of them are more extreme than the data.
+  # If (alpha*nr.perm) null samples are more extreme than the data, you know that the PV is > alpha for sure, no need to compute an exact Pvalue using nr.perm data generations.
   if(do_check_vs_minimum_number_of_required_iterations){
     minimal_required_number_of_iterations = ceiling(alpha*nr.perm)
     
@@ -692,11 +746,13 @@ mcleod.CI.PV.at_point = function(bank,
                                                                                                                  do_serial = do_serial)
     if(( is_GE & all(null_stat_values_for_quick_test >= CDF_value)) |
        (!is_GE & all(null_stat_values_for_quick_test <= CDF_value))){
-      #print(paste0('Break early by iterations'))
       return(1)
     }
     
   }
+  
+  # no more checks - we compute full nr.perm data generations from the worst case hypothesis, and calculate the percentage of times
+  # the test statistic (median CDF of data at theta +- rho) is more extreme the the values samples under the null hypothesis.
   
   null_stat_values = mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis_at_point(bank,
                                                                                                 ind_theta = ind_theta,
@@ -725,19 +781,21 @@ mcleod.CI.PV.at_point = function(bank,
 #' @examples
 mcleod.CI.find.ai.by.theta.and.rho=function(res_mcleod_object, theta, rho, is_GE = T){
   if(is_GE){
+    # for a GE type hypothesis, we find the right most point, which is at least "rho distance" to the left of theta
     a_ind_GE = which(res_mcleod_object$parameters_list$a.vec <= theta - rho)
-    if(length(a_ind_GE) > 0 ){
-      a_ind_GE = max(a_ind_GE)
+    if(length(a_ind_GE) > 0 ){ #if there is a point to consider
+      a_ind_GE = max(a_ind_GE) #we take the rightmost one
     }else{
-      a_ind_GE = 1
+      a_ind_GE = 1 #if no points, take the leftmost side of the grid
     }
     return(a_ind_GE)
   }else{
+    # for an LE type hypothesis, we find the left most point, which is at least "rho distance" to the right of theta
     a_ind_LE = which(res_mcleod_object$parameters_list$a.vec >= theta + rho)
-    if(length(a_ind_LE) > 0 ){
-      a_ind_LE = min(a_ind_LE)
+    if(length(a_ind_LE) > 0 ){#if there is a point to consider
+      a_ind_LE = min(a_ind_LE) #we take the leftmost one
     }else{
-      a_ind_LE = length(res_mcleod_object$parameters_list$a.vec)
+      a_ind_LE = length(res_mcleod_object$parameters_list$a.vec) #if no points, take the rightmost side of the grid
     }
     return(a_ind_LE)
   }
@@ -770,29 +828,34 @@ mcleod.CI.rho.calibration.constructor = function(
   theta_for_rho_optimization = NULL,
   verbose = F
 ){
-  bank<<- bank_original
-  NR.POINTS.FOR.PV.EXTERPOLATION.IN.CALIBRATION = bank$CI_param$rho.calibration.nr.points.for.pv.exterpolation
-  rho.calibration.method  = bank$CI_param$rho.calibration.method 
+  bank<<- bank_original #register the bank as a global object
+  NR.POINTS.FOR.PV.EXTERPOLATION.IN.CALIBRATION = bank$CI_param$rho.calibration.nr.points.for.pv.exterpolation #number of points by which we compute an estimate of the CI at each point
+  rho.calibration.method  = bank$CI_param$rho.calibration.method #either max/ sum / specific
   nr_theta_points_for_optimization = NA
-  if(is.null(theta_for_rho_optimization)){
-    nr_theta_points_for_optimization = length(q_for_rho_optimization)
+  if(is.null(theta_for_rho_optimization)){ #if the user didnt ask for specific thethas for the optimization, we choose the theta points by the quantiles of the point estimate for the holdout data
+    nr_theta_points_for_optimization = length(q_for_rho_optimization) #theta will be determined adaptively by q_for_rho_optimization
     calibration_points_by_q = T
   }else{
-    nr_theta_points_for_optimization = length(theta_for_rho_optimization)
+    nr_theta_points_for_optimization = length(theta_for_rho_optimization) #theats will be determined by the user input theta_for_rho_optimization
     calibration_points_by_q = F
-    
   }
+  
+  #these will hold, for each theta point considered (by row), the estimated q-values of GE and LE curves, by rho (column)
+  #using these matrices, we will minimize (min max, min sum, etc) the size of CIs for the holdout data, and select the optimal rho
   curve_GE_q_by_theta_and_rho = matrix(NA,nrow = nr_theta_points_for_optimization,ncol = length(possible_rhos))
   curve_LE_q_by_theta_and_rho = matrix(NA,nrow = nr_theta_points_for_optimization,ncol = length(possible_rhos))
   
+  #these will hold the optimal rho by theta point. These will be useful when the user asks for mode 'specific' and we need to interpolate to find optimal rho as a function of theta (once for LE and once for GE)
   optimal_rho_by_theta_for_GE = rep(NA,nr_theta_points_for_optimization)
   optimal_rho_by_theta_for_LE = rep(NA,nr_theta_points_for_optimization)
-  theta_points = rep(NA,nr_theta_points_for_optimization)
-  for(index_q in 1:nr_theta_points_for_optimization){
-    #index_q = 2
-    if(calibration_points_by_q){
-      current_q = q_for_rho_optimization[index_q]
-      a_ind_for_theta_for_current_q = which.min(abs(CDF_holdout - current_q))
+  theta_points = rep(NA,nr_theta_points_for_optimization) #this will hold the values of theta, for which we calibrate rho
+  
+  for(index_q in 1:nr_theta_points_for_optimization){ #iterate over points in the theta axis
+    
+    if(calibration_points_by_q){ #if the user inserted wanted q-values
+      current_q = q_for_rho_optimization[index_q] #the current q-value the user asked for.
+      a_ind_for_theta_for_current_q = which.min(abs(CDF_holdout - current_q)) #we find the closest point in the deconvolution estimate for the holdout data which has CDF value close to current_q
+      #then, we find the point in the theta grid defined by the user (which is coarser than the a grid) which is closest to a_ind_for_theta_for_current_q
       theta_current_q = res_mcleod_holdout$parameters_list$a.vec[a_ind_for_theta_for_current_q]
       theta_current_q_ind = which.min(abs(bank$CI_param$theta_vec - theta_current_q))
       theta_current_q = bank$CI_param$theta_vec[theta_current_q_ind]
@@ -800,6 +863,7 @@ mcleod.CI.rho.calibration.constructor = function(
       if(verbose)
         print(paste0('optimizing rho for q=',current_q,', which is equivalent to theta = ',theta_current_q,' in the holdout data'))
     }else{
+      #the user has chosed a theta point. We just choose the closest one in the theta grid.
       theta_current_q_ind = which.min(abs(bank$CI_param$theta_vec - theta_for_rho_optimization[index_q]))
       theta_current_q = bank$CI_param$theta_vec[theta_current_q_ind]
       a_ind_for_theta_for_current_q = which.min(abs(res_mcleod_holdout$parameters_list$a.vec - theta_current_q))
@@ -810,24 +874,30 @@ mcleod.CI.rho.calibration.constructor = function(
     }
    
     
+    # we have finished figuring out on which thetas we compute CIs for q for the holdout data
+    # we start with the lower end of CIs (determined by the GE hypothesis)
     
-    q_lower_by_rho = rep(NA,length(possible_rhos))
+    q_lower_by_rho = rep(NA,length(possible_rhos)) #this will hold the estimated lower point of CI, for the current theta, for each possible value of rho
+    #we can start testing GE hypotheses from this value of q (determined by the noiseless case):
     point_to_start_testing_GE = qbinom(p = alpha.one.sided,size = length(bank$N_vec),prob = current_q) / length(bank$N_vec)
+    
+    # than we find the NR.POINTS.FOR.PV.EXTERPOLATION.IN.CALIBRATION values of q which are smaller than point_to_start_testing_GE.
     points_to_test_GE = which(bank$CI_param$q_vec<= point_to_start_testing_GE)
     points_to_test_GE = tail(points_to_test_GE,n = NR.POINTS.FOR.PV.EXTERPOLATION.IN.CALIBRATION)
     
+    # for each of the q-values in points_to_test_GE, we compute a PV value with each of the rhos.
     if(length(points_to_test_GE)>=2){
       if(verbose)
         print(paste0('selecting rho for GE'))
-      for(index_rho in 1:length(possible_rhos)){
+      for(index_rho in 1:length(possible_rhos)){ #iterate over rhos:
         
         current_rho = possible_rhos[index_rho]
-        
+        # find the point for computing the statistic, which is the rightmost point smaller than theta-rho
         a_ind_GE = mcleod.CI.find.ai.by.theta.and.rho(res_mcleod_object = res_mcleod_holdout,
                                                       theta = theta_current_q,
                                                       rho = current_rho,
                                                       is_GE = T)
-        
+        #next, we iterate over the NR.POINTS.FOR.PV.EXTERPOLATION.IN.CALIBRATION q-values found in points_to_test_GE and compute a Pvalue for each of them
         PVs_at_Qs = rep(NA,length(points_to_test_GE))
         
          q_lower_by_rho[index_rho] = 0
@@ -843,52 +913,56 @@ mcleod.CI.rho.calibration.constructor = function(
                                                do_check_vs_minimum_number_of_required_iterations = F,
                                                is_GE = T,
                                                do_serial = bank$CI_param$do_serial)
-          # if(PVs_at_Qs[i]<=alpha.one.sided){
-          #   q_lower_by_rho[index_rho] = bank$CI_param$q_vec[points_to_test_GE[i]]
-          #   break
-          # }
+          
         }
         # 
-        #create model:
+        # we then create a linear model for the log-it of PVs as a function of q:
         if(length(unique(PVs_at_Qs))>1){
           PVs_at_Qs = PVs_at_Qs*(nr.perm)/(nr.perm+1) #this is to make sure we dont have 1's. 0's are avoided by adding the test statistic to the perms when computing a PV value
           logits = log.odds(PVs_at_Qs)
           model = lm(logits~bank$CI_param$q_vec[points_to_test_GE])
           b0 = model$coefficients[1]
           b1 = model$coefficients[2]
-          q_lower_by_rho[index_rho] = (log.odds(alpha.one.sided) - b0 )/b1
+          q_lower_by_rho[index_rho] = (log.odds(alpha.one.sided) - b0 )/b1 #than we interpolate/exterpolate to find the lower point of the CI for q, at this combination of value for theta and rho.
         }else{
-          #q_lower_by_rho[index_rho] = max(bank$CI_param$q_vec[points_to_test_GE])
+          #Nothing to do
         }
         
-        if(q_lower_by_rho[index_rho]<0 | q_lower_by_rho[index_rho]>1){#by exterpolation or bug
+        if(q_lower_by_rho[index_rho]<0 | q_lower_by_rho[index_rho]>1){#by exterpolation or numerical instability
           q_lower_by_rho[index_rho] = 0
         }
+         # for the current theta point and rho, we store the q-value of the lower end of the CI
         curve_GE_q_by_theta_and_rho[index_q,index_rho] = q_lower_by_rho[index_rho]
       }
-      
-      optimal_rho_by_theta_for_GE[index_q] =  which.max(q_lower_by_rho)
+      #for the current theta point specifically, we know the (index) of the optimal rho, by finding which rho had the highest value of the low-end of the CI
+      optimal_rho_by_theta_for_GE[index_q] =  which.max(q_lower_by_rho) #will be used only if the user asked for method "specific"
     }
     
-    
-    q_upper_by_rho = rep(NA,length(possible_rhos))
+    #we redo the same analysis for the upper side of the CIs
+    q_upper_by_rho = rep(NA,length(possible_rhos)) #this will hold the estimated upper point of CI, for the current theta, for each possible value of rho
+    #we can start testing LE hypotheses from this value of q (determined by the noiseless case):
     point_to_start_testing_LE = qbinom(p = 1-alpha.one.sided,size = length(bank$N_vec),prob = current_q) / length(bank$N_vec)
+    
+    # than we find the NR.POINTS.FOR.PV.EXTERPOLATION.IN.CALIBRATION values of q which are higher than point_to_start_testing_GE.
     points_to_test_LE = which(bank$CI_param$q_vec>= point_to_start_testing_LE)
     points_to_test_LE = head(points_to_test_LE,n = NR.POINTS.FOR.PV.EXTERPOLATION.IN.CALIBRATION)
     
+    # for each of the q-values in points_to_test_GE, we compute a PV value with each of the rhos.
     if(length(points_to_test_LE)>=2){
       if(verbose)
         print(paste0('selecting rho for LE'))
       for(index_rho in 1:length(possible_rhos)){
         
         current_rho = possible_rhos[index_rho]
-        
+        # find the point for computing the statistic, which is the leftmost point higher than theta+rho
         a_ind_LE = mcleod.CI.find.ai.by.theta.and.rho(res_mcleod_object = res_mcleod_holdout,
                                                       theta = theta_current_q,
                                                       rho = current_rho,
                                                       is_GE = F)
         
         q_upper_by_rho[index_rho] =  1
+        
+        #next, we iterate over the NR.POINTS.FOR.PV.EXTERPOLATION.IN.CALIBRATION q-values found in points_to_test_LE and compute a Pvalue for each of them
         PVs_at_Qs = rep(NA,length(points_to_test_LE))
         for(i in 1:length(points_to_test_LE)){
           PVs_at_Qs[i] = mcleod.CI.PV.at_point(bank = bank,
@@ -902,33 +976,37 @@ mcleod.CI.rho.calibration.constructor = function(
                                                do_check_vs_minimum_number_of_required_iterations = F,
                                                is_GE = F,
                                                do_serial = bank$CI_param$do_serial)
-          # if(PVs_at_Qs[i]<=alpha.one.sided){
-          #   q_upper_by_rho[index_rho] = bank$CI_param$q_vec[points_to_test_LE[i]]
-          #   break
-          # }
+         
         }
         
-        #create model:
+        #we then create a linear model for the log-it of PVs as a function of q:
         PVs_at_Qs = PVs_at_Qs*(nr.perm)/(nr.perm+1) #this is to make sure we dont have 1's. 0's are avoided by adding the test statistic to the perms when computing a PV value
         if(length(unique(PVs_at_Qs))>1){
           logits = log.odds(PVs_at_Qs)
           model = lm(logits~bank$CI_param$q_vec[points_to_test_LE])
           b0 = model$coefficients[1]
           b1 = model$coefficients[2]
-          q_upper_by_rho[index_rho] = (log.odds(alpha.one.sided) - b0 )/b1
+          q_upper_by_rho[index_rho] = (log.odds(alpha.one.sided) - b0 )/b1 #than we interpolate/exterpolate to find the upper point of the CI for q, at this combination of value for theta and rho.
         }else{
-          # q_upper_by_rho[index_rho] = min(bank$CI_param$q_vec[points_to_test_LE])
+          # Nothing to do
         }
-        if(q_upper_by_rho[index_rho]<0 | q_upper_by_rho[index_rho]>1){ #by exterpolation or bug
+        if(q_upper_by_rho[index_rho]<0 | q_upper_by_rho[index_rho]>1){ #by exterpolation or or numerical instability
           q_upper_by_rho[index_rho] = 1
         }
+        # for the current theta point and rho, we store the q-value of the upper end of the CI
         curve_LE_q_by_theta_and_rho[index_q,index_rho] = q_upper_by_rho[index_rho]
       }
-      optimal_rho_by_theta_for_LE[index_q] = which.min(q_upper_by_rho)
+      #for the current theta point specifically, we know the (index) of the optimal rho, by finding which rho had the lowest value of the top-end of the CI
+      optimal_rho_by_theta_for_LE[index_q] = which.min(q_upper_by_rho) #will be used only if the user asked for method "specific"
     }
     
   }# end of loop over q
   
+  #the two matrices curve_LE_q_by_theta_and_rho and curve_GE_q_by_theta_and_rho are now filled
+  # we proceed to compute the optimal rho according to the method that the user requested.
+  
+  #if we couldnt compute optimal rho for point (for method 'specific', than we fill values from the left (for LE), or from the right (for GE)).
+  # the order of filling (left/right) is chosen so that   
   if(nr_theta_points_for_optimization>1){# check this is not a case we are handling confidence intervals
     for(i in 2:length(optimal_rho_by_theta_for_LE)){
       if(is.na(optimal_rho_by_theta_for_LE[i]))
@@ -940,7 +1018,7 @@ mcleod.CI.rho.calibration.constructor = function(
     }  
   }
   
-  
+  #points that are still NA are placed as 0
   if(any(is.na(optimal_rho_by_theta_for_LE))){
     optimal_rho_by_theta_for_LE[is.na(optimal_rho_by_theta_for_LE)]=0
   }
@@ -948,7 +1026,11 @@ mcleod.CI.rho.calibration.constructor = function(
     optimal_rho_by_theta_for_GE[is.na(optimal_rho_by_theta_for_GE)]=0
   }
   
+  #we proceed to produce continuous function of optimal rho as a function of theta.
+  # these functions will be used in practice only if the user chose 'specific'
   
+  # we generate a data structure for optimization
+  #pad the thetas with the grid edges, and the rhos with the edge values:
   optimal_rho_by_theta_for_LE = c(optimal_rho_by_theta_for_LE[1],
                                   optimal_rho_by_theta_for_LE,
                                   optimal_rho_by_theta_for_LE[length(optimal_rho_by_theta_for_LE)])
@@ -961,6 +1043,8 @@ mcleod.CI.rho.calibration.constructor = function(
   theta_points = c(min(bank$CI_param$theta_vec),
                    theta_points,
                    max(bank$CI_param$theta_vec))
+  
+  # produce a continuous function for optimal rho
   if(nr_theta_points_for_optimization>1){
     x.ks = seq(min(theta_points),max(theta_points),(max(theta_points) - min(theta_points))/1000)
     optimal_rho_by_theta_for_LE_smoothed = ksmooth(x = theta_points,
@@ -972,17 +1056,19 @@ mcleod.CI.rho.calibration.constructor = function(
                                                    x.points = x.ks,
                                                    kernel = 'normal',bandwidth = 1)
     
-  }else{
+  }else{# if nr_theta_points_for_optimization=1, we cannot interpolate, and we produce a function which is a constant.
     optimal_rho_by_theta_for_LE_smoothed = list(x = c(theta_points-1,theta_points+1), y = rep(optimal_rho_by_theta_for_LE,2))
     optimal_rho_by_theta_for_GE_smoothed = list(x = c(theta_points-1,theta_points+1), y = rep(optimal_rho_by_theta_for_GE,2))
     
   }
   
+  #pack the results from smoothing as a function (approxfun helps with that)
   rho_approx_fun_LE = approxfun(x = optimal_rho_by_theta_for_LE_smoothed$x,y = optimal_rho_by_theta_for_LE_smoothed$y,
                                 method = 'linear',rule = 2)
   rho_approx_fun_GE = approxfun(x = optimal_rho_by_theta_for_GE_smoothed$x,y = optimal_rho_by_theta_for_GE_smoothed$y,
                                 method = 'linear',rule = 2)
   
+  #pack also the non-smoohted results as a function (with linear interpolation across theta between the optimal rhos)
   if(nr_theta_points_for_optimization>1){
     
     rho_approx_fun_LE_non_smoothed = approxfun(x = theta_points,y = optimal_rho_by_theta_for_LE,method = 'linear',rule = 2)
@@ -993,10 +1079,14 @@ mcleod.CI.rho.calibration.constructor = function(
     rho_approx_fun_GE_non_smoothed = optimal_rho_by_theta_for_GE_smoothed
   }
   
-  rho_approx_fun_LE = rho_approx_fun_LE_non_smoothed
+  rho_approx_fun_LE = rho_approx_fun_LE_non_smoothed  #our reccomended approach is the non-smoothed function, but we also report the smoothed function
   rho_approx_fun_GE = rho_approx_fun_GE_non_smoothed
-  is_single_rho_method = (rho.calibration.method %in% c('max','sum'))
+  
+
+  is_single_rho_method = (rho.calibration.method %in% c('max','sum')) #handle cases where the user asked for a single rho for all values of theta and LE/GE
   if(is_single_rho_method){
+    #we compute a score, by either the sum or max of CI lengths across thetas
+    # we choose rho to be arg min (sum/max (CI Length)).
     distances = curve_LE_q_by_theta_and_rho - curve_GE_q_by_theta_and_rho
     if(rho.calibration.method == 'max'){
       scores = apply(distances,2,max,na.rm = T)
@@ -1004,11 +1094,11 @@ mcleod.CI.rho.calibration.constructor = function(
       scores = apply(distances,2,sum,na.rm = T)
     }
     selected_rho = possible_rhos[which.min(scores)]
-    rho_approx_fun_LE = function(x){return(selected_rho)}
+    rho_approx_fun_LE = function(x){return(selected_rho)} #we pack the results using a function the returns a constant value
     rho_approx_fun_GE = rho_approx_fun_LE
   }
   
-  
+  #  pack results
   ret = list(rho_approx_fun_LE = rho_approx_fun_LE,#rho_approx_fun_LE,
              rho_approx_fun_GE = rho_approx_fun_GE,#rho_approx_fun_GE,
              bank = bank,
@@ -1019,7 +1109,7 @@ mcleod.CI.rho.calibration.constructor = function(
              curve_LE_q_by_theta_and_rho = curve_LE_q_by_theta_and_rho,
              curve_GE_q_by_theta_and_rho = curve_GE_q_by_theta_and_rho
              )
-  
+  # for single rho methods we also have scores to report
   if(is_single_rho_method){
     ret$distances = distances
     ret$scores = scores
@@ -1045,7 +1135,9 @@ mcleod.CI.rho.calibration.constructor = function(
 #'
 #' @examples
 compute_P_values_over_grid_function=function(bank_original,rho_calibration_obj,res_mcleod_data,median_curve,alpha.one.sided,verbose = F){
-  bank<<- bank_original
+  bank<<- bank_original #set as public variable
+  
+  #Two grids of Pvalues, for LE/GE pvalues
   GE.pval.grid = matrix(NA,ncol = bank$CI_param$n_theta,nrow = bank$CI_param$n_q,
                         dimnames = list(paste0('q = ',bank$CI_param$q_vec),paste0('theta = ',bank$CI_param$theta_vec)))
   LE.pval.grid = matrix(NA,ncol = bank$CI_param$n_theta,nrow = bank$CI_param$n_q,
@@ -1053,27 +1145,29 @@ compute_P_values_over_grid_function=function(bank_original,rho_calibration_obj,r
   
   
   #Compute GE Grid:
-  P_values_grid_compute_univariate_CI = bank$CI_param$P_values_grid_compute_univariate_CI
+  P_values_grid_compute_univariate_CI = bank$CI_param$P_values_grid_compute_univariate_CI #This is an indicator used by the package to denote we are computing a CI for a single q or theta.
   
   CI_for_single_Q_need_to_break = F
   
   for(j in 1:bank$CI_param$n_theta){
     for(i in (bank$CI_param$n_q):1){
       
-      if(!(bank$CI_param$theta_vec[j] %in% bank$CI_param$theta_vec_for_computation &
+      if(!(bank$CI_param$theta_vec[j] %in% bank$CI_param$theta_vec_for_computation & #this condition makes sure we iterate over the entire grid put compute only wanted values. This is used primarily for CIs for single q/theta
            bank$CI_param$q_vec[i] %in% bank$CI_param$q_vec_for_computation)){
         next
       }
       
       if(verbose)
         print(paste0('testing GE at q_ind = ',i,'/',bank$CI_param$n_q,' , theta_ind = ',j,'/',bank$CI_param$n_theta))
-      rho_GE = rho_calibration_obj$rho_approx_fun_GE(bank$CI_param$theta_vec[j])
+      rho_GE = rho_calibration_obj$rho_approx_fun_GE(bank$CI_param$theta_vec[j]) #get the rho
       
+      
+      #get the point for the statistic
       a_ind_GE = mcleod.CI.find.ai.by.theta.and.rho(res_mcleod_object = res_mcleod_data,
                                                     theta = bank$CI_param$theta_vec[j],
                                                     rho = rho_GE,
                                                     is_GE = T)
-      
+      #compute pvalues
       GE.pval.grid[i,j] = mcleod.CI.PV.at_point(bank = bank,
                                                 ind_theta = j,
                                                 ind_q = i,
@@ -1086,6 +1180,7 @@ compute_P_values_over_grid_function=function(bank_original,rho_calibration_obj,r
                                                 is_GE = T,
                                                 do_serial = bank$CI_param$do_serial)
       
+      #check if we can break the loop. This is for the case we have a single CI, and we found its edge
       if(P_values_grid_compute_univariate_CI & GE.pval.grid[i,j]<=alpha.one.sided){
         if(length(bank$CI_param$q_vec_for_computation) == 1)
           CI_for_single_Q_need_to_break = T
@@ -1105,6 +1200,7 @@ compute_P_values_over_grid_function=function(bank_original,rho_calibration_obj,r
   CI_for_single_Q_need_to_break = F
   for(j in (bank$CI_param$n_theta):1){
     for(i in 1:bank$CI_param$n_q){
+      #this loop has the same structure as the above loop, see extensive comments there
       
       if(!(bank$CI_param$theta_vec[j] %in% bank$CI_param$theta_vec_for_computation &
            bank$CI_param$q_vec[i] %in% bank$CI_param$q_vec_for_computation)){
@@ -1183,33 +1279,33 @@ compute_CI_curves_function = function(
   alpha.one.sided,
   verbose
 ){
-  bank<<- bank_original
-  maximal_point_for_GE = rep(NA, bank$CI_param$n_theta)
+  bank<<- bank_original #set as global variable
+  maximal_point_for_GE = rep(NA, bank$CI_param$n_theta) #these two arrays will hold, for each index/point in theta, the index for the q-value from which it is relevant to start checking the q-values for significance
   minimal_point_for_LE = rep(NA, bank$CI_param$n_theta)
   for(i in 1:bank$CI_param$n_theta){
-    current_theta = bank$CI_param$theta_vec[i]
-    ai_point_GE = min(which(res_mcleod_data$parameters_list$a.vec >= current_theta))
+    current_theta = bank$CI_param$theta_vec[i] #for each theta
+    ai_point_GE = min(which(res_mcleod_data$parameters_list$a.vec >= current_theta)) #find the points for the statistics LE/GE
     ai_point_LE = max(which(res_mcleod_data$parameters_list$a.vec <= current_theta))
-    maximal_point_for_GE[i] = max(which(bank$CI_param$q_vec<=median_curve[ai_point_GE]),1)
+    maximal_point_for_GE[i] = max(which(bank$CI_param$q_vec<=median_curve[ai_point_GE]),1) # find the first q-values that are above/below the median CDF
     minimal_point_for_LE[i] = min(which(bank$CI_param$q_vec>=median_curve[ai_point_LE]),bank$CI_param$n_q)
   }
   
   i_star_GE = rep(NA,bank$CI_param$n_theta)
   q_star_GE = rep(NA,bank$CI_param$n_theta)
   for(i in 1:bank$CI_param$n_theta){
-    
+    #we start constructing the lower end of CI curves, by computing PVs for GE tests
     if(verbose){
       print(paste0('Computing GE confidence intervals, log.odds = ',bank$CI_param$theta_vec[i]))
     }
-    #ai = 2
-    if(i == 1){
+    
+    if(i == 1){ #at the left we start from the bottom
       N_21_GE = 1
-    }else{
+    }else{ #at later points (to the right), we start from the CI of the previous point +1, or the maximum ind for q
       N_21_GE = min(i_star_GE[i-1] + 1,bank$CI_param$n_q)
     }
     N_22_GE = maximal_point_for_GE[i]
     
-    
+    #get rho and the point for the statistic
     rho_GE = rho_calibration_obj$rho_approx_fun_GE(bank$CI_param$theta_vec[i])
     
     
@@ -1217,10 +1313,10 @@ compute_CI_curves_function = function(
                                                   theta = bank$CI_param$theta_vec[i],
                                                   rho = rho_GE,
                                                   is_GE = T)
-    
+    #find the points we need to test over
     ind_to_select_from = (max(N_21_GE,1)):N_22_GE
     rejected_ind = rep(NA,length(ind_to_select_from))
-    for(u in 1:length(rejected_ind)){
+    for(u in 1:length(rejected_ind)){ #starting from the bottom up, we test the points
       if(verbose){
         #print(paste0('Testing at q with index ',ind_to_select_from[u],' which is equivalent to ',bank$CI_param$q_vec[ind_to_select_from[u]]))
       }
@@ -1234,18 +1330,20 @@ compute_CI_curves_function = function(
                                               do_check_vs_noiseless_case = T,
                                               do_check_vs_minimum_number_of_required_iterations = T,
                                               is_GE = T,
-                                              do_serial = bank$CI_param$do_serial) <= alpha.one.sided
-      if(is.na(rejected_ind[u])) #need to handle bounds and shifts better
+                                              do_serial = bank$CI_param$do_serial) <= alpha.one.sided #we check if we rejected
+      if(is.na(rejected_ind[u])) #in case a pvalue cannot be computed, assume we did not reject
         rejected_ind[u] = F  
       
       # if(u==1 & rejected_ind[u] == F ){
       #   rejected_ind = rep(F,length(ind_to_select_from))
       #   break
       # }
-      if(!rejected_ind[u])
+      if(!rejected_ind[u]) #if we didn't reject, we can stop. We have found the lower edge of the CI for this value of theta
         break
       
     }
+    
+    #the next few lines hnde the index and value of q, by which rejection happened, so we can start at the next theta index from an updated q-level
     if(i == 1 & rejected_ind[1] == F){
       i_star_GE[i] = 0
     }else if (i == 1){
@@ -1265,8 +1363,7 @@ compute_CI_curves_function = function(
     
   }
   
-  #maximum_point_to_consider_for_LE = max(which(is.finite(minimal_point_for_LE)))
-  #maximum_point_to_consider_for_LE = min(maximum_point_to_consider_for_LE,length(a.vec)-1 )
+  # NOTE: This code uses LE tests to find the upper part of the CI. it is similar to the above section, see extensive remarks in the previous section.
   i_star_LE = rep(NA,bank$CI_param$n_theta)
   q_star_LE = rep(NA,bank$CI_param$n_theta)
   for(i in bank$CI_param$n_theta:1){
@@ -1309,8 +1406,7 @@ compute_CI_curves_function = function(
       
       if(is.na(rejected_ind[u])) #need to handle bounds and shifts better
         rejected_ind[u] = F
-      # if(u==length(ind_to_select_from) & rejected_ind[u] == F )
-      #   break
+     
       if(!rejected_ind[u])
          break
     }
@@ -1334,6 +1430,7 @@ compute_CI_curves_function = function(
     }
     
   }
+  #report q_star_LE and q_star_GE, toghether with the bank. The first two variables hold the CIs
   ret = list()
   ret$q_star_LE = q_star_LE
   ret$q_star_GE = q_star_GE
