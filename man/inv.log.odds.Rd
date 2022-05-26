@@ -9,6 +9,9 @@ inv.log.odds(theta)
 \arguments{
 \item{theta}{}
 }
+\value{
+
+}
 \description{
 Title
 }

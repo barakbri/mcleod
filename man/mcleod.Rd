@@ -2,45 +2,85 @@
 % Please edit documentation in R/mcleod_main_function.R
 \name{mcleod}
 \alias{mcleod}
-\title{Title}
+\title{The one-stop-shop function for density estimates for the mixing distribution,}
 \usage{
-mcleod(x.smp, n.smp, a.limits = c(-4, 4),
-  Noise_Type = MCLEOD.BINOMIAL.ERRORS, covariates = NULL,
-  prior_parameters = NULL, computational_parameters = NULL,
-  covariates_estimation_parameters = NULL, input_P_k_i = NULL,
-  exact.numeric.integration = TRUE)
+mcleod(
+  x.smp,
+  n.smp,
+  a.limits = c(-4, 4),
+  Noise_Type = MCLEOD.BINOMIAL.ERRORS,
+  covariates = NULL,
+  prior_parameters = NULL,
+  computational_parameters = NULL,
+  covariates_estimation_parameters = NULL,
+  input_P_k_i = NULL,
+  exact.numeric.integration = TRUE,
+  offset_vec = rep(0, length(n.smp)),
+  nr_threads = 1
+)
 }
 \arguments{
-\item{x.smp}{}
+\item{x.smp}{a vector of N measurements. For the binomial sampling distribution, measurement must be smaller or equal to n.smp (entry-wise)}
 
-\item{n.smp}{}
+\item{n.smp}{number of draws, per observation, for the binomial model. For poisson sampling errors, set this value to NULL.}
 
-\item{a.limits}{}
+\item{a.limits}{a vector with two entries, setting the range for the support of log(p/(1-p)) or log(lambda) for the model with no covariates. When using a model with covariates, these two values set the range for the support of gamma.}
 
-\item{Noise_Type}{}
+\item{Noise_Type}{Noise type: either \code{MCLEOD.BINOMIAL.ERRORS} or \code{MCLEOD.POISSON.ERRORS}}
 
-\item{covariates}{}
+\item{covariates}{(optional) a matrix of covariates. Must as have a number of rows equal to length(x.smp). Different colmn represent different covariates.}
 
-\item{prior_parameters}{}
+\item{prior_parameters}{Result of \code{\link{mcleod.prior.parameters}}. Sets parameter for the mixing / random intercept distribution.}
 
-\item{computational_parameters}{}
+\item{computational_parameters}{Result of \code{\link{mcleod.computational.parameters}} Sets computational parameters for the MCMC sampler used for estimating the mixing / random intercept distribution.}
 
-\item{covariates_estimation_parameters}{}
+\item{covariates_estimation_parameters}{Result of \code{\link{mcleod.covariates.estimation.parameters}}. Sets statistical and computational}
 
-\item{input_P_k_i}{}
+\item{input_P_k_i}{A parallel approach for specifying the sampling distribution (instead of using binomial/poisson sampling). This parameter is used to define a matrix specifying each observations probability of being sampled, from each segment of the prior. The rows of the matrix need to correspond to observations, and the columns need to be associated with the segments of the piece-wise constant mixing distribution. The number of segments is defined by the prior object given in the argument \code{prior_parameters}. For example, for the Heirarchical Beta (Polya tree) prior there are 2^(L-1) segments placed evenly in the range defined by the argument \code{a.limits}, see additional details in the function \code{\link{mcleod.prior.parameters}}}
+
+\item{exact.numeric.integration}{should exact numeric integration be used. See additional details in the doc page for \code{\link{mcleod.prior.parameters}}.}
+
+\item{offset_vec}{A vector of covariates added with a slope of 1 to the model. This can be used for example to add terms of the form "+log(N_i)" to a poisson model, in order to incorporate knowledge about the extensive size of the sampled units.}
+
+\item{nr_threads}{The function allows multiple x.smp to be a list of data samples, with each entry of the list being a vector of the same size as \code{n.smp}. When x.smp is set to be a list of vectors, this parameter sets the number of threads used for parallel computation of the deconvolution estimates. There results are returned as a list: \code{original_stat_res} (described below) become a list of the deconvolution estimates for the different data samples (with entries corresponding to the entries of the list supplied under \code{x.vec}). If \code{x.smp} is a list, then \code{input_P_k_i} can also be a list (but not vice versa)}
 }
 \value{
-names(res$parameters_list)
-\link{1} "a.vec"                            "nr.gibbs"
-\link{3} "nr.gibbs.burnin"                  "prior_parameters"
-\link{5} "computational_parameters"         "covariates_estimation_parameters"
-\link{7} "covariates"                       "x.smp"
-\link{9} "n.smp"                            "Noise_Type"
-\link{11} "covariates_given"
-names(res$additional$original_stat_res)
-\link{1} "p_k_i"             "n_smp"             "pi_smp"            "beta_smp"          "beta_suggestion"
-\link{6} "proposal_approved" "elapsed_secs"      "ll_proposal"       "ll_current"
+an object of type 'mcleod.obj' with the two following lists.
+A list named \code{parameters_list} with the following entries:
+\itemize{
+\item{a.vec}{ - The mixing distribution for the binomial/poisson samples is estimated as a piece-wise constant function, over these breaking point.}
+\item{nr.gibbs}{ - Number of gibbs samples}
+\item{nr.gibbs.burnin}{ - Number of gibbs samples taken as burnin (excluded when computing estimators)}
+\item{prior_parameters}{ - Input object by same name.}
+\item{computational_parameters}{ - Input object by same name.}
+\item{covariates_estimation_parameters}{ - Input object by same name.}
+\item{covariates}{ - The matrix of inserted covariates}
+\item{x.smp}{ - Input data by same name}
+\item{n.smp}{ - Input data by same name}
+\item{Noise_Type}{ - 0 for binomial, 1 for Poisson.}
+\item{covariates_given}{ - Logical value indicating if covariates were given.}
+}
+
+And a second list named \code{original_stat_res} with the following entries:
+\itemize{
+\item{p_k_i}{ - A matrix with dimensions (length(x.smp),length(a.vec)-1). Entries of the matrix are the probabilities of each observation (by row), to be sampled when the random effect is sampled uniformly from each of the segments of a.vec (segments corresponding to columns).}
+\item{n_smp}{ - A matrix of size (length(a.vec)-1,nr.gibbs) giving for each MCMC iteration (by column), the number of observations generated from each segment of the support of the mixing distribution. }
+\item{pi_smp}{ - A matrix of size (length(a.vec)-1,nr.gibbs) giving for each MCMC iteration (by column), a posterior sample of the mixing distribution. computing the mean of each row gives the posterior mean for each segment of the piecewise constant mixing distribution. }
+\item{beta_smp}{ - When covariates are included, a matrix of size (ncol(covariates),nr.gibbs), giving the MCMC samples for the vector of slope coefficients.}
+\item{beta_suggestion}{ - When covariates are included,a matrix of size (ncol(covariates),nr.gibbs), giving the MCMC proposals for the vector of slope coffeficients. At each iteration, the proposal is suggested based on a normally distributed step from the previous MCMC step, and chosen usin a Metropolis Hastings rule.}
+\item{proposal_approved}{ - When covariates are included: for each step, was the proposal for the vector of slope coefficients approved. The parameters proposal_approved, ll_proposal and ll_current are used for interogating the acceptance rate for the sampler, when covariates are used.}
+\item{elapsed_secs}{ - Running time in seconds.}
+\item{ll_proposal}{ - When covariates are included: for each MCMC step, the loglikelihood value of proposal of the new parameter values. Values computed without the probability of the polya tree prior, see CPP code for details.}
+\item{ll_current}{ - When covariates are included: for each MCMC step, the loglikelihood value of the current parameter values. Values computed without the probability of the polya tree prior, see CPP code for details.}
+}
 }
 \description{
-Title
+The one-stop-shop function for density estimates for the mixing distribution,
+}
+\details{
+Computes deconvolution estimates for the mixing distribution of the following model: For binomial measurements, X~bin(N,p) and log(p/(1-p)) is random deviate from either a Polya-Tree or Dirichlet Tree distribution, as defined by \code{prior_parameters}. For Poisson errors, the model equation is X~Pois(lambda), where log(lambda) is distributed using a Polya tree or Dirichlet tree distribution.
+If covariates are included in the model, the model is log(p/(1-p)) = gamma + delta^T Z, where gamma is a random deviate from a general density estimated from the data, delta is a vector of slopes, and Z is a vector of covariates. For poisson errors, the mode equation is log(lambda) = gamma + delta^T Z.
+}
+\examples{
+see package vignette
 }

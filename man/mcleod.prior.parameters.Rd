@@ -2,22 +2,36 @@
 % Please edit documentation in R/mcleod_main_function.R
 \name{mcleod.prior.parameters}
 \alias{mcleod.prior.parameters}
-\title{Title}
+\title{Generates an object of type 'mcleod.prior.def.obj' defining the prior for the random effect in the functions \code{mcleod}, \code{mcleod.estimate.CI}, \code{mcleod.estimate.CI.single.q} and \code{mcleod.estimate.CI.single.theta}}
 \usage{
-
-  mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,
-  Beta.Heirarchical.Levels = 6, Two.Layer.Dirichlet.Intervals = 64,
-  Two.Layer.Dirichlet.Nodes.in.First.Layer = 8)
+mcleod.prior.parameters(
+  prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,
+  Beta.Heirarchical.Levels = 6,
+  Two.Layer.Dirichlet.Intervals = 64,
+  Two.Layer.Dirichlet.Nodes.in.First.Layer = 8,
+  Prior_Hyper_Parameters_BetaH_L = NULL,
+  Prior_Hyper_Parameters_BetaH_U = NULL,
+  Prior_Hyper_Parameters_2LDT = NULL
+)
 }
 \arguments{
-\item{prior.type}{}
+\item{prior.type}{The type of prior used. Values are either \code{MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL} or \code{MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET}}
 
-\item{Beta.Heirarchical.Levels}{}
+\item{Beta.Heirarchical.Levels}{The number of levels used (for prior of type MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL). The first level (root of the tree) is 1. A full tree with L=4 levels has 2^(4-1) segments for the prior.}
 
-\item{Two.Layer.Dirichlet.Intervals}{}
+\item{Two.Layer.Dirichlet.Intervals}{When using \code{MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET} as the prior - the total number of leafs in the two-layer dirichet tree.}
 
-\item{Two.Layer.Dirichlet.Nodes.in.First.Layer}{}
+\item{Two.Layer.Dirichlet.Nodes.in.First.Layer}{Number of nodes in the first level of the Dirichlet tree. \code{Two.Layer.Dirichlet.Intervals} must be an integer multiple of \code{Two.Layer.Dirichlet.Nodes.in.First.Layer}}
+}
+\value{
+An object of type \code{mcleod.prior.def.obj}
 }
 \description{
-Title
+Generates an object of type 'mcleod.prior.def.obj' defining the prior for the random effect in the functions \code{mcleod}, \code{mcleod.estimate.CI}, \code{mcleod.estimate.CI.single.q} and \code{mcleod.estimate.CI.single.theta}
+}
+\details{
+Details the type of prior for the random effect model. The prior for the distribution of random effects can be either Hierarchical Beta (a Polya Tree, i.e. a full binary tree with L levels, with each leaf corresponding to a segment on the real line, and each internal node associated with a beta random variable) or a two level dirichlet tree. See additional details in the package vignette.
+}
+\examples{
+See the package vignette
 }

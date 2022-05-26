@@ -1,11 +1,11 @@
 # Auxiliary Functions and Wrapper:
 
 
-#' Title
-#'
+#' Compute log-odds from probability
+#' 
 #' @param p 
 #'
-#' @return
+#' @return log(p/(1-p))
 #' @export
 #'
 #' @examples
@@ -13,11 +13,11 @@ log.odds			<- function(p){
   log(p / (1-p))
 } 		
 
-#' Title
+#' Compute probability from log-odds
 #'
 #' @param theta 
 #'
-#' @return
+#' @return exp(theta) / (1 +exp(theta))
 #' @export
 #'
 #' @examples

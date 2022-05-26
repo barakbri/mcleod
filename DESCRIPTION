@@ -11,7 +11,7 @@ Imports: Rcpp (>= 1.0.0),ggplot2, doRNG,doParallel,parallel,hash,RcppThread
 LinkingTo: 
     Rcpp,RcppThread
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 6.1.1
+RoxygenNote: 7.1.1
 Suggests: 
     testthat (>= 2.1.0),rmarkdown
 VignetteBuilder: knitr

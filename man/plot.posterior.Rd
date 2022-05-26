@@ -4,10 +4,15 @@
 \alias{plot.posterior}
 \title{Title}
 \usage{
-\method{plot}{posterior}(mcleod.obj)
+\method{plot}{posterior}(mcleod.obj, plot_only_point_estimate = F)
 }
 \arguments{
 \item{mcleod.obj}{}
+
+\item{plot_only_point_estimate}{}
+}
+\value{
+
 }
 \description{
 Title

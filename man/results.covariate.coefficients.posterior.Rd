@@ -4,8 +4,11 @@
 \alias{results.covariate.coefficients.posterior}
 \title{Title}
 \usage{
-results.covariate.coefficients.posterior(mcleod.obj, plot.posterior = T,
-  plot.MH.proposal.by.iteration = F)
+results.covariate.coefficients.posterior(
+  mcleod.obj,
+  plot.posterior = T,
+  plot.MH.proposal.by.iteration = F
+)
 }
 \arguments{
 \item{mcleod.obj}{}
@@ -13,6 +16,9 @@ results.covariate.coefficients.posterior(mcleod.obj, plot.posterior = T,
 \item{plot.posterior}{}
 
 \item{plot.MH.proposal.by.iteration}{}
+}
+\value{
+
 }
 \description{
 Title
