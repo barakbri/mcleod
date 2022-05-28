@@ -226,13 +226,18 @@ mcleod.covariates.estimation.parameters = function(proposal_sd = c(0.05),
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-#' The one-stop-shop function for density estimates for the mixing distribution, 
+#' Function estimates the mixing distribution, for data with Binomial/Poisson samples with varying success probabilities/rates.
 #' 
 #' The function estimates the mixing distribution of P/lambda for binomial/Poisson samples, respectively.
 #' 
 #' @details Computes deconvolution estimates for the mixing distribution of the following model: For binomial measurements, X~bin(N,p) and log(p/(1-p)) is random deviate from either a Polya-Tree or Dirichlet Tree distribution, as defined by \code{prior_parameters}. For Poisson errors, the model equation is X~Pois(lambda), where log(lambda) is distributed using a Polya tree or Dirichlet tree distribution.
 #' If covariates are included in the model, the model is log(p/(1-p)) = gamma + delta^T Z, where gamma is a random deviate from a general density estimated from the data, delta is a vector of slopes, and Z is a vector of covariates. For poisson errors, the mode equation is log(lambda) = gamma + delta^T Z.
 #' 
+#' The type of prior, how segments are split across a.vec...
+#' The estimation procedure uses an MCMC-type algorithm used to sample...
+#' The returned object contains...
+#' 
+#' For the cases with covariates (algorithm + returned results...)
 #'
 #' @param x.smp a vector of N measurements. For the binomial sampling distribution, measurement must be smaller or equal to n.smp (entry-wise)
 #' @param n.smp number of draws, per observation, for the binomial model. For poisson sampling errors, set this value to NULL.
@@ -591,15 +596,18 @@ mcleod	<- function( x.smp,
 # Functions for plotting results
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-#' Title
+#' Plot the posterior mixing distribution, estimated for the data from a mcleod model
+#' 
+#' The function receives an object returned from \code{\link{mcleod}} and plots the posterior estimate for the mixing distribution. The posterior mean is shown in red (means for each point in the support of the mixing distribution). A point cloud shows the posterior distribution at each point of the support.
+#' 
+#' @param mcleod.obj Object received from \code{\link{mcleod}}.
+#' @param plot_only_point_estimate Logical value indicating if only the posterior mean should be plotted (using a red line). If set to F (default value), the posterior density will also be plotted.
 #'
-#' @param mcleod.obj 
-#' @param plot_only_point_estimate 
-#'
-#' @return
+#' @return NONE
 #' @export
 #'
 #' @examples
+#' See package vignette
 plot.posterior	<- function(mcleod.obj, plot_only_point_estimate = F)
 {
   library(ggplot2)
@@ -640,16 +648,19 @@ plot.posterior	<- function(mcleod.obj, plot_only_point_estimate = F)
 }
 
 
-#' Title
+#' Obtain posterior means and plot graphs for the slope coefficients, for the mcleod model with covariates
 #'
-#' @param mcleod.obj 
-#' @param plot.posterior 
-#' @param plot.MH.proposal.by.iteration 
+#' The function receives the output of \code{\link{mcleod}}, when trying to estimate the mixing distribution with additional covariates, and performs the following actions: 1) returns the posterior means for the slope coefficients, and the mean acceptance rate for the MCMC sampler; 2) plots a graph of the values of the slope coefficients, by MCMC iteration number (see additional details for the function parameters); plot the suggested vectors of slope coefficients, sampled by the MCMC algorithm at each iteration, and whether the suggested vector was accepted in each iteration (see additional details below).
 #'
-#' @return
+#' @param mcleod.obj Object received from \code{\link{mcleod}}, when covariates are included in the model.
+#' @param plot.posterior If set to True (default is True): plot a series of figures showing the values of the slope coefficients by MCMC iteration number. Burnin iterations (excluded from the computation of posterior means) are shown in red.
+#' @param plot.MH.proposal.by.iteration If set to True (default is False): plot a series of figures showing the values of the slope coefficients for the slope vectors sampled as suggestions by the MCMC iteration number. Accepted iterations are shown in red.
+#'
+#' @return Returns a list with two entries: \code{posterior.means}- a vector with estiamtes for the posterior means of the slope coefficients (see model description in \code{\link{mcleod}}); and \code{acceptance.rate} the ratio of times proposals for slope vectors were accepted in the MCMC sampler.
 #' @export
 #'
 #' @examples
+#' See package vignette
 results.covariate.coefficients.posterior = function(mcleod.obj, plot.posterior = T, plot.MH.proposal.by.iteration = F){
 
   if(class(mcleod.obj) != CLASS.NAME.MCLEOD){
