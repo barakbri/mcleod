@@ -2,7 +2,7 @@
 % Please edit documentation in R/mcleod_main_function.R
 \name{mcleod}
 \alias{mcleod}
-\title{The one-stop-shop function for density estimates for the mixing distribution,}
+\title{Function estimates the mixing distribution, for data with Binomial/Poisson samples with varying success probabilities/rates.}
 \usage{
 mcleod(
   x.smp,
@@ -75,11 +75,16 @@ And a second list named \code{original_stat_res} with the following entries:
 }
 }
 \description{
-The one-stop-shop function for density estimates for the mixing distribution,
+Given a dataset with either binomial or Poisson samples, the function estimates the mixing distribution of \eqn{P} or \eqn{\lambda}{lambda}, respectively. The function assumes the following hierarchical Bayesian model for the mixing distribution: For binomial measurements, the model is \eqn{X_i\sim bin(N,P_i)}{Xi~bin(N,Pi)}, where  \eqn{log(P_i/(1-P_i))}{log(Pi/(1-Pi))} is random deviate from a piecewise-constant function, whose density values are modeled using either a Polya-Tree or Dirichlet Tree distribution. For Poisson errors, the model equation is \eqn{X_i\sim Pois(lambda_i)}{X_i~Pois(lambda_i)}, where \eqn{log(lambda_i)} is modeled using the heirarchical Bayesian approach (using a piecewise-constant density function).
+If covariates are included in the model, the model is \eqn{log(P_i/(1-P_i)) = \gamma_i + \vec{\delta}^T \vec{Z}_i}, where the density of \eqn{\gamma_i}'s is estimated using the heirarchical Bayesian approach, \eqn{\vec{\delta}} is a vector of slopes, and \eqn{\vec{Z}_i} is a vector of sample covariates. For Poisson errors, the model equation is \eqn{log(\lambda_i) = \gamma_i + \vec{delta}^T \vec{Z}_i}.
 }
 \details{
-Computes deconvolution estimates for the mixing distribution of the following model: For binomial measurements, X~bin(N,p) and log(p/(1-p)) is random deviate from either a Polya-Tree or Dirichlet Tree distribution, as defined by \code{prior_parameters}. For Poisson errors, the model equation is X~Pois(lambda), where log(lambda) is distributed using a Polya tree or Dirichlet tree distribution.
-If covariates are included in the model, the model is log(p/(1-p)) = gamma + delta^T Z, where gamma is a random deviate from a general density estimated from the data, delta is a vector of slopes, and Z is a vector of covariates. For poisson errors, the mode equation is log(lambda) = gamma + delta^T Z.
+The mixing distribution ( or the density of $\gamma_i$'s for the setting with covariates) is estimated using an MCMC sampler conditioning on the observed data. The hyperparameters for prior for the mixing distribution are defined using the function \code{\link{mcleod.prior.parameters}}, and passed as an object to the argument \code{prior_parameters}, together with the support for the mixing distribution (random intercept term for the case with covariates), and the number of breaks in the piecewise constant density function (discontinuity points in the density function are equally placed across the support).
+The returned object contains both the parameters and data given by the user, together with results for the MCMC sampler. The main result returned by the function is \code{pi_smp}: a series of density functions sampled from the posterior distribution of the mixing distribution (density of \eqn{\gamma_i}'s for the case with covariates). The function \code{\link{plot.posterior}} plots the samples from the posterior distribution of the random effect. See the package vignette on how to extract results from the returned object.
+See the package vignette and cited papers for additional information on the model and statistical estimation approach.
+
+If covariates are also supplied by the user, the algorithm performs two types of MCMC steps: one for the density of the random intercept term (density of  \eqn{\gamma_i's}) and one for the vector of slope coefficients (given by \eqn{\vec{\delta}}). MCMC steps for the slope coefficients are done using an accept-reject Metropolis-Hastings step. The function \code{\link{results.covariate.coefficients.posterior}} allows the mean posterior estiamtes of \eqn{\vec{\delta}} to be extracted from the output, together with plots and statistics for the posterior distribution of \eqn{\vec{\delta}}, and the acceptance ratio of the MH step.
+The prior distribution for \eqn{\vec{\delta}}, together with parameters for the proposal distribution (suggesting the MCMC algorithm new values of \eqn{\vec{\delta}} based on the current iteration's values) can be set using the parameter \code{covariates_estimation_parameters}.
 }
 \examples{
 see package vignette

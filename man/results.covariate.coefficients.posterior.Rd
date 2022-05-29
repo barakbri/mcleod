@@ -2,7 +2,7 @@
 % Please edit documentation in R/mcleod_main_function.R
 \name{results.covariate.coefficients.posterior}
 \alias{results.covariate.coefficients.posterior}
-\title{Title}
+\title{Obtain posterior means and plot graphs for the slope coefficients, for the mcleod model with covariates}
 \usage{
 results.covariate.coefficients.posterior(
   mcleod.obj,
@@ -11,15 +11,18 @@ results.covariate.coefficients.posterior(
 )
 }
 \arguments{
-\item{mcleod.obj}{}
+\item{mcleod.obj}{Object received from \code{\link{mcleod}}, when covariates are included in the model.}
 
-\item{plot.posterior}{}
+\item{plot.posterior}{If set to True (default is True): plot a series of figures showing the values of the slope coefficients by MCMC iteration number. Burnin iterations (excluded from the computation of posterior means) are shown in red.}
 
-\item{plot.MH.proposal.by.iteration}{}
+\item{plot.MH.proposal.by.iteration}{If set to True (default is False): plot a series of figures showing the values of the slope coefficients for the slope vectors sampled as suggestions by the MCMC iteration number. Accepted iterations are shown in red.}
 }
 \value{
-
+Returns a list with two entries: \code{posterior.means}- a vector with estiamtes for the posterior means of the slope coefficients (see model description in \code{\link{mcleod}}); and \code{acceptance.rate} the ratio of times proposals for slope vectors were accepted in the MCMC sampler.
 }
 \description{
-Title
+The function receives the output of \code{\link{mcleod}}, when trying to estimate the mixing distribution with additional covariates, and performs the following actions: 1) returns the posterior means for the slope coefficients, and the mean acceptance rate for the MCMC sampler; 2) plots a graph of the values of the slope coefficients, by MCMC iteration number (see additional details for the function parameters); plot the suggested vectors of slope coefficients, sampled by the MCMC algorithm at each iteration, and whether the suggested vector was accepted in each iteration (see additional details below).
+}
+\examples{
+See package vignette
 }

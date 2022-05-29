@@ -2,7 +2,7 @@
 % Please edit documentation in R/Auxiliary_Functions.R
 \name{inv.log.odds}
 \alias{inv.log.odds}
-\title{Title}
+\title{Compute probability from log-odds}
 \usage{
 inv.log.odds(theta)
 }
@@ -10,8 +10,8 @@ inv.log.odds(theta)
 \item{theta}{}
 }
 \value{
-
+exp(theta) / (1 +exp(theta))
 }
 \description{
-Title
+Compute probability from log-odds
 }

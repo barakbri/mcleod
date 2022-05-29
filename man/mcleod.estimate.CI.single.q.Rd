@@ -2,7 +2,7 @@
 % Please edit documentation in R/CI_mixture_distribution.R
 \name{mcleod.estimate.CI.single.q}
 \alias{mcleod.estimate.CI.single.q}
-\title{Title}
+\title{A wrapper function for mcleod.estimate.CI, used to estimate a two-sided confidence interval for the quantile of the mixing distribution at a given CDF/percentile value.}
 \usage{
 mcleod.estimate.CI.single.q(
   X,
@@ -14,21 +14,27 @@ mcleod.estimate.CI.single.q(
 )
 }
 \arguments{
-\item{X}{}
+\item{X}{Same parameter as in \code{\link{mcleod.estimate.CI}}.}
 
-\item{N}{}
+\item{N}{Same parameter as in \code{\link{mcleod.estimate.CI}}.}
 
-\item{q}{}
+\item{q}{The CDF value for which the confidence interval will be built.}
 
-\item{CI_param}{}
+\item{CI_param}{Same parameter as in \code{\link{mcleod.estimate.CI}}. This parameter can be used to change the confidence level.}
 
-\item{ratio_holdout}{}
+\item{ratio_holdout}{Same parameter as in \code{\link{mcleod.estimate.CI}}.}
 
-\item{verbose}{}
+\item{verbose}{Same parameter as in \code{\link{mcleod.estimate.CI}}.}
 }
 \value{
 
 }
 \description{
-Title
+The function receives input parameters as defined for \code{\link{mcleod.estimate.CI}}, together with a single CDF/percentile value (name \code{q}). The function returns a confidence interval for the mixing distribution at the required percentile. For example, using a value of \code{q=0.5} will return a confidence interval, in terms of theta (log-odds), for the median of the mixing distribution.
+}
+\details{
+This function is actually a "convenience wrapper" for \code{\link{mcleod.estimate.CI}}. It is used to make sure that CIs are computed for the required percentile alone. In addition, calibration of rho is done for a single theta/log-odds point: the theta for which the mixing distribution in the holdout data obtains the value closest to \code{q}.
+}
+\examples{
+ See package vignette.
 }

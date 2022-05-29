@@ -27,10 +27,12 @@ mcleod.prior.parameters(
 An object of type \code{mcleod.prior.def.obj}
 }
 \description{
-Generates an object of type 'mcleod.prior.def.obj' defining the prior for the random effect in the functions \code{mcleod}, \code{mcleod.estimate.CI}, \code{mcleod.estimate.CI.single.q} and \code{mcleod.estimate.CI.single.theta}
+Details the type of prior for mixing distribution. For a \code{\link{mcleod}} model with covariates, this function is used to define the distribution of the random intercept term. The prior for the distribution of random effects can be either Hierarchical Beta (a Polya Tree, i.e. a full binary tree with L levels, with each leaf corresponding to a segment on the real line, and each internal node associated with a beta random variable) or a two level dirichlet tree. See additional details in the package vignette.
 }
 \details{
-Details the type of prior for the random effect model. The prior for the distribution of random effects can be either Hierarchical Beta (a Polya Tree, i.e. a full binary tree with L levels, with each leaf corresponding to a segment on the real line, and each internal node associated with a beta random variable) or a two level dirichlet tree. See additional details in the package vignette.
+For a prior of type \code{MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL}, the Polya tree defines a piecewise constant prior with 2^(Beta.Heirarchical.Levels-1) segments on the real line. For priors defined using \code{MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET}, the number of segments on the real line is defined using \code{Two.Layer.Dirichlet.Intervals}, and the number of nodes in the upper later of the dirichlet tree is defined by \code{Two.Layer.Dirichlet.Nodes.in.First.Layer}. .The support for the prior is given by the parameter \code{a.limits} in the function \code{\link{mcleod}}, with "jumps" in the piecewise constant density function equally placed equally across the support defined by \code{a.limits}.
+
+All intensity hyperparameters for either Beta variables (in the Polya tree), or gamma variables (in the 2-level Dirichlet tree) have a value of 1 by default. This can be changed using the parameters \code{Prior_Hyper_Parameters_BetaH_L}, \code{Prior_Hyper_Parameters_BetaH_U} and \code{Prior_Hyper_Parameters_2LDT}, see example in the package vignette.
 }
 \examples{
 See the package vignette

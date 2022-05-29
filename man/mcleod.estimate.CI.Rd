@@ -2,7 +2,7 @@
 % Please edit documentation in R/CI_mixture_distribution.R
 \name{mcleod.estimate.CI}
 \alias{mcleod.estimate.CI}
-\title{Compute point-wise Confidence Intervals for the Quantiles and Percentiles of the mixing distribution of binomial samples.}
+\title{Compute point-wise Confidence Intervals for the quantiles and percentiles of the mixing distribution of binomial samples.}
 \usage{
 mcleod.estimate.CI(
   X,
@@ -24,9 +24,9 @@ mcleod.estimate.CI(
 
 \item{ratio_holdout}{When estimating rho adaptively from the data, the ratio of data samples used for the calibration procedure for rho. Values such as 0.1 and 0.2 are plausible.}
 
-\item{compute_P_values_over_grid}{Shoudl}
+\item{compute_P_values_over_grid}{Should the function perform an exhaustive computation of the point-wise CIs, for different quantiles and percentiles of the mixing distribution. This is done by testing all LE/GE type hypotheses, see additional information in the package vignette and paper for the method. Generally, this option is not needed, and the user needs the efficient computation method which only constructs CI at a given confidence levels. This option is useful if a user wishes to construct CI for the mixing distribution at multiple levels simultanously (i.e., using results from a single function call).}
 
-\item{compute_CI_curves}{}
+\item{compute_CI_curves}{Should the function perform an efficient computation of the point-wise CIs, for different quantiles and percentiles of the mixing distribution. This option is needed for most cases: get point-wise CIs for the mixing distribution at a given confidence levels, plot the CIs, etc.}
 
 \item{verbose}{Should messages be printed to screen.}
 
@@ -64,7 +64,10 @@ The list given by \code{pvalues_grid}
 }
 }
 \description{
-The assumed model is of the form \eqn{Xi ~ bin(Ni,Pi)}, where \eqn{i} is an index in the range 1,...,n. The function constructs pointwise confidence intervals for the mixing distribution, i.e., the distribution of Pi's. The statistical method is explained in the package vignette.
+The assumed model is of the form \eqn{Xi ~ bin(Ni,Pi)}, where \eqn{i} is an index in the range 1,...,n. The function constructs pointwise confidence intervals for the mixing distribution, i.e., the distribution of Pi's, for different quantiles and percentiles. The statistical method is explained in the package vignette.
+}
+\details{
+See package vignette for a full explanation on algorithm and parameters.
 }
 \examples{
 See package vignette

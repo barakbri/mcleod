@@ -2,18 +2,21 @@
 % Please edit documentation in R/mcleod_main_function.R
 \name{plot.posterior}
 \alias{plot.posterior}
-\title{Title}
+\title{Plot the posterior mixing distribution, estimated for the data from a mcleod model}
 \usage{
 \method{plot}{posterior}(mcleod.obj, plot_only_point_estimate = F)
 }
 \arguments{
-\item{mcleod.obj}{}
+\item{mcleod.obj}{Object received from \code{\link{mcleod}}.}
 
-\item{plot_only_point_estimate}{}
+\item{plot_only_point_estimate}{Logical value indicating if only the posterior mean should be plotted (using a red line). If set to F (default value), the posterior density will also be plotted.}
 }
 \value{
-
+NONE
 }
 \description{
-Title
+The function receives an object returned from \code{\link{mcleod}} and plots the posterior estimate for the mixing distribution. The posterior mean is shown in red (means for each point in the support of the mixing distribution). A point cloud shows the posterior distribution at each point of the support.
+}
+\examples{
+See package vignette
 }

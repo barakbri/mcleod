@@ -2,7 +2,7 @@
 % Please edit documentation in R/CI_mixture_distribution.R
 \name{plot.mcleod.CI}
 \alias{plot.mcleod.CI}
-\title{Title}
+\title{Plot the pointwise Confidence Intervals obtained from running mcleod.estimate.CI}
 \usage{
 \method{plot}{mcleod.CI}(
   mcleod.CI.obj,
@@ -14,21 +14,24 @@
 )
 }
 \arguments{
-\item{mcleod.CI.obj}{}
+\item{mcleod.CI.obj}{An object returned from \code{\link{mcleod.estimate.CI}}, with parameter \code{compute_CI_curves} set to \code{True}.}
 
-\item{X_axis_as_Prob}{}
+\item{X_axis_as_Prob}{Should the X axis for the mixing distribution be presented as Probability (True, default) or as log-odds (parameter named theta, False)}
 
-\item{add_CI_curves_on_top_of_plot}{}
+\item{add_CI_curves_on_top_of_plot}{Should the CI curves be plotted on top of an existing plot. This option is usefull when plotting multiple CIs for the same data.}
 
-\item{point_estimate_color}{}
+\item{point_estimate_color}{Color for the posterior median of the mixing distribution. Medians are taken point-wise across the support.}
 
-\item{CI_curves_color}{}
+\item{CI_curves_color}{Color for the curves showing the pointwise confidence intervals.}
 
-\item{title}{}
+\item{title}{Title for the plot}
 }
 \value{
-
+NONE
 }
 \description{
-Title
+Plot the pointwise Confidence Intervals obtained from running mcleod.estimate.CI
+}
+\examples{
+see package vignette
 }

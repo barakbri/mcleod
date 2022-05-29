@@ -2,7 +2,7 @@
 % Please edit documentation in R/CI_mixture_distribution.R
 \name{mcleod.estimate.CI.single.theta}
 \alias{mcleod.estimate.CI.single.theta}
-\title{Title}
+\title{A wrapper function for mcleod.estimate.CI, used to estimate a two-sided confidence interval for the percentile of the mixing distribution at a given log-odds value.}
 \usage{
 mcleod.estimate.CI.single.theta(
   X,
@@ -14,21 +14,27 @@ mcleod.estimate.CI.single.theta(
 )
 }
 \arguments{
-\item{X}{}
+\item{X}{Same parameter as in \code{\link{mcleod.estimate.CI}}.}
 
-\item{N}{}
+\item{N}{Same parameter as in \code{\link{mcleod.estimate.CI}}.}
 
-\item{theta}{}
+\item{theta}{The log-odds value for which the confidence interval will be built. For example, using a value of \code{theta=0} will return a confidence interval, in terms of CDF values, for mixing distribution at \code{theta=0}.}
 
-\item{CI_param}{}
+\item{CI_param}{Same parameter as in \code{\link{mcleod.estimate.CI}}. This parameter can be used to change the confidence level.}
 
-\item{ratio_holdout}{}
+\item{ratio_holdout}{Same parameter as in \code{\link{mcleod.estimate.CI}}.}
 
-\item{verbose}{}
+\item{verbose}{Same parameter as in \code{\link{mcleod.estimate.CI}}.}
 }
 \value{
-
+A vector with two entries name 'Lower' and 'Upper', denoting the two-sided CI, in terms of CDF values, for a given theta (log-odds value).
 }
 \description{
-Title
+The function receives input parameters as defined for \code{\link{mcleod.estimate.CI}}, together with a single log-odds value (theta). The function returns a confidence interval, in terms of CDF values, for the mixing distribution at the required point.
+}
+\details{
+This function is actually a "convenience wrapper" for \code{\link{mcleod.estimate.CI}}. It is used to make sure that the only point where CIs are computed is at log-odds=theta, and that calibration of rho is also done for this point alone.
+}
+\examples{
+ See package vignette.
 }

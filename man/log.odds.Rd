@@ -2,7 +2,7 @@
 % Please edit documentation in R/Auxiliary_Functions.R
 \name{log.odds}
 \alias{log.odds}
-\title{Title}
+\title{Compute log-odds from probability}
 \usage{
 \method{log}{odds}(p)
 }
@@ -10,8 +10,8 @@
 \item{p}{}
 }
 \value{
-
+log(p/(1-p))
 }
 \description{
-Title
+Compute log-odds from probability
 }

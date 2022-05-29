@@ -328,3 +328,97 @@ res = mcleod(x, n, covariates = covariates,
 ```{r, cache=TRUE,eval=FALSE}
 mcleod::results.covariate.coefficients.posterior(res,plot.posterior = F)
 ```
+
+
+# Additional topics
+
+## changeing hyper-parameters for the priors of the mixing distribution:
+
+
+```{r, cache=TRUE,eval=FALSE}
+
+set.seed(1)
+
+K = 2000 # Number of samples
+n.vec = rep(2,K) #number of draws for each sample
+
+# function for sampling a beta binomial (2,2)
+generate_sample_Beta_2_2 = function(K){ 
+  p.vec = rbeta(n = K,2,2)
+  x.vec = rbinom(K,size = n.vec,p.vec)
+  return(x.vec)
+}
+
+x.vec = generate_sample_Beta_2_2(K)
+
+#run sampler:
+mcleod_res = mcleod(x.vec,n.vec,a.limits = c(-4,4),exact.numeric.integration = T,
+                    prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 5),
+                    computational_parameters = mcleod.computational.parameters(nr.gibbs = 2000,nr.gibbs.burnin = 1000))
+
+mcleod::plot.posterior(mcleod_res)
+
+```
+
+```{r, cache=TRUE,eval=FALSE}
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#Example how to change hyper-parameters.
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#For, example, how to change all hyper parameters to 2
+# We form two matrices, for $\alpha^{L}$ and $\alpha^{U}$.
+# In each matrix, the [l,i] entry gives the appropriate hyper parameter for the ith node on the lth level.
+
+L = 5 # number of levels
+alpha_L = matrix(NA,nrow = L,ncol = 2^(L-1)) # hyper-parameter matrices 
+alpha_U = matrix(NA,nrow = L,ncol = 2^(L-1))
+
+for(l in 1:L){
+  for(k in 1:2^(l-1)){
+    alpha_L[l,k] = 2
+    alpha_U[l,k] = 2
+  }
+}
+
+# we pass the hyper-paramers to the mcleod.prior.parameters(...) function
+mcleod_res = mcleod(x.vec,n.vec,
+                    a.limits = c(-4,4),
+                    exact.numeric.integration = T,
+                    prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,
+                                                          Beta.Heirarchical.Levels = L,
+                                                          Prior_Hyper_Parameters_BetaH_L = alpha_L,
+                                                          Prior_Hyper_Parameters_BetaH_U = alpha_U),
+                    computational_parameters = mcleod.computational.parameters(nr.gibbs = 2000,
+                                                                               nr.gibbs.burnin = 1000)
+                    )
+
+mcleod::plot.posterior(mcleod_res)
+
+```
+
+```{r, cache=TRUE,eval=FALSE}
+
+
+Nodes_in_first_layer = 8
+Total_nr_nodes = 64
+
+Two_Level_Dirichlet_Tree_Hyperparameters = matrix(NA,nrow = 2,ncol = Total_nr_nodes)
+
+Two_Level_Dirichlet_Tree_Hyperparameters[1,1:Nodes_in_first_layer] = 2
+Two_Level_Dirichlet_Tree_Hyperparameters[2,1:Total_nr_nodes] = 2
+
+# we pass the hyper-paramers to the mcleod.prior.parameters(...) function
+mcleod_res = mcleod(x.vec,n.vec,
+    a.limits = c(-4,4),
+    exact.numeric.integration = T,
+    prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
+                              Two.Layer.Dirichlet.Intervals = Total_nr_nodes,
+                              Two.Layer.Dirichlet.Nodes.in.First.Layer =  Nodes_in_first_layer,
+                               Prior_Hyper_Parameters_2LDT = Two_Level_Dirichlet_Tree_Hyperparameters),
+    computational_parameters = mcleod.computational.parameters(nr.gibbs = 2000,
+                                                               nr.gibbs.burnin = 1000)
+)
+
+mcleod::plot.posterior(mcleod_res)
+
+```

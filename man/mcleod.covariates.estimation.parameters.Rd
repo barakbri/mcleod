@@ -2,7 +2,7 @@
 % Please edit documentation in R/mcleod_main_function.R
 \name{mcleod.covariates.estimation.parameters}
 \alias{mcleod.covariates.estimation.parameters}
-\title{An object of type 'mcleod.covariates.estimation.parameters.obj' defining computational and statistical parameters, when estimating a random effect model with covariates.}
+\title{Creates object defining computational and statistical parameters, when estimating a random effect model with covariates.}
 \usage{
 mcleod.covariates.estimation.parameters(
   proposal_sd = c(0.05),
@@ -19,11 +19,11 @@ mcleod.covariates.estimation.parameters(
 
 \item{beta_prior_sd}{vector of standard deviations for the prior. The prior for delta is assumed to be N(0,diag(beta_prior_sd)). Setting an entry to a negative value (e.g. -1) will use an uninformative prior (constant) for that component of delta.}
 
-\item{beta_init}{Initial values for beta. default value is zero, however non-cold-start values can be used, e.g. by using values from a binomial, or normal random-intercept binomial regression.}
+\item{beta_init}{Initial values for \eqn{\vec{\delta}} in the MCMC sampler.}
 
 \item{Manual_Prior_Values}{When using a predefined prior for delta, a vector of sorted values defining the paritioning points for a piece-wise constant prior for delta.}
 
-\item{Manual_Prior_Probs}{A vector with length = length(Manual_Prior_Values)-1, giving the probablities for the different segments defined by  \code{Manual_Prior_Values}. Within each segment, it is assumed the prior is uniformly distributed.}
+\item{Manual_Prior_Probs}{A matrix with number of rows equal to = length(Manual_Prior_Values)-1, and number of columns equal to the number of covariates, giving the probablities for the different segments defined by  \code{Manual_Prior_Values}. Within each segment, it is assumed the prior is uniformly distributed.}
 
 \item{do_P_k_i_hashing}{A computational workaround for faster computation of bayesian probabilites. See additional details in the appendix describing the computational method, in the dissertation of Brill (2022)}
 
@@ -33,10 +33,14 @@ mcleod.covariates.estimation.parameters(
 an object of type 'mcleod.covariates.estimation.parameters.obj'
 }
 \description{
-An object of type 'mcleod.covariates.estimation.parameters.obj' defining computational and statistical parameters, when estimating a random effect model with covariates.
+For binomial response, the model with covariates is \eqn{log(P_i/(1-P_i)) = \eqn{\gamma_i} + \vec{delta}^T \vec{Z}_i}, where the density of \eqn{\gamma_i}'s is estimated from the data, \eqn{\vec{\delta}} is a vector of slopes, and \eqn{\vec{Z}_i} is a vector of covariates. For Poisson errors, the model equation is \eqn{log(\lambda_i) = \eqn{\gamma_i} + \vec{delta}^T \vec{Z}_i}. The function is used to create an object the defines the prior distribution of \eqn{\vec{\delta}}, as well as the proposal distribution used for drawing new values of \eqn{\vec{\delta}} in the MCMC algorithm.
 }
 \details{
-For binomial response, the model with covariates is log(p/(1-p)) = gamma + delta^T Z, where gamma is a random deviate from a general density estimated from the data, delta is a vector of slopes, and Z is a vector of covariates. For poisson errors, the mode equation is log(lambda) = gamma + delta^T Z
+The default prior assumed for \eqn{\vec{\delta}} is a multivariate normal prior, with mean of 0, and a covariance matrix given by \code{diag(beta_prior_sd)}. Setting one of the standard deviations to a negative value means a non-informative prior is assumed for the slope coefficient.
+
+Alternatively, the user may define a non normal prior for each slope coefficient. This is done by supplying the the function with a series piece-wise constant density functions serving as priors for the different slope coefficients.
+A piecewise constant prior density function with M segments has M+1 partitioning points. These are supplied using the argument \code{Manual_Prior_Values}. The density values for each segment are given by \code{Manual_Prior_Probs}, which has M rows (one for each segment), and number of columns equal to the number of covariates.
+The parameter \code{beta_init} sets the initial values for \eqn{\vec{\delta}} in the MCMC sampler. The default value is a vector of zeros, however it is better to use non-cold-start values, e.g. by using values from a binomial regression with a normally distributed random-intercept term. See the package vignette for an example on how to perform such an initialization.
 }
 \examples{
 See the package vignette

@@ -2,7 +2,7 @@
 % Please edit documentation in R/CI_mixture_distribution.R
 \name{mcleod.CI.estimation.parameters}
 \alias{mcleod.CI.estimation.parameters}
-\title{Constructs an object containing the parameters used in the computational pipeline for estimating pointwise confidence intervals for quantiles and percentiles of the mixing distribution, for binomial/poisson generated samples.}
+\title{Constructs container for parameters used when building CIs for the mixing distribution}
 \usage{
 mcleod.CI.estimation.parameters(
   q_vec = seq(0.1, 0.9, 0.1),
@@ -31,7 +31,7 @@ mcleod.CI.estimation.parameters(
 \arguments{
 \item{q_vec}{When estimating CIs/ CI curves of the mixing distribution, this vector sets the possible percentiles over which CIs are built (values in the range (0,1)).}
 
-\item{theta_vec}{When estimating CIs/ CI curves of the mixing distribution, this vector sets the possible quantiles over which CIs are built (values are deviates of the random effect distribution).}
+\item{theta_vec}{When estimating CIs/ CI curves of the mixing distribution, this vector sets the possible quantiles over which CIs are built (values are deviates of the random effect distribution, defined using the same units as \code{a.limits}).}
 
 \item{a.limits}{a vector of size 2, setting the minimum and maximum values of the support of the mixing distribution. For binomial sampling distributions - this sets the support of the log odds of p (the probability for a successfull draw). For poisson errors, this sets the support of log(lambda), with lambda being the Poisson rate.}
 
@@ -73,8 +73,8 @@ mcleod.CI.estimation.parameters(
 
 }
 \description{
-Constructs an object containing the parameters used in the computational pipeline for estimating pointwise confidence intervals for quantiles and percentiles of the mixing distribution, for binomial/poisson generated samples.
+Constructs an object containing the parameters used in \code{\link{mcleod.estiamte.CI}} for estimating point-wise confidence intervals for quantiles and percentiles of the mixing distribution, for binomial/poisson generated samples.
 }
 \details{
-See package vignette on the meaning of the parameter rho, the procedure for estimating rho, and its parameters.
+See package vignette for a thorough explanantion on how the mixing distribution is estimated. Also, see package vignette on the meaning of the parameter rho, the procedure for estimating rho, and its parameters.
 }
