@@ -1,13 +1,3 @@
-#Tasks:
-# - sample holdout data at random
-
-# I mixed quantile and percentile, need to check in documentation.
-# document code inside functions
-# Finish package documentation
-
-# add check on number of available interpolation points.d
-# Build a vignette
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 WORK_WITH_THREADS = F # A constant setting if computation of the CIs for the mixing distribution should be done in a multithreaded computation. Currently, this is disabled, since the open/close times of many threads are slower than simply holding multiple R processes open and sendig commands to them.
 
 # Classes related to CI estimation of the mixing distribution:
@@ -252,17 +242,26 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
 
 
 
-#' Title
+#' Internal function used for generating a smart cache, for faster generation of Pki matrices
 #'
-#' @param n.vec 
-#' @param a.max 
-#' @param prior_param 
-#' @param comp_param 
+#' @param n.vec vector of number of draws per sample
+#' @param a.max used to define the support using the parameterization (-a.max,a.max)
+#' @param prior_param result from \code{\link{mcleod.prior.parameters}}
+#' @param comp_param result from \code{\link{mcleod.computational.parameters}}
 #'
-#' @return
+#' @return returns a list with functions and lookup tables for generating Pki matrices
 #' @export
 #' @keywords internal
 #' @examples
+#' function returns the hashtables, precomputed entries and functions to the user.
+#' the user can now generate a PKI matrix more efficiently using (with gen_object being the object returned from this function):
+#' sorted_n_data = gen_object$sorted_n_data
+#' n_to_P_k_i_generator_index = gen_object$n_to_P_k_i_generator_index
+#' generate_P_k_i_generator_list = gen_object$generate_P_k_i_generator_list
+#' generator_list = gen_object$generator_list
+#' generate_P_k_i = gen_object$generate_P_k_i
+#' a.vec = gen_object$a.vec
+#' generated_P_k_i_matrix = generate_P_k_i(X_sampled,length(a.vec)-1,N_vec)
 generate_P_k_i_matrix_cache = function(n.vec,a.max,prior_param,comp_param){
   
   #these are the unique values for the number of draws
@@ -313,17 +312,6 @@ generate_P_k_i_matrix_cache = function(n.vec,a.max,prior_param,comp_param){
     return(P_k_i_generated)
   }
   
-  #return the hashtables, precomputed entries and functions to the user.
-  # the user can now generate a PKI matrix more efficiently using 
-  # (with gen_object being the object returned from this function)
-  #sorted_n_data = gen_object$sorted_n_data
-  #n_to_P_k_i_generator_index = gen_object$n_to_P_k_i_generator_index
-  #generate_P_k_i_generator_list = gen_object$generate_P_k_i_generator_list
-  #generator_list = gen_object$generator_list
-  #generate_P_k_i = gen_object$generate_P_k_i
-  #a.vec = gen_object$a.vec
-  #generated_P_k_i_matrix = generate_P_k_i(X_sampled,length(a.vec)-1,N_vec)
-  
   ret = list()
   ret$sorted_n_data = sorted_n_data
   ret$n_to_P_k_i_generator_index = n_to_P_k_i_generator_index
@@ -333,7 +321,7 @@ generate_P_k_i_matrix_cache = function(n.vec,a.max,prior_param,comp_param){
   return(ret)
 }
 
-#' Generate a cache for estimated CDFs of the mixing distributions, computed for worstcase (GE/LE) data generaitons
+#' Generate a cache for estimated CDFs of the mixing distributions, computed for worstcase (GE/LE) data עקמקרשאןםמד
 #'
 #' The object is used to cache the estimated CDFs by value of (theta,q). The values median_curve_GE/median_curve_LE (returned inside the object) are double-nested lists by theta and then q, holding samples of the estimated CDFs (across mcleod's a.vec representation), by value of theta,q.
 #' This object is then used throughout the pipeline to also hold CI_param.
@@ -341,10 +329,9 @@ generate_P_k_i_matrix_cache = function(n.vec,a.max,prior_param,comp_param){
 #' @param CI_param The CI parameters object used for the pipeline
 #' @param Use_Existing_Permutations_From_Object an existing object generated using mcleod.estimate.CI. the cachec is instantiated using the CDF samples available in this object. It is up to the user to verify the the object uses the same CI parameters and N vec.
 #'
-#' @return
+#' @return the constructed objected for the cache, of type 'mcleod.CI.obj.deconv.bank'
 #' @export
 #' @keywords internal
-#' @examples
 mcleod.CI.deconv.bank.constructor = function(N_vec=NULL,CI_param,Use_Existing_Permutations_From_Object = NULL){
   n_theta = CI_param$n_theta #number of theta values
   n_q = CI_param$n_q #number of q values
@@ -380,14 +367,15 @@ mcleod.CI.deconv.bank.constructor = function(N_vec=NULL,CI_param,Use_Existing_Pe
 }
 
 
-#' Title
+#' Given a mcleod object, compute the posterior median for the random effect distribution
+#' 
+#' Medians are taken pointwise across a.vec
+#' 
+#' @param mcleod_for_data mcleod object
 #'
-#' @param mcleod_for_data 
-#'
-#' @return
+#' @return vector of length = length(a.vec), with edge values of 0 and 1, giving the pointwise posterior medians across a.vec.
 #' @export
 #' @keywords internal
-#' @examples
 compute_medians_curve = function(mcleod_for_data,list_ind = NA){
   #extract the matrix givein for MCMC replicates, the probability for each segment of the distribution
   if(is.na(list_ind)){ #if mcleod_for_data contains only a single result, we extract the matrix and transpower (so after transpose MCMC samples are rows, and segments of the distribution are columns)
@@ -406,19 +394,18 @@ compute_medians_curve = function(mcleod_for_data,list_ind = NA){
 }
 
 
-#' Title
+#' Function returns a series of posterior median CDF curves, for bootstrap samples of a specific LE/GE hypothesis
 #'
-#' @param bank 
-#' @param ind_theta 
-#' @param ind_q 
-#' @param nr.curves 
-#' @param is_GE 
-#' @param do_serial 
+#' @param bank cache to use for sampling/update
+#' @param ind_theta index of theta for the hypothesis for which curves are generated
+#' @param ind_q index of q for the hypothesis for which curves are generated
+#' @param nr.curves number of bootstrap samples required
+#' @param is_GE is the hypothesis GE? (F is LE)
+#' @param do_serial should computation be done in a serieal manner
 #'
-#' @return
+#' @return list of curves of posterior median CDFs. Each entry has a vector of length(a.vec). The list has \code{nr.curves} entries.
 #' @export
 #' @keywords internal
-#' @examples
 mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
                                                                            ind_theta,
                                                                            ind_q,
@@ -614,17 +601,17 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
 
 
 
-#' Title
+#' Function returns result from mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis, and extract values at a specific point in the a.vec grid
 #'
-#' @param bank 
-#' @param ind_theta 
-#' @param ind_q 
-#' @param a_index 
-#' @param nr.perms 
-#' @param is_GE 
-#' @param do_serial 
+#' @param bank Passed to \code{mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis}
+#' @param ind_theta Passed to \code{mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis}
+#' @param ind_q Passed to \code{mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis}
+#' @param a_index the index in the a.grid for which posterior medians of CDFs are wanted.
+#' @param nr.perms Passed to \code{mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis}
+#' @param is_GE Passed to \code{mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis}
+#' @param do_serial Passed to \code{mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis}
 #'
-#' @return
+#' @return a vector of length \code{nr.perms}, with the median CDF values of different bootstrap permutations at a given point.
 #' @export
 #' @keywords internal
 #' @examples
@@ -652,14 +639,16 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis_at_point = fun
 
 
 
-#' Title
+#' Function gives a lower bound for a CDF value, when testing a given LE/GE hypothesis
+#' 
+#' Function uses the binomial/noiseless approximation
+#' 
+#' @param bank bank object, used to extract the value of q by index of q.
+#' @param ind_q index of q-value/CDF-value for the tested hypothesis
+#' @param CDF_value The CDF value for which to compute a lower bound for the PV
+#' @param is_GE is the hypothesis GE/LE
 #'
-#' @param bank 
-#' @param ind_q 
-#' @param CDF_value 
-#' @param is_GE 
-#'
-#' @return
+#' @return lower bound for the PV, computed by the binomial approximation
 #' @export
 #' @keywords internal
 #' @examples
@@ -690,19 +679,19 @@ mcleod.CI.lower_bound_PV_for_worst_case=function(bank,
 }
 
 
-#' Title
+#' Function computes PV for a given GE/LE hypothesis
 #'
-#' @param bank 
-#' @param ind_theta 
-#' @param ind_q 
-#' @param CDF_value 
-#' @param a_index 
-#' @param alpha 
-#' @param nr.perm 
-#' @param do_check_vs_noiseless_case 
-#' @param do_check_vs_minimum_number_of_required_iterations 
-#' @param is_GE 
-#' @param do_serial 
+#' @param bank cache object to update and also use for computations. Also contains the CI_params object, which contains all computational and statistical parameters
+#' @param ind_theta the index of the theta value, for the hypothesis to be tested
+#' @param ind_q the index of the theta value, for the hypothesis to be tested
+#' @param CDF_value the median CDF value for the test data, at the a_index point used for testing
+#' @param a_index the index (in the a.grid) for which computation should be made. This value needs to be obtained using \code{mcleod.CI.find.ai.by.theta.and.rho}, using the theta corresponding to ind_theta, and the rho for the current tested hypothesis.
+#' @param alpha the one sided significance level of testing. Will be used for the two fast checks specificed below
+#' @param nr.perm number of permutations for PV computation
+#' @param do_check_vs_noiseless_case Should a lower bound for the PV be computed using the noiseless case. If the lowerbound exceeds alpha, the reported PV is 1.
+#' @param do_check_vs_minimum_number_of_required_iterations Should a quick check be performed using ceiling(alpha*nr.perm) hypotheses. If all bootstrap samples are more extreme than the sample, than we know we do not reject at level alpha. If this is the case, the function reports PV = 1.
+#' @param is_GE is the hypothesis GE? (F = LE hypothesis)
+#' @param do_serial should computation be done serially
 #'
 #' @return
 #' @export
@@ -772,17 +761,17 @@ mcleod.CI.PV.at_point = function(bank,
   
 }
 
-#' Title
+#' Compute the index on the a grid, for testing a specific LE/GE hypothesis
 #'
-#' @param res_mcleod_object 
-#' @param theta 
-#' @param rho 
-#' @param is_GE 
+#' For GE hypotheses, the a.grid point selected is the rightmost point smaller than theta-rho. For LE hypotheses, the a.grid point selected is the leftmost point bigger than theta+rho.
+#' @param res_mcleod_object mcleod object. Used for extracting the a.vec grid
+#' @param theta theta for the hypothesis
+#' @param rho rho used for testing
+#' @param is_GE is the hypothesis LE or GE
 #'
-#' @return
+#' @return index of the point on the a.vec grid, on which the test should be performed
 #' @export
 #' @keywords internal
-#' @examples
 mcleod.CI.find.ai.by.theta.and.rho=function(res_mcleod_object, theta, rho, is_GE = T){
   if(is_GE){
     # for a GE type hypothesis, we find the right most point, which is at least "rho distance" to the left of theta
@@ -805,22 +794,37 @@ mcleod.CI.find.ai.by.theta.and.rho=function(res_mcleod_object, theta, rho, is_GE
   }
 }
 
-#' Title
+#' Function performs calibration for the value of rho used for testing (unless the user asked for a specific rho) 
 #'
-#' @param bank_original 
-#' @param res_mcleod_holdout 
-#' @param CDF_holdout 
-#' @param alpha.one.sided 
-#' @param nr.perm 
-#' @param possible_rhos 
-#' @param q_for_rho_optimization 
-#' @param theta_for_rho_optimization 
-#' @param verbose 
+#' Calibration results returned as an object of a specific type
+#' 
+#' @param bank_original Cache object to be updated. Also contains CI_params containing required parameters and definitions.
+#' @param res_mcleod_holdout mcleod result for the holdout data
+#' @param CDF_holdout point estimates for the CDF (posterior median), obtained for the holdout data
+#' @param alpha.one.sided significance level for one sided test
+#' @param nr.perm number of bootstrap samples when testing
+#' @param possible_rhos an ordered vector of the possible rhos to be considered
+#' @param q_for_rho_optimization an ordered vector of CDF values, used to select the thetas for which optimization is performed (by looking at the thetas corresponding to these CDF values in CDF_holdout)
+#' @param theta_for_rho_optimization if specified, thetas for which calibration is performed will be taken from this vector, instead of the ones defined by the CDF values given by \code{q_for_rho_optimization}
+#' @param verbose should the function print messages
 #'
-#' @return
+#' @return an object of type 'mcleod.CI.obj.rho' with the following fields
+#' \itemize{
+#' \item{rho_approx_fun_LE}{ - BAR}
+#' \item{rho_approx_fun_GE }{ - BAR}
+#' \item{bank }{ - BAR}
+#' \item{rho_approx_fun_LE_specific_non_smoothed }{ - BAR}
+#' \item{rho_approx_fun_GE_specific_non_smoothed }{ - BAR}
+#' \item{rho_approx_fun_LE_specific_smoothed }{ - BAR}
+#' \item{rho_approx_fun_GE_specific_smoothed }{ - BAR}
+#' \item{curve_LE_q_by_theta_and_rho }{ - BAR}
+#' \item{curve_GE_q_by_theta_and_rho }{ - BAR}
+#' \item{distances }{ - BAR}
+#' \item{scores}{ - BAR}
+#' \item{selected_rho}{ - BAR}
+#' }
 #' @export
 #' @keywords internal
-#' @examples
 mcleod.CI.rho.calibration.constructor = function(
   bank_original,
   res_mcleod_holdout,
@@ -1125,19 +1129,18 @@ mcleod.CI.rho.calibration.constructor = function(
 
 
 
-#' Title
+#' Compute PVs for all GE/LE hypotheses on the theta X q grid
 #'
-#' @param bank_original 
-#' @param rho_calibration_obj 
-#' @param res_mcleod_data 
-#' @param median_curve 
-#' @param alpha.one.sided 
-#' @param verbose 
+#' @param bank_original cache to be updated and used, also contains parameters
+#' @param rho_calibration_obj rho calibration object
+#' @param res_mcleod_data result of \code{mcleod} for the test data
+#' @param median_curve posterior median CDF for the test data
+#' @param alpha.one.sided alpha for one-sided testing
+#' @param verbose should the function print messages
 #'
-#' @return
+#' @return a list with the following entries: \code{GE.pval.grid} - matrix with PVs for GE hypotheses. theta and q for the hypotheses are found in the colnames and rownames; \code{LE.pval.grid}- similar to \code{GE.pval.grid}, only for LE type hypotheses ; \code{bank} - updated cache
 #' @export
 #' @keywords internal
-#' @examples
 compute_P_values_over_grid_function=function(bank_original,rho_calibration_obj,res_mcleod_data,median_curve,alpha.one.sided,verbose = F){
   bank<<- bank_original #set as public variable
   
@@ -1262,7 +1265,7 @@ compute_P_values_over_grid_function=function(bank_original,rho_calibration_obj,r
 }
 
 
-#' Title
+#' Function performs efficient computation of pointwise CIs, for a given confidence level
 #'
 #' @param bank_original 
 #' @param res_mcleod_data 
@@ -1271,10 +1274,9 @@ compute_P_values_over_grid_function=function(bank_original,rho_calibration_obj,r
 #' @param alpha.one.sided 
 #' @param verbose 
 #'
-#' @return
+#' @return a list with the following entries: \code{q_star_LE} - ; \code{q_star_GE} - ; \code{bank} - 
 #' @export
 #' @keywords internal
-#' @examples
 compute_CI_curves_function = function(
   bank_original,
   res_mcleod_data ,
