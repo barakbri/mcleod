@@ -2,23 +2,23 @@
 % Please edit documentation in R/CI_mixture_distribution.R
 \name{mcleod.CI.find.ai.by.theta.and.rho}
 \alias{mcleod.CI.find.ai.by.theta.and.rho}
-\title{Title}
+\title{Compute the index on the a grid, for testing a specific LE/GE hypothesis}
 \usage{
 mcleod.CI.find.ai.by.theta.and.rho(res_mcleod_object, theta, rho, is_GE = T)
 }
 \arguments{
-\item{res_mcleod_object}{}
+\item{res_mcleod_object}{mcleod object. Used for extracting the a.vec grid}
 
-\item{theta}{}
+\item{theta}{theta for the hypothesis}
 
-\item{rho}{}
+\item{rho}{rho used for testing}
 
-\item{is_GE}{}
+\item{is_GE}{is the hypothesis LE or GE}
 }
 \value{
-
+index of the point on the a.vec grid, on which the test should be performed
 }
 \description{
-Title
+For GE hypotheses, the a.grid point selected is the rightmost point smaller than theta-rho. For LE hypotheses, the a.grid point selected is the leftmost point bigger than theta+rho.
 }
 \keyword{internal}

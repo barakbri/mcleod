@@ -2,7 +2,7 @@
 % Please edit documentation in R/CI_mixture_distribution.R
 \name{mcleod.CI.rho.calibration.constructor}
 \alias{mcleod.CI.rho.calibration.constructor}
-\title{Title}
+\title{Function performs calibration for the value of rho used for testing (unless the user asked for a specific rho)}
 \usage{
 mcleod.CI.rho.calibration.constructor(
   bank_original,
@@ -17,28 +17,42 @@ mcleod.CI.rho.calibration.constructor(
 )
 }
 \arguments{
-\item{bank_original}{}
+\item{bank_original}{Cache object to be updated. Also contains CI_params containing required parameters and definitions.}
 
-\item{res_mcleod_holdout}{}
+\item{res_mcleod_holdout}{mcleod result for the holdout data}
 
-\item{CDF_holdout}{}
+\item{CDF_holdout}{point estimates for the CDF (posterior median), obtained for the holdout data}
 
-\item{alpha.one.sided}{}
+\item{alpha.one.sided}{significance level for one sided test}
 
-\item{nr.perm}{}
+\item{nr.perm}{number of bootstrap samples when testing}
 
-\item{possible_rhos}{}
+\item{possible_rhos}{an ordered vector of the possible rhos to be considered}
 
-\item{q_for_rho_optimization}{}
+\item{q_for_rho_optimization}{an ordered vector of CDF values, used to select the thetas for which optimization is performed (by looking at the thetas corresponding to these CDF values in CDF_holdout)}
 
-\item{theta_for_rho_optimization}{}
+\item{theta_for_rho_optimization}{if specified, thetas for which calibration is performed will be taken from this vector, instead of the ones defined by the CDF values given by \code{q_for_rho_optimization}}
 
-\item{verbose}{}
+\item{verbose}{should the function print messages}
 }
 \value{
-
+an object of type 'mcleod.CI.obj.rho' with the following fields
+\itemize{
+\item{rho_approx_fun_LE}{ - BAR}
+\item{rho_approx_fun_GE }{ - BAR}
+\item{bank }{ - BAR}
+\item{rho_approx_fun_LE_specific_non_smoothed }{ - BAR}
+\item{rho_approx_fun_GE_specific_non_smoothed }{ - BAR}
+\item{rho_approx_fun_LE_specific_smoothed }{ - BAR}
+\item{rho_approx_fun_GE_specific_smoothed }{ - BAR}
+\item{curve_LE_q_by_theta_and_rho }{ - BAR}
+\item{curve_GE_q_by_theta_and_rho }{ - BAR}
+\item{distances }{ - BAR}
+\item{scores}{ - BAR}
+\item{selected_rho}{ - BAR}
+}
 }
 \description{
-Title
+Calibration results returned as an object of a specific type
 }
 \keyword{internal}

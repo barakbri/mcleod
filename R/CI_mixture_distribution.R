@@ -53,7 +53,7 @@ verify_q_and_theta_vec = function(q_vec,q_vec_for_computation,theta_vec,theta_ve
 
 #' Constructs container for parameters used when building CIs for the mixing distribution
 #' 
-#' Constructs an object containing the parameters used in \code{\link{mcleod.estiamte.CI}} for estimating point-wise confidence intervals for quantiles and percentiles of the mixing distribution, for binomial/poisson generated samples.
+#' Constructs an object containing the parameters used in \code{\link{mcleod.estimate.CI}} for estimating point-wise confidence intervals for quantiles and percentiles of the mixing distribution, for binomial/poisson generated samples.
 #' 
 #' @details See package vignette for a thorough explanantion on how the mixing distribution is estimated. Also, see package vignette on the meaning of the parameter rho, the procedure for estimating rho, and its parameters.
 #'
@@ -321,7 +321,7 @@ generate_P_k_i_matrix_cache = function(n.vec,a.max,prior_param,comp_param){
   return(ret)
 }
 
-#' Generate a cache for estimated CDFs of the mixing distributions, computed for worstcase (GE/LE) data עקמקרשאןםמד
+#' Generate a cache for estimated CDFs of the mixing distributions, computed for worstcase (GE/LE) data
 #'
 #' The object is used to cache the estimated CDFs by value of (theta,q). The values median_curve_GE/median_curve_LE (returned inside the object) are double-nested lists by theta and then q, holding samples of the estimated CDFs (across mcleod's a.vec representation), by value of theta,q.
 #' This object is then used throughout the pipeline to also hold CI_param.

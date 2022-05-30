@@ -2,7 +2,7 @@
 % Please edit documentation in R/CI_mixture_distribution.R
 \name{compute_P_values_over_grid_function}
 \alias{compute_P_values_over_grid_function}
-\title{Title}
+\title{Compute PVs for all GE/LE hypotheses on the theta X q grid}
 \usage{
 compute_P_values_over_grid_function(
   bank_original,
@@ -14,22 +14,22 @@ compute_P_values_over_grid_function(
 )
 }
 \arguments{
-\item{bank_original}{}
+\item{bank_original}{cache to be updated and used, also contains parameters}
 
-\item{rho_calibration_obj}{}
+\item{rho_calibration_obj}{rho calibration object}
 
-\item{res_mcleod_data}{}
+\item{res_mcleod_data}{result of \code{mcleod} for the test data}
 
-\item{median_curve}{}
+\item{median_curve}{posterior median CDF for the test data}
 
-\item{alpha.one.sided}{}
+\item{alpha.one.sided}{alpha for one-sided testing}
 
-\item{verbose}{}
+\item{verbose}{should the function print messages}
 }
 \value{
-
+a list with the following entries: \code{GE.pval.grid} - matrix with PVs for GE hypotheses. theta and q for the hypotheses are found in the colnames and rownames; \code{LE.pval.grid}- similar to \code{GE.pval.grid}, only for LE type hypotheses ; \code{bank} - updated cache
 }
 \description{
-Title
+Compute PVs for all GE/LE hypotheses on the theta X q grid
 }
 \keyword{internal}

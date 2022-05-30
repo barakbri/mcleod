@@ -2,7 +2,7 @@
 % Please edit documentation in R/CI_mixture_distribution.R
 \name{compute_CI_curves_function}
 \alias{compute_CI_curves_function}
-\title{Title}
+\title{Function performs efficient computation of pointwise CIs, for a given confidence level}
 \usage{
 compute_CI_curves_function(
   bank_original,
@@ -27,9 +27,9 @@ compute_CI_curves_function(
 \item{verbose}{}
 }
 \value{
-
+a list with the following entries: \code{q_star_LE} - ; \code{q_star_GE} - ; \code{bank} -
 }
 \description{
-Title
+Function performs efficient computation of pointwise CIs, for a given confidence level
 }
 \keyword{internal}

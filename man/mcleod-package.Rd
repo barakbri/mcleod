@@ -2,8 +2,9 @@
 % Please edit documentation in R/mcleod-package.R
 \docType{package}
 \name{mcleod-package}
-\alias{mcleod}
 \alias{mcleod-package}
+\alias{_PACKAGE}
+\alias{mcleod-pkg}
 \title{mcleod: Monte Carlo methods for Estimating Latent OverDispersion of binomial and Poisson random variables.}
 \description{
 The package contains several non-parametric Bayesian methods for analyzing overdispersion of binomial and Poisson random variables. Methods include regularized estimators of rate parameters, confidence intervals for the CDF of rate parameters, logistic and Poisson random effect regressions with non-parametric estiamtion of a random intercept.

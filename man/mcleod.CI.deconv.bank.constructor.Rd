@@ -2,7 +2,7 @@
 % Please edit documentation in R/CI_mixture_distribution.R
 \name{mcleod.CI.deconv.bank.constructor}
 \alias{mcleod.CI.deconv.bank.constructor}
-\title{Generate a cache for estimated CDFs of the mixing distributions, computed for worstcase (GE/LE) data generaitons}
+\title{Generate a cache for estimated CDFs of the mixing distributions, computed for worstcase (GE/LE) data}
 \usage{
 mcleod.CI.deconv.bank.constructor(
   N_vec = NULL,
@@ -18,7 +18,7 @@ mcleod.CI.deconv.bank.constructor(
 \item{Use_Existing_Permutations_From_Object}{an existing object generated using mcleod.estimate.CI. the cachec is instantiated using the CDF samples available in this object. It is up to the user to verify the the object uses the same CI parameters and N vec.}
 }
 \value{
-
+the constructed objected for the cache, of type 'mcleod.CI.obj.deconv.bank'
 }
 \description{
 The object is used to cache the estimated CDFs by value of (theta,q). The values median_curve_GE/median_curve_LE (returned inside the object) are double-nested lists by theta and then q, holding samples of the estimated CDFs (across mcleod's a.vec representation), by value of theta,q.

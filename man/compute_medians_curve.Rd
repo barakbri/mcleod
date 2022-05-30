@@ -2,17 +2,17 @@
 % Please edit documentation in R/CI_mixture_distribution.R
 \name{compute_medians_curve}
 \alias{compute_medians_curve}
-\title{Title}
+\title{Given a mcleod object, compute the posterior median for the random effect distribution}
 \usage{
 compute_medians_curve(mcleod_for_data, list_ind = NA)
 }
 \arguments{
-\item{mcleod_for_data}{}
+\item{mcleod_for_data}{mcleod object}
 }
 \value{
-
+vector of length = length(a.vec), with edge values of 0 and 1, giving the pointwise posterior medians across a.vec.
 }
 \description{
-Title
+Medians are taken pointwise across a.vec
 }
 \keyword{internal}

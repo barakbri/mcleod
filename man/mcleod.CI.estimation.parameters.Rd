@@ -73,7 +73,7 @@ mcleod.CI.estimation.parameters(
 
 }
 \description{
-Constructs an object containing the parameters used in \code{\link{mcleod.estiamte.CI}} for estimating point-wise confidence intervals for quantiles and percentiles of the mixing distribution, for binomial/poisson generated samples.
+Constructs an object containing the parameters used in \code{\link{mcleod.estimate.CI}} for estimating point-wise confidence intervals for quantiles and percentiles of the mixing distribution, for binomial/poisson generated samples.
 }
 \details{
 See package vignette for a thorough explanantion on how the mixing distribution is estimated. Also, see package vignette on the meaning of the parameter rho, the procedure for estimating rho, and its parameters.

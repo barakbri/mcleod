@@ -2,23 +2,34 @@
 % Please edit documentation in R/CI_mixture_distribution.R
 \name{generate_P_k_i_matrix_cache}
 \alias{generate_P_k_i_matrix_cache}
-\title{Title}
+\title{Internal function used for generating a smart cache, for faster generation of Pki matrices}
 \usage{
 generate_P_k_i_matrix_cache(n.vec, a.max, prior_param, comp_param)
 }
 \arguments{
-\item{n.vec}{}
+\item{n.vec}{vector of number of draws per sample}
 
-\item{a.max}{}
+\item{a.max}{used to define the support using the parameterization (-a.max,a.max)}
 
-\item{prior_param}{}
+\item{prior_param}{result from \code{\link{mcleod.prior.parameters}}}
 
-\item{comp_param}{}
+\item{comp_param}{result from \code{\link{mcleod.computational.parameters}}}
 }
 \value{
-
+returns a list with functions and lookup tables for generating Pki matrices
 }
 \description{
-Title
+Internal function used for generating a smart cache, for faster generation of Pki matrices
+}
+\examples{
+function returns the hashtables, precomputed entries and functions to the user.
+the user can now generate a PKI matrix more efficiently using (with gen_object being the object returned from this function):
+sorted_n_data = gen_object$sorted_n_data
+n_to_P_k_i_generator_index = gen_object$n_to_P_k_i_generator_index
+generate_P_k_i_generator_list = gen_object$generate_P_k_i_generator_list
+generator_list = gen_object$generator_list
+generate_P_k_i = gen_object$generate_P_k_i
+a.vec = gen_object$a.vec
+generated_P_k_i_matrix = generate_P_k_i(X_sampled,length(a.vec)-1,N_vec)
 }
 \keyword{internal}

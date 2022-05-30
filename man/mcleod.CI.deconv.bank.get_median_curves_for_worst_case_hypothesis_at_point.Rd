@@ -2,7 +2,7 @@
 % Please edit documentation in R/CI_mixture_distribution.R
 \name{mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis_at_point}
 \alias{mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis_at_point}
-\title{Title}
+\title{Function returns result from mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis, and extract values at a specific point in the a.vec grid}
 \usage{
 mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis_at_point(
   bank,
@@ -15,24 +15,24 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis_at_point(
 )
 }
 \arguments{
-\item{bank}{}
+\item{bank}{Passed to \code{mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis}}
 
-\item{ind_theta}{}
+\item{ind_theta}{Passed to \code{mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis}}
 
-\item{ind_q}{}
+\item{ind_q}{Passed to \code{mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis}}
 
-\item{a_index}{}
+\item{a_index}{the index in the a.grid for which posterior medians of CDFs are wanted.}
 
-\item{nr.perms}{}
+\item{nr.perms}{Passed to \code{mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis}}
 
-\item{is_GE}{}
+\item{is_GE}{Passed to \code{mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis}}
 
-\item{do_serial}{}
+\item{do_serial}{Passed to \code{mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis}}
 }
 \value{
-
+a vector of length \code{nr.perms}, with the median CDF values of different bootstrap permutations at a given point.
 }
 \description{
-Title
+Function returns result from mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis, and extract values at a specific point in the a.vec grid
 }
 \keyword{internal}

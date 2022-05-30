@@ -2,7 +2,7 @@
 % Please edit documentation in R/CI_mixture_distribution.R
 \name{mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis}
 \alias{mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis}
-\title{Title}
+\title{Function returns a series of posterior median CDF curves, for bootstrap samples of a specific LE/GE hypothesis}
 \usage{
 mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis(
   bank,
@@ -14,22 +14,22 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis(
 )
 }
 \arguments{
-\item{bank}{}
+\item{bank}{cache to use for sampling/update}
 
-\item{ind_theta}{}
+\item{ind_theta}{index of theta for the hypothesis for which curves are generated}
 
-\item{ind_q}{}
+\item{ind_q}{index of q for the hypothesis for which curves are generated}
 
-\item{nr.curves}{}
+\item{nr.curves}{number of bootstrap samples required}
 
-\item{is_GE}{}
+\item{is_GE}{is the hypothesis GE? (F is LE)}
 
-\item{do_serial}{}
+\item{do_serial}{should computation be done in a serieal manner}
 }
 \value{
-
+list of curves of posterior median CDFs. Each entry has a vector of length(a.vec). The list has \code{nr.curves} entries.
 }
 \description{
-Title
+Function returns a series of posterior median CDF curves, for bootstrap samples of a specific LE/GE hypothesis
 }
 \keyword{internal}

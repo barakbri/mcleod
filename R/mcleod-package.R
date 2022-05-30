@@ -1,3 +1,4 @@
+#' @aliases mcleod-pkg
 #' @keywords internal
 "_PACKAGE"
 

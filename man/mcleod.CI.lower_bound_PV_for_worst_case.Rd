@@ -2,23 +2,23 @@
 % Please edit documentation in R/CI_mixture_distribution.R
 \name{mcleod.CI.lower_bound_PV_for_worst_case}
 \alias{mcleod.CI.lower_bound_PV_for_worst_case}
-\title{Title}
+\title{Function gives a lower bound for a CDF value, when testing a given LE/GE hypothesis}
 \usage{
 mcleod.CI.lower_bound_PV_for_worst_case(bank, ind_q, CDF_value, is_GE = F)
 }
 \arguments{
-\item{bank}{}
+\item{bank}{bank object, used to extract the value of q by index of q.}
 
-\item{ind_q}{}
+\item{ind_q}{index of q-value/CDF-value for the tested hypothesis}
 
-\item{CDF_value}{}
+\item{CDF_value}{The CDF value for which to compute a lower bound for the PV}
 
-\item{is_GE}{}
+\item{is_GE}{is the hypothesis GE/LE}
 }
 \value{
-
+lower bound for the PV, computed by the binomial approximation
 }
 \description{
-Title
+Function uses the binomial/noiseless approximation
 }
 \keyword{internal}

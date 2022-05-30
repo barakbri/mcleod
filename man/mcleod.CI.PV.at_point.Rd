@@ -2,7 +2,7 @@
 % Please edit documentation in R/CI_mixture_distribution.R
 \name{mcleod.CI.PV.at_point}
 \alias{mcleod.CI.PV.at_point}
-\title{Title}
+\title{Function computes PV for a given GE/LE hypothesis}
 \usage{
 mcleod.CI.PV.at_point(
   bank,
@@ -19,32 +19,32 @@ mcleod.CI.PV.at_point(
 )
 }
 \arguments{
-\item{bank}{}
+\item{bank}{cache object to update and also use for computations. Also contains the CI_params object, which contains all computational and statistical parameters}
 
-\item{ind_theta}{}
+\item{ind_theta}{the index of the theta value, for the hypothesis to be tested}
 
-\item{ind_q}{}
+\item{ind_q}{the index of the theta value, for the hypothesis to be tested}
 
-\item{CDF_value}{}
+\item{CDF_value}{the median CDF value for the test data, at the a_index point used for testing}
 
-\item{a_index}{}
+\item{a_index}{the index (in the a.grid) for which computation should be made. This value needs to be obtained using \code{mcleod.CI.find.ai.by.theta.and.rho}, using the theta corresponding to ind_theta, and the rho for the current tested hypothesis.}
 
-\item{alpha}{}
+\item{alpha}{the one sided significance level of testing. Will be used for the two fast checks specificed below}
 
-\item{nr.perm}{}
+\item{nr.perm}{number of permutations for PV computation}
 
-\item{do_check_vs_noiseless_case}{}
+\item{do_check_vs_noiseless_case}{Should a lower bound for the PV be computed using the noiseless case. If the lowerbound exceeds alpha, the reported PV is 1.}
 
-\item{do_check_vs_minimum_number_of_required_iterations}{}
+\item{do_check_vs_minimum_number_of_required_iterations}{Should a quick check be performed using ceiling(alpha*nr.perm) hypotheses. If all bootstrap samples are more extreme than the sample, than we know we do not reject at level alpha. If this is the case, the function reports PV = 1.}
 
-\item{is_GE}{}
+\item{is_GE}{is the hypothesis GE? (F = LE hypothesis)}
 
-\item{do_serial}{}
+\item{do_serial}{should computation be done serially}
 }
 \value{
 
 }
 \description{
-Title
+Function computes PV for a given GE/LE hypothesis
 }
 \keyword{internal}
