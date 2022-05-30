@@ -1,6 +1,6 @@
 ---
-title: "Monte Carlo for Estimating Latent Over-Dispersion"
-author: "Daniel Yekutieli,Barak Brill"
+title: "package mcleod: Monte Carlo for Estimating Latent Over-Dispersion"
+author: "Barak Brill, Daniel Yekutieli"
 date: "August 14, 2019"
 output: 
   pdf_document:
@@ -21,13 +21,31 @@ library(mcleod)
 
 # Introduction
 
-Here we discuss the structure of the document, what the method is about and where it is applicable
+The `mcleod` package includes models for the mixing distribution of binomial and Poisson mixtures.
+Specifically, let $X_i, i=1,...,n,$ denote $n$ binomial samples distributed via $X_i\sim bin(N_i,P_i)$, where the $N_i$'s are some known constants and the $P_i$'s are random variable from an unknown distribution. The `mcleod` package allows users to estimate the distribution of $P_i$'s and construct confidence intervals for its percentiles. For the Poisson case, the mixing distribution is modeled using $X_i\sim Pois(\lambda_i)$, where the $\lambda_i$'s are drawn from an unknown distribution estimated from the data. 
+
+In addition, the package allows users to fit a random intercept model of the following form: $X_i\sim bin(N_i,P_i)$ ; $log(P_i/(1-P_i)) = \gamma_i +\vec{\beta}^T \vec{Z}_i$, where $\gamma_i$ is an intercept term drawn from general distribution, whose CDF is estimated from the data, $\vec{Z}_i$ is a vector of sample covariates, and $\vec{\beta}$ is a vector of slope coefficients, also estiamted from the data. For the Poisson case, the mcleod package allows for the following model: $X_i\sim Pois(\lambda_i)$; $log(\lambda_i) = \gamma_i +\vec{\beta}^T \vec{Z}_i$.
+
+The document is structed as follows. In Section 2 we introducing the generative model for the setting with no covariates, and briefly discuss how the estimation procedure for the mixing distribution. In Section 3 we show how point estimates for the CDF of the mixing distribution can be obtained using the package. In Section 4 we breifly discuss how confidence intervals for the quantiles and percentiles of the mixing distribution are constructed and show several code examples. In Section 5 we discuss the different random intercept models implemented in the `mcleod` package and provide example for fitting those models to data. In Section 5 we discuss some advances topics.
 
 # The generative model
+   We present the approach for modeling the mixing distribution in the binomial case, where $X_i\sim bin(N_i,P_i)$ and $P_i$ is a random variable. The approach for modeling Poisson samples is similar, and involves modeling $log(\lambda_i)$ as a random sample from the modeled presented below.
    
-   ![Diagram](./Diagram.png)
+   Let $\gamma_i \equiv log(P_i/(1-P_i))$. Since the $P_i$'s are not observed (only indirectly through the $X_i$'s), we use a heirarhical Bayesian approach for modeling the distribution from which $P_i$'s are drawn. Let $I$ be some complete power of $2$, e.g., 32 or 64. Let $\vec{a}=(a_0,a_1,...,a_I), a_0<a_1<...<a_I,$ be a vector with $I+1$ entries marking $I+1$ partitioning point on the real line. We approximate the density function for the distribution of $\gamma_i$'s using a piece-wise constant density function, with "jumps" at the $I-1$ internal points of $\vec{a}$. This density function is characterized by $I$ unique function values, which we will denote using the vector $\vec{\pi}=(\pi_1,\pi_2,...,\pi_I)$. The conditional density function of $\gamma_i$'s $\vec{\pi}$ is given by:
+    $$f_{\gamma|\pi}(u) = \pi_1\cdot \frac{\mathbb{1}_{[a_0,a_1)}\left(u\right)}{a_1-a_0} + ... + \pi_I\cdot \frac{\mathbb{1}_{[a_{I-1},a_I]}\left(u\right)}{a_I-a_{I-1}},$$ 
+   where $\mathbb{1}_{[a_0,a_1)}(u)$ is the indicator function, receiving the value $1$ if $u$ is in the interval $[a_0,a_1)$. In order to estiamte the parameter vector $\vec{\pi}$, we assume a Polya tree prior: we assume $I-1$ Beta random variables are positioned in a binary tree-like hierarchy, and that the values of $\vec{\pi}$ are formed by multiplying the values Beta random variables in the paths formed by the tree, as explained in Figure 1. As a default choice we assume all Beta random variables in the Polya tree are $Beta(1,1)$, however, other hyper-parameter choices are also supported by the package, see additional details in Section 6.
    
-# Sampling from the posterior distribution
+The function $f_{\gamma|\pi}$ is estimated by sampling vectors from the posterior distribution of $\vec{\pi}|\vec{X}$ using an MCMC algorithm breifly described in Section 1.1.  We finish this section with two important notes:
+
+(1) It is assumed that $N_i$ and $P_i$ are independent.
+
+(2) The `mcleod` package also supports a second type of prior for $\vec{\pi}$, called a Dirichlet tree prior. The Dirichlet tree prior assumes the values of $\pi$ are formed by a two layer tree with the following structure: the root of the tree is associated with a Dirichlet random variable with $I_1$ components. Each of the components corresponds with a child node (in the second layer of the tree), which in turn, is associated with a Dirichlet random variable with $I_2$ components. Overall, the tree has $I=I_1\cdot I_2$ leaves, associated with $I$ entries in the vector $\vec{\pi}$. The probability vector $\vec{\pi}$ for this model is formed by multipling the values of Dirichlet vector components, as descending down the tree, in manner similar to Figure 1. The MCMC algorithm for estimating $\vec{\pi}$ for this type of prior is similar to the one presented in Section 1.1.
+   
+   ![Generative model of the $\gamma_i$'s](./Diagram.png)
+   
+## Sampling from the posterior distribution
+   The MCMC algorithm can be breifly explained as follows:
+   (1) Given $\vec{\pi}$, samples for$\gamma_i$ can be drawn from  
    
 # Deconvolution estimates
 
@@ -83,6 +101,7 @@ res = mcleod(x, n,
              prior_parameters = prior_obj,
              computational_parameters = comp_obj)
 ```
+
 ## Deconvolution for Poisson errors
 
 ```{r,cache=TRUE,eval=FALSE}
