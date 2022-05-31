@@ -26,7 +26,7 @@ Specifically, let $X_i, i=1,...,n,$ denote $n$ binomial samples distributed via 
 
 In addition, the package allows users to fit a random intercept model of the following form: $X_i\sim bin(N_i,P_i)$ ; $log(P_i/(1-P_i)) = \gamma_i +\vec{\beta}^T \vec{Z}_i$, where $\gamma_i$ is an intercept term drawn from general distribution, whose CDF is estimated from the data, $\vec{Z}_i$ is a vector of sample covariates, and $\vec{\beta}$ is a vector of slope coefficients, also estiamted from the data. For the Poisson case, the mcleod package allows for the following model: $X_i\sim Pois(\lambda_i)$; $log(\lambda_i) = \gamma_i +\vec{\beta}^T \vec{Z}_i$.
 
-The document is structed as follows. In Section 2 we introducing the generative model for the setting with no covariates, and briefly discuss how the estimation procedure for the mixing distribution. In Section 3 we show how point estimates for the CDF of the mixing distribution can be obtained using the package. In Section 4 we breifly discuss how confidence intervals for the quantiles and percentiles of the mixing distribution are constructed and show several code examples. In Section 5 we discuss the different random intercept models implemented in the `mcleod` package and provide example for fitting those models to data. In Section 5 we discuss some advances topics.
+The document is structured as follows. In Section 2 we introducing the generative model for the setting with no covariates, and briefly discuss how the estimation procedure for the mixing distribution. In Section 3 we show how point estimates for the CDF of the mixing distribution can be obtained using the package. In Section 4 we briefly discuss how confidence intervals for the quantiles and percentiles of the mixing distribution are constructed and show several code examples. In Section 5 we discuss the different random intercept models implemented in the `mcleod` package and provide example for fitting those models to data. In Section 5 we discuss some advances topics.
 
 # The generative model
    We present the approach for modeling the mixing distribution in the binomial case, where $X_i\sim bin(N_i,P_i)$ and $P_i$ is a random variable. The approach for modeling Poisson samples is similar, and involves modeling $log(\lambda_i)$ as a random sample from the modeled presented below.
@@ -141,37 +141,111 @@ res = mcleod(x, n.smp = NULL,a.limits = c(-2,8),
 
 ![Diagram_2](./Diagram_2.png)
 
-## Confidence intervals for CDF, binomial noise
+## Pointwise Confidence intervals for CDF, binomial noise
 ```{r,cache=TRUE,eval=FALSE}
-suppressWarnings(library(doRNG))
 
-x.vec = deconvolveR::surg[,2]
-n.vec = deconvolveR::surg[,1]
-
-set.seed(1)
-
-CI_obj= mcleod.CI.estimation.parameters(
-                  Nr.reps.for.each.n = 1,
-                  nr.cores = parallel::detectCores(),                                                                fraction.of.points.computed = 0.33,
-                  epsilon.nr.gridpoints = 2)
-
-prior_obj = mcleod.prior.parameters(
-                  prior.type = MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
-                  Two.Layer.Dirichlet.Intervals = 48,
-                  Two.Layer.Dirichlet.Nodes.in.First.Layer = 8)
-
-CI.res = mcleod.estimate.CI(x.vec = x.vec,
-                            n.vec = n.vec,
-                            a.max = 3,
-                            q_grid = seq(0.1,0.9,0.1),
-                            CI.estimation.parameters = CI_obj,
-                            prior_param = prior_obj,
-                            verbose = F
-                            )
-
-plot.mcleod.CI(CI.res)
+  n = 500
+  N = rep(20,n) 
+  shape_1 = 2
+  shape_2 = 2
+  set.seed(1)
+  p = inv.log.odds(rnorm(n,-2,0.5)+3*rbinom(n,1,0.3))
+  
+  X = rbinom(n = n,size = N,prob = p)
+  p_true = inv.log.odds(rnorm(1E6,-2,0.5)+3*rbinom(1E6,1,0.3))
+  
+  CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-2.5,2.5,0.25),
+                                             q_vec = seq(0.05,0.95,0.05),
+                                             do_serial = F,
+                                             rho.estimation.perm = 50,
+                                             rho.possible.values = seq(0,1.0,0.1),
+                                             rho.q_for_calibration = seq(0.1,0.9,0.1))
+  
+  CI.est.res = mcleod.estimate.CI(X = X,
+                                  N = N,
+                                  CI_param = CI_param,
+                                  ratio_holdout = 0.1,
+                                  compute_P_values_over_grid = F,
+                                  compute_CI_curves = T,
+                                  verbose = T)
+  
+  
+  
+  plot.mcleod.CI(mcleod.CI.obj = CI.est.res,
+                 X_axis_as_Prob = T,
+                 add_CI_curves_on_top_of_plot = F)
+  
+  
+  oracle_x = seq(0.1,0.9,0.01)
+  
+  lines(oracle_x,(ecdf(p_true))(oracle_x),col = 'blue',lwd =1.5)
 
 ```
+
+## Computationally efficient confidence intervals for the quantile of the mixing distribution that corresponds to a given CDF value
+
+```{r,cache=TRUE,eval=FALSE}
+  n = 200
+  N = rep(50,n)
+  shape_1 = 2
+  shape_2 = 2
+  set.seed(1)
+  X = rbinom(n = n,size = N,prob = rbeta(n = n,shape1 = shape_1,shape2 = shape_2))
+  
+  q = 0.05
+  
+  CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-3,3,0.25),
+                                             q_vec = seq(0.02,0.98,0.04),
+                                             do_serial = F,
+                                             rho.estimation.perm = 50,
+                                             nr.perms = 200,alpha.CI = 0.95,
+                                             rho.possible.values = seq(0,1.0,0.1))
+  
+  CI.res = mcleod.estimate.CI.single.q(X = X,N = N,q = q,
+                                       CI_param = CI_param,ratio_holdout = 0.1,verbose = F)
+  CI.res
+  
+```
+
+## Computationally efficient confidence intervals for the CDF value of the mixing distribution at a given quantile
+
+```{r,cache=TRUE,eval=FALSE}
+
+  n = 200
+  N = rep(50,n)
+  shape_1 = 2
+  shape_2 = 2
+  set.seed(1)
+  X = rbinom(n = n,size = N,prob = rbeta(n = n,shape1 = shape_1,shape2 = shape_2))
+  
+  theta_0 = c(0)
+  
+  CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-3,3,0.25),
+                                             q_vec = seq(0.02,0.98,0.04),
+                                             do_serial = F,
+                                             rho.estimation.perm = 50,
+                                             nr.perms = 200,alpha.CI = 0.9,
+                                             rho.possible.values = seq(0,1.0,0.1),
+                                             rho.q_for_calibration = seq(0.1,0.9,0.1))
+  
+  
+  CI.res = mcleod.estimate.CI.single.theta(X = X,
+                                           N = N,
+                                           theta = theta_0,
+                                           CI_param = CI_param,
+                                           ratio_holdout = 0.2,
+                                           verbose = F)
+  
+  CI.res
+  
+```
+
+## How to compute point-wise confidence intervals for the mixing distribution for multiple confidence intervals simultanously
+
+```{r,cache=TRUE,eval=FALSE}
+
+```
+
 
 # GLMs with a random effect intercept of a general distribution
 
@@ -351,7 +425,7 @@ mcleod::results.covariate.coefficients.posterior(res,plot.posterior = F)
 
 # Additional topics
 
-## changeing hyper-parameters for the priors of the mixing distribution:
+## Changing hyper-parameters for the priors of the mixing distribution:
 
 
 ```{r, cache=TRUE,eval=FALSE}
