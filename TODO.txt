@@ -1,0 +1,29 @@
+#todo
+
+- vignette
+finish method CI
+finish method covariate
+
+- write readme
+
+- update package description
+
+- finish documentation for internal functions:
+mcleod.CI.rho.calibration.constructor
+compute_CI_curves_function
+
+
+
+- finish vignette
+
+later...
+- add code examples to documentation
+- unit test - add simple use cases
+- register function for printing main object and CI object.
+- add citations to papers and dissertation
+
+
+
+
+
+
