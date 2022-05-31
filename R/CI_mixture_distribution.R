@@ -82,7 +82,7 @@ verify_q_and_theta_vec = function(q_vec,q_vec_for_computation,theta_vec,theta_ve
 #' @export
 #'
 #' @examples
-mcleod.CI.estimation.parameters = function(q_vec = seq(0.1,0.9,0.1),
+mcleod.CI.estimation.parameters = function(q_vec = seq(0.05,0.95,0.05),
                                            theta_vec = seq(-3,3,0.25),
                                            a.limits = c(-5,5),
                                            sampling_distribution = 'binomial',
