@@ -152,16 +152,40 @@ Let $CDF(p)$ be the CDF value for the mixing distribution at point $p$, $p\in (0
 We proceed to explain how the hypotheses $H_0^{GE}(\tilde{q},\tilde{p})$ and $H_0^{LE}(\tilde{q},\tilde{p})$ are tested. Since the procedures for the two hypotheses are similar, we describe the procedure for $H_0^{GE}(\tilde{q},\tilde{p})$ alone. Throughout the explanation we make use of Figure~2. Let $\hat{CDF}(p)$ denote an estimator for $CDF(p)$, computed using the point-wise median at each value of $p$. This estimator is represented in Figure 2 by the blue curve. In order to test $H_0^{GE}(q,p)$, we compare the function $\hat{CDF}(p)$ for the data with similar deconvolution estimates, obtained for a distribution for which the null hypothesis. Specifically, our valid test for $H_0^{GE}(\tilde{q},\tilde{p})$ would compare $\hat{CDF}$ with estimates obtained from data samples, generated from the sthocastically smallest distribution for which $H_0^{GE}(\tilde{q},\tilde{p})$ holds. This distribution has $\tilde{q}$ mass at $p=0$ and a mass of $1-\tilde{q}$ at $p=\tilde{p}$, and is represented by the orange curve in Figure 2.
 
 The step for testing $H_0^{GE}(\tilde{q},\tilde{p})$ are as follows:
-(1) Generate point estimate
-(2) Sample bootstrap samples, for each sample generate point estiamte
-(3) Compute PV, explain rho
+(1) Estimate $\hat{CDF}(p)$ for the data.
+
+(2) Sample $B$ data sets of the form $X_i\sim bin(N_i,P_i), i\in\{1,...,n\}$, where the $N_i$'s are identical to the values for the observed data, and the $P_i$'s are sampled independently from a distribution with $\tilde{q}$ mass at $p=0$ and a mass of $1-\tilde{q}$ at $p=\tilde{p}$. For each of the $B$ data generations, estimate the mixing distribution. Let $\hat{CDF}^{(b)}(p), b\in\{1,...,b\}$ denote the estimated CDFs for the observed dataset. A graphical depiction of the estimated CDFs for the generated samples is shown using the green curves in Figure 2.
+
+(3) Compute a $P$-value using the following formula:
+    $$ PV = \frac{1+\sum_{b=1}^{B} I\left(\hat{CDF}(\tilde{p}-\rho) \le \hat{CDF}^{(b)}(\tilde{p}-\rho) \right)}{1+B}, $$
+    where $\rho$ is a parameter of the method, see additional figures below. The PV can be interpreted as counting the relative portion of green curves that are found above the blue curve, at point $\tilde{p}-\rho$ (shown in purple in Figure 2). In Figure 2, we have $B=3$ green curves found above the blue curve, so we know the $PV$ is $\frac{1+3}{1+3}$ or $1$.
+
+Yekutieli et al. (2022) discuss the importance of the parameter rho: they show that by testing GE hypotheses by taking the values of CDF estimates at $\tilde{p}-\rho$ instead of $\tilde{p}$, the test potentially has higher power, if $\rho$ is calibrated correctly. The authors suggest the following calibratio procedure for $\rho$: (1) pick, at random, 10\%-20\% of the samples, and exclude them from the data used for testing; (2) Let $p_1,p_2,...,p_m$ be a series of values in the range $(0,1)$. In addition, let $\rho_1,\rho_2,...,\rho_T$ be a set of $T$ candidate values for $\rho$. Constructing CIs for $CDF(p_1),CDF(p_2),..., CDF(p_m)$ using each of the $T$ values for $rho$. Let $LengthCI(p_i,\rho_j)$ denote the length of the CI for $CDF(p_i)$, when statistical testing is done using $\rho_j$. (3) The authors suggest selecting $\rho$ using: 
+$$\rho = arg\,\, min_{\rho \in \{\rho_1,\rho_2,...,\rho_T\}} \sum_{i=1}^{m} LengthCI(p_i,\rho).$$
+
+The authors suggest selecting the values $p_1,p_2,...,p_T$ to be the quantiles for which the estimated CDF for mixing distribution in the holdout data obtains the values $0.1,0.2,...,0.9$. In addition, the package also include default values for $\rho_1,\rho_2,...,\rho_T$. See additional details in the on the calibration method for $\rho$ in the manuscript.
+
+![Graphical representation of a test for $H_0^{GE}(q,p)$](./Diagram_2.png)
 
 
-- Describe what happens in LE
+When testing $H_0^{LE}(\tilde{q},\tilde{q})$ hypotheses, there are two differences: (1) bootstrap samples are generated using a mixing distribution with $\tilde{q}$ mass at $p=\tilde{p}$ and a mass of $1-\tilde{q}$ at $p=1$; (2) testing is done at the quantile $\tilde{p}+\rho$; and (3) Pvalues are computed using a left tailed rejection region, i.e., by checking the proportion of 
+$\hat{CDF}^{(b)}(\tilde{p}+\rho)$'s smaller than $\hat{CDF}(\tilde{p}+\rho)$.
 
-- Say some words on computational efficiency: MONOTONICITY, LE VS GE, STOP-EARLY, START TESTING FROM THE NOISELESS CASE, MULTIPLE PROCESSES.
 
-![Diagram_2](./Diagram_2.png)
+### Speeding up computations
+
+The above method is computationally intensive, however there are several steps taken to speed up computation:
+* Computation of $P$-values is done parallely, using `R` package `doRNG`. The number of cores used can be set by the user.
+
+* When computing $P$-values, if the first $\alpha\cdot B$ permutations are more extreme than oberserved test statistic, the computation is halted and a PV of 1 is returned.
+
+* Let $p,p'$ be two quantiles of the mixing distribution, with $p<p'$. Due to the monotonicty of the CDF of the mixing distribution, it is unknown that the lower end of the CI for $CDF(p')$ is greater than or equal to the lower end of the CI for $CDF(p)$. The upper ends of the CIs share the same relationship. Therefore, if $H_0^{GE}(q,p)$ was rejected at significance level $\alpha$, we need not test $H_0^{GE}(q,p')$, and can proceed directly to testing CDF values higher than $q$.
+
+* For LE FROM GE
+
+* START TESTING FROM THE NOISELESS CASE, 
+
+
 
 ## Pointwise Confidence intervals for CDF, binomial noise
 ```{r,cache=TRUE,eval=FALSE}
