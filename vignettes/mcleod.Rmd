@@ -181,11 +181,9 @@ The above method is computationally intensive, however there are several steps t
 
 * Let $p,p'$ be two quantiles of the mixing distribution, with $p<p'$. Due to the monotonicty of the CDF of the mixing distribution, it is unknown that the lower end of the CI for $CDF(p')$ is greater than or equal to the lower end of the CI for $CDF(p)$. The upper ends of the CIs share the same relationship. Therefore, if $H_0^{GE}(q,p)$ was rejected at significance level $\alpha$, we need not test $H_0^{GE}(q,p')$, and can proceed directly to testing CDF values higher than $q$.
 
-* For LE FROM GE
+* The code only needs to generate bootstrap samples for $H_0^{GE}(q,p)$. Bootstrap samples for $H_0^{LE}(q,p)$ are obtained without additional computation using the following "hack": Let $\theta=log(p/(1-p))$ denote the log-odds for $p$. Let $\hat{CDF}(\theta)$ denote a CDF estimate parameterized using the parameter $theta$ (i.e., $\hat{CDF}\left(\frac{exp(p)}{1+exp(p)}\right)$ ). If $\hat{CDF}(\theta)$ is a deconvolution estimate for a sample from the worst case (stochastically lowest) distribution of $H_0^{GE}(q,p)$, then $\hat{CDF}(-\theta)$ is equivalent to a deconvolution estimate for a sample from the worst case (stochastically highest) distribution of $H_0^{GE}(1-q,1-p)$. See additional details in paper and the internal function `mcleod:::mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis_at_point`.
 
-* START TESTING FROM THE NOISELESS CASE, 
-
-
+* We testing $H_0^{GE}(q,p)$, a lower bound for the $P$-value is given by $F_{bin(n,q)}(n\cdot \hat{CDF}(p-\rho))$, where $F_{bin(n,q)}$ is the CDF of a binomial random variable with $n$ draws and probability $q$ for success in each draw. Similarly, for $H_0^{LE}(q,p)$, a lower bound for the $P$-value is given by $F_{bin(n,1-q)}(n\cdot (1-\hat{CDF}(p-\rho)))$. The code checks if the lower bound for the $P$-value is greater than $\alpha/2$. If this is the case, we do not need to perform permutations. See additional details on how this bound was derived in the paper.
 
 ## Pointwise Confidence intervals for CDF, binomial noise
 ```{r,cache=TRUE,eval=FALSE}
