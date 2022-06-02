@@ -185,8 +185,8 @@ mcleod.CI.estimation.parameters = function(q_vec = seq(0.05,0.95,0.05),
   if(rho.estimation.perm<0){
     stop('rho.estimation.perm must be positive')
   }
-  if(rho.estimation.perm>100){
-    warning('rho.estimation.perm larger than 100 - ussually values in the range 50-100 are sufficient.')
+  if(rho.estimation.perm>200){
+    warning('rho.estimation.perm larger than 200 - usually values in the range 100-200 are sufficient.')
   }
   
   if(rho.calibration.nr.points.for.pv.exterpolation != as.integer(rho.calibration.nr.points.for.pv.exterpolation))
@@ -542,11 +542,14 @@ mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis=function(bank,
           }
         }else{ #parallel solution
           #this assumes a cluster is registered in the function mcleod.estimate.CI(...)
-          res_Binomial = foreach(seed=(nr.computed+1):nr.curves, .options.RNG=1,
-                                 .export = c('ind_theta','ind_q','bank','worker_function_Binomial_GE','gen_object')) %dorng% {
-                                   worker_function_Binomial_GE(seed)
-                                   
-                                 }
+          suppressWarnings({
+            res_Binomial = foreach(seed=(nr.computed+1):nr.curves, .options.RNG=1,
+                                   .export = c('ind_theta','ind_q','bank','worker_function_Binomial_GE','gen_object')) %dorng% {
+                                     worker_function_Binomial_GE(seed)
+                                     
+                                   }
+          })
+          
         }
       }#end of parallel processes
       
@@ -1842,7 +1845,7 @@ mcleod.estimate.CI.single.theta = function(X, N, theta,
   #go over the grid and extract the lower and upper q-values for the CI (at the single theta required by the user)
   
   #Lower end:
-  pvals_GE = CI.est.res$pvalues_grid$GE.pval.grid[,which(CI_param$theta_vec == theta_0)]
+  pvals_GE = CI.est.res$pvalues_grid$GE.pval.grid[,which(CI_param$theta_vec == theta)]
   ind_GE_lower_than_alpha_one_sided = which(pvals_GE <= alpha.one.sided)
   if(length(ind_GE_lower_than_alpha_one_sided)==0){
     Lower = 0  
@@ -1851,7 +1854,7 @@ mcleod.estimate.CI.single.theta = function(X, N, theta,
   }
   
   #Higher end:
-  pvals_LE = CI.est.res$pvalues_grid$LE.pval.grid[,which(CI_param$theta_vec == theta_0)]
+  pvals_LE = CI.est.res$pvalues_grid$LE.pval.grid[,which(CI_param$theta_vec == theta)]
   ind_LE_lower_than_alpha_one_sided = which(pvals_LE <= alpha.one.sided)
   if(length(ind_LE_lower_than_alpha_one_sided)==0){
     Upper = 1  

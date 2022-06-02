@@ -22,7 +22,7 @@ library(mcleod)
 # Introduction
 
 The `mcleod` package includes models for the mixing distribution of binomial and Poisson mixtures.
-Specifically, let $X_i, i=1,...,n,$ denote $n$ binomial samples distributed via $X_i\sim bin(N_i,P_i)$, where the $N_i$'s are some known constants and the $P_i$'s are random variable from an unknown distribution. The `mcleod` package allows users to estimate the distribution of $P_i$'s and construct confidence intervals for its percentiles. For the Poisson case, the mixing distribution is modeled using $X_i\sim Pois(\lambda_i)$, where the $\lambda_i$'s are drawn from an unknown distribution estimated from the data. 
+Specifically, let $X_i, i=1,...,n,$ denote $n$ binomial samples distributed via $X_i\sim bin(N_i,P_i)$, where the $N_i$'s are some known constants and the $P_i$'s are random variable from an unknown distribution. The `mcleod` package allows users to estimate the distribution of $P_i$'s and construct confidence intervals for its quantiles and CDF values. For the Poisson case, the mixing distribution is modeled using $X_i\sim Pois(\lambda_i)$, where the $\lambda_i$'s are drawn from an unknown distribution estimated from the data. 
 
 In addition, the package allows users to fit a random intercept model of the following form: $X_i\sim bin(N_i,P_i)$ ; $log(P_i/(1-P_i)) = \gamma_i +\vec{\beta}^T \vec{Z}_i$, where $\gamma_i$ is an intercept term drawn from general distribution, whose CDF is estimated from the data, $\vec{Z}_i$ is a vector of sample covariates, and $\vec{\beta}$ is a vector of slope coefficients, also estiamted from the data. For the Poisson case, the mcleod package allows for the following model: $X_i\sim Pois(\lambda_i)$; $log(\lambda_i) = \gamma_i +\vec{\beta}^T \vec{Z}_i$.
 
@@ -52,8 +52,11 @@ The function $f_{\gamma|\pi}$ is estimated by sampling vectors from the posterio
 In order to obtain an estimator for $\vec{\pi}$ (and $f_{\gamma|\pi}$), we run the MCMC sampler for a large number of iterations, e.g., 500 or 1000, and estimate $\vec{\pi}$ using the empirical mean of the obtained samples. "Burn-in" samples from the start of the chain, usually 200-300 sampels, are disregarded when computing the estimate for $\vec{\pi}$.
 
 # Deconvolution estimates
-
+ In this section we present code examples showing how to estimate the mixing distribution in various cases.
+ 
 ## Deconvolution for binomial errors
+
+We generate 300 samples, with $X_i\sim bin(30,P_i),$ and $log(P_i/(1-P_i))$ sampled from a mixture $0.5\cdot N(-1,0.3^2) + 0.5\cdot N(2,0.3^2)$.
 ```{r,cache=TRUE,eval=FALSE}
 N = 30
 K = 300
@@ -64,76 +67,79 @@ n = rep(N,K)
 head(cbind(x,n))
 ```
 
+The simplest was to obtain deconvolution estimates is to run the function `mcleod`, receiving the $X_i$'s and $N_i$'s:
 ```{r,cache=TRUE,eval=FALSE}
 res = mcleod(x, n)
-  
-plot.posterior(res)
 ```
 
+The posterior samples for $\vec{\pi}$ can be obtained using the following entry `res$additional$original_stat_res$pi_smp`. The matrix has $I$ rows, corresponding to the segents of the prior distribution, and columns corresponding the MCMC iterations. For example, the CDF for the 100th MCMC sample for $\vec{\pi}$ can be obtained via:
+```{r,cache=TRUE,eval=FALSE}
+iter_number = 100
+
+plot(res$parameters_list$a.vec, #the X axis is the series of breaks defined by \vec{a}
+     c(0,cumsum(res$additional$original_stat_res$pi_smp[,iter_number])) #Y is the cumulative probability: starts at zero, and sums over the values of \vec{\pi} for the different segments
+     , type = 'l' )
+```
+We can plot the posterior means of the CDF of the mixing distribution, along with a point cloud for the distribution of samples, using the following command:
+
+```{r,cache=TRUE,eval=FALSE}
+plot.posterior(res)
+```
+  
+We proceed to show how various parameters can be changed. We can change the limits for $\vec{a}$ using the argument `a.limits`:
 ```{r,cache=TRUE,eval=FALSE}
 res = mcleod(x, n, a.limits = c(-5,5))
 ```
 
-
+We can change the prior and hyperparameters for the mixing distribution by constructing an object using `mcleod.prior.parameters`, and passing it as an argument to `prior_parameters`. For example, here we consruct a finer estimate of the mixing distribution, using a tree with $6$ layers.
 ```{r,cache=TRUE,eval=FALSE}
-prior_obj  = mcleod.prior.parameters(
-  prior.type =MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,
+prior_obj  = mcleod.prior.parameters( #construct object defining the prior
+  prior.type =MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL, #type of prior
   Beta.Heirarchical.Levels = 6
   )
-res = mcleod(x, n, prior_parameters = prior_obj)
+
+res = mcleod(x, n, prior_parameters = prior_obj) #pass object to main function as argument
 ```
+
+Another type of prior is the two layer dirichlet tree. This prior requires the number of intervals (corresponding to leaves), and the number of nodes in the first layer.The prior can be defined using the following function:
 
 ```{r,cache=TRUE,eval=FALSE}
 prior_obj  = mcleod.prior.parameters(
-  prior.type =MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
-  Two.Layer.Dirichlet.Intervals = 64,
-  Two.Layer.Dirichlet.Nodes.in.First.Layer = 8
+  prior.type =MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET, # define a 2-layer Dirichlet tree
+  Two.Layer.Dirichlet.Intervals = 64, #number of segments
+  Two.Layer.Dirichlet.Nodes.in.First.Layer = 8 # Intervals must be integer multiple of this number
   )
 
-res = mcleod(x, n, prior_parameters = prior_obj)
+res = mcleod(x, n, prior_parameters = prior_obj) #pass as argument
 ```
 
+We can change the number of MCMC iterations, together with the number of iterations taken as "burn-in" period, using the function `mcleod.computational.parameters`:
 ```{r,cache=TRUE,eval=FALSE}
-comp_obj = mcleod.computational.parameters(nr.gibbs = 500,
-                                             nr.gibbs.burnin = 250)
+comp_obj = mcleod.computational.parameters(nr.gibbs = 500, #define the number of iter.s
+                                             nr.gibbs.burnin = 250) 
 
-res = mcleod(x, n,
-             prior_parameters = prior_obj,
-             computational_parameters = comp_obj)
+res = mcleod(x, n, computational_parameters = comp_obj) # pass object as argument
 ```
 
 ## Deconvolution for Poisson errors
+We show to estimate the mixing distribution when the data is sampled using a Poisson distribution. In our example $\log(\lambda_i)$ is distributed via a mixture of two normal components: $0.5*N(2,0.5^2) + 0.5*N(5,0.5^2)$. 
 
 ```{r,cache=TRUE,eval=FALSE}
 
-  K = 200
+  K = 200 # number of samples
   set.seed(1)
-  u = sample(c(0,1),size = K,replace = T)
-  x = rpois(K,lambda = exp(rnorm(K,2 + 3*u,0.5)) )
+  #u sets right or left component in the mix. dist. for each obs.:
+  u = sample(c(0,1),size = K,replace = T) 
+  x = rpois(K,lambda = exp(rnorm(K,2 + 3*u,0.5)) ) #sample the obs
   
+```
+
+For Poisson distributed data, we run the `mcleod` function with `n.smp` set to `NULL`, and setting  `Noise_Type` to `MCLEOD.POISSON.ERRORS`. Other than that, parameters may be passed to `computational_parameters` and `prior_parameters` as in the previous examples. The following example also plots the posterior distribution.
+
+```{r,cache=TRUE,eval=FALSE}
   res = mcleod(x, n.smp = NULL,a.limits = c(-2,8),Noise_Type = MCLEOD.POISSON.ERRORS)
   
   plot.posterior(res)
-```
-
-Setting parameters...
-
-```{r,cache=TRUE,eval=FALSE}
-
-prior_obj  = mcleod.prior.parameters(
-  prior.type =MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
-  Two.Layer.Dirichlet.Intervals = 64,
-  Two.Layer.Dirichlet.Nodes.in.First.Layer = 8
-  )
-
-comp_obj = mcleod.computational.parameters(nr.gibbs = 500,
-                                             nr.gibbs.burnin = 250)
-
-res = mcleod(x, n.smp = NULL,a.limits = c(-2,8),
-             Noise_Type = MCLEOD.POISSON.ERRORS,
-             prior_parameters = prior_obj,
-             computational_parameters = comp_obj)
-
 ```
 
 # Constructing confidence intervals for the CDF of rate parameters
@@ -186,120 +192,187 @@ The above method is computationally intensive, however there are several steps t
 * We testing $H_0^{GE}(q,p)$, a lower bound for the $P$-value is given by $F_{bin(n,q)}(n\cdot \hat{CDF}(p-\rho))$, where $F_{bin(n,q)}$ is the CDF of a binomial random variable with $n$ draws and probability $q$ for success in each draw. Similarly, for $H_0^{LE}(q,p)$, a lower bound for the $P$-value is given by $F_{bin(n,1-q)}(n\cdot (1-\hat{CDF}(p-\rho)))$. The code checks if the lower bound for the $P$-value is greater than $\alpha/2$. If this is the case, we do not need to perform permutations. See additional details on how this bound was derived in the paper.
 
 ## Pointwise Confidence intervals for CDF, binomial noise
+For the example, we 500 binomially distributed samples with $X_i\sim bin(20,P_i)$, and $log(P_i/(1-P_i))$ distributed according to a bi-normal mixture: $log(P_i/(1-P_i)) \sim 0.5\cdot N(-2,0.5^2) + 0.5 \cdot N(-1,0.3^2)$.
+
+
 ```{r,cache=TRUE,eval=FALSE}
 
   n = 500
   N = rep(20,n) 
-  shape_1 = 2
-  shape_2 = 2
-  set.seed(1)
+    set.seed(1)
   p = inv.log.odds(rnorm(n,-2,0.5)+3*rbinom(n,1,0.3))
   
   X = rbinom(n = n,size = N,prob = p)
+  
+   # we obtain the true distribution $P_i$'s by sampling 10^6 observations,
+   # later used for plottin
   p_true = inv.log.odds(rnorm(1E6,-2,0.5)+3*rbinom(1E6,1,0.3))
   
-  CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-2.5,2.5,0.25),
-                                             q_vec = seq(0.05,0.95,0.05),
-                                             do_serial = F,
-                                             rho.estimation.perm = 50,
-                                             rho.possible.values = seq(0,1.0,0.1),
-                                             rho.q_for_calibration = seq(0.1,0.9,0.1))
-  
-  CI.est.res = mcleod.estimate.CI(X = X,
-                                  N = N,
-                                  CI_param = CI_param,
-                                  ratio_holdout = 0.1,
-                                  compute_P_values_over_grid = F,
-                                  compute_CI_curves = T,
-                                  verbose = T)
-  
-  
-  
-  plot.mcleod.CI(mcleod.CI.obj = CI.est.res,
-                 X_axis_as_Prob = T,
-                 add_CI_curves_on_top_of_plot = F)
-  
-  
-  oracle_x = seq(0.1,0.9,0.01)
-  
-  lines(oracle_x,(ecdf(p_true))(oracle_x),col = 'blue',lwd =1.5)
 
 ```
 
-## Computationally efficient confidence intervals for the quantile of the mixing distribution that corresponds to a given CDF value
+Confidence intervals for the CDF, across all values of $\theta = log(P_i/(1-P_i))$, are estimated via the following functions. The code takes a few minutes to run, and prints progress to screen. This can be changed by setting `verbose` to `F`. For this run, we use all the data for testing, and use a fixed value of $\rho=0.25$. Calibration of $\rho$ will be discussed in the next examples.
 
 ```{r,cache=TRUE,eval=FALSE}
-  n = 200
-  N = rep(50,n)
-  shape_1 = 2
-  shape_2 = 2
+
+CI.est.res = mcleod.estimate.CI(X = X, N = N,
+        CI_param = mcleod.CI.estimation.parameters(rho.set.value = 0.25))
+
+```
+
+Next, we plot the estimated CDF in red (posterior median), the pointwise confidence intervals in black, and the true mixing distribution in blue.
+```{r,cache=TRUE,eval=FALSE}
+
+plot.mcleod.CI(mcleod.CI.obj = CI.est.res) #one command to plots CIs
+
+# plots the oracle:  
+oracle_x = seq(0.01,0.99,0.01) 
+lines(oracle_x,(ecdf(p_true))(oracle_x),col = 'blue',lwd =1.5)
+
+```
+
+The above code snippet was run before-hand, and the result is displayed here as a figure:
+
+![Estimated mixing distribution (pointwise posterior median in red), 95% pointwise CIs (in black) and true mixing distribution (in blue)](./Deconvolution_Example_1.png)
+
+The exact values for the CI can be extracted via:
+
+```{r,cache=TRUE,eval=FALSE}
+
+dt_CIs = data.frame(
+  log.odds = CI.est.res$bank$CI_param$theta_vec,
+  Lower = CI.est.res$computed_curves$q_star_GE,
+  Upper = CI.est.res$computed_curves$q_star_LE 
+)
+
+dt_CIs
+
+```
+
+We move to a more advanced example, showing how (a) $\rho$ can be estimated from the data, (b) how to refine the grid of quantiles and CDF values, over which CIs are constructed, and (c) how to change to confidence level for the CIs.
+
+
+```{r,cache=TRUE,eval=FALSE}
+
+  # We construct a CI object holding the different definitions
+  CI_param = mcleod.CI.estimation.parameters(
+    # grid of mixing distribution quantiles. Here we work with 0.1 steps, instead of 0.25
+    theta_vec = seq(-4,4,0.1),
+    # grid of CDF values. Previous grid has 0.05 jumps
+    q_vec = seq(0.05,0.95,0.025),
+    # We change the confidence level to 0.9 (instead of the default 95% CI)
+    alpha.CI = 0.9,
+    # we consider 0.1,0.2,0.3 as possible values for rho
+    rho.possible.values = seq(0.1,0.3,0.1))
+  
+  # we pass CI_param as an object, and also set the 
+  # relative part of samples used for calibrating rho
+  # here we pick 10% of the data. Values in the range 0.1-0.2 are reasonable
+  CI.est.res = mcleod.estimate.CI(X = X,
+                                  N = N,
+                                  CI_param = CI_param,
+                                  ratio_holdout = 0.1)
+
+```
+
+Running the code with the following parameters leads to finer CI:s
+
+![Estimated mixing distribution (pointwise posterior median in red), 95% pointwise CIs (in black) and true mixing distribution (in blue). Estimation done over a finer grid compared to Figure 3.](./Deconvolution_Example_2.png)
+
+## Computationally efficient confidence intervals for the quantile of the mixing distribution that corresponds to a given CDF value
+
+The function `mcleod.estimate.CI.single.q` is appropriate for cases where a single confidence interval for a given CDF value is needed.  The function receives the data, toghether with a given CDF value, e.g. `q=0.5` for the median. The function outputs a confidence interval, in terms of quantiles (values of $\theta$) for the given CDF value.
+
+The following code snippet computes a CI for the median of the mixing distribution. In this code snippet, we choose a resolution of $0.05$ for the reported confidence interval. Calibration of $\rho$ is done automatically using 10% of the data. Using a fixed value for $\rho$ reduces the running time by about 50%.
+
+```{r,cache=TRUE,eval=FALSE}
+  
   set.seed(1)
-  X = rbinom(n = n,size = N,prob = rbeta(n = n,shape1 = shape_1,shape2 = shape_2))
   
-  q = 0.05
+  CI.res = mcleod.estimate.CI.single.q(X = X,N = N,q = 0.5, #the wanted CDF value
+     #set resolution:
+   CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-3,3,0.05)), 
+           verbose = F) # can ask to print progress. Takes around 2 minutes.
   
-  CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-3,3,0.25),
-                                             q_vec = seq(0.02,0.98,0.04),
-                                             do_serial = F,
-                                             rho.estimation.perm = 50,
-                                             nr.perms = 200,alpha.CI = 0.95,
-                                             rho.possible.values = seq(0,1.0,0.1))
-  
-  CI.res = mcleod.estimate.CI.single.q(X = X,N = N,q = q,
-                                       CI_param = CI_param,ratio_holdout = 0.1,verbose = F)
   CI.res
   
 ```
 
 ## Computationally efficient confidence intervals for the CDF value of the mixing distribution at a given quantile
 
+
+The function `mcleod.estimate.CI.single.theta` is appropriate for cases where a single confidence interval for a given $\theta$ value is needed.  The function receives the data, toghether with a quantile, and outputs a confidence interval, in terms of CDF values.
+
+The following code snippet computes a CI for the CDF value of the mixing distribution, at the quantile $\theta = 0.5$. Calibration of $\rho$ is done automatically using 10% of the data. Using a fixed value for $\rho$ reduces the running time by about 50%.
+
 ```{r,cache=TRUE,eval=FALSE}
 
-  n = 200
-  N = rep(50,n)
-  shape_1 = 2
-  shape_2 = 2
-  set.seed(1)
-  X = rbinom(n = n,size = N,prob = rbeta(n = n,shape1 = shape_1,shape2 = shape_2))
-  
-  theta_0 = c(0)
-  
-  CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-3,3,0.25),
-                                             q_vec = seq(0.02,0.98,0.04),
-                                             do_serial = F,
-                                             rho.estimation.perm = 50,
-                                             nr.perms = 200,alpha.CI = 0.9,
-                                             rho.possible.values = seq(0,1.0,0.1),
-                                             rho.q_for_calibration = seq(0.1,0.9,0.1))
-  
-  
-  CI.res = mcleod.estimate.CI.single.theta(X = X,
-                                           N = N,
-                                           theta = theta_0,
-                                           CI_param = CI_param,
-                                           ratio_holdout = 0.2,
-                                           verbose = F)
-  
+  CI.res = mcleod.estimate.CI.single.theta(X = X, N = N,
+    # the quantile for which the CI is needed
+    theta = 0,
+    # resolution for the CI, in terms of CDF values
+    CI_param = mcleod.CI.estimation.parameters(q_vec = seq(0.05,0.95,0.01)) )
+
   CI.res
   
 ```
 
-## How to compute point-wise confidence intervals for the mixing distribution for multiple confidence intervals simultanously
+## How to compute point-wise confidence intervals for multiple confidence levels simultanously
+
+Users may need $P$-values for $H_0^{LE}(\tilde{q},\tilde{q})$ and $H_0^{GE}(\tilde{q},\tilde{q})$ across all values of $\tilde{q}$'s and $\tilde{q}$'s. For example, when wanting to derive all point-wise confidence intervals, for all confidence levels, simultanously. The following code snippet explains how to generate $P$-values for all hypotheses simultanously.
 
 ```{r,cache=TRUE,eval=FALSE}
+
+#Generate a similar dataset, 200 samples
+n = 200
+N = rep(20,n) 
+  set.seed(1)
+p = inv.log.odds(rnorm(n,-2,0.5)+3*rbinom(n,1,0.3))
+X = rbinom(n = n,size = N,prob = p)
+
+# We call mcleod.estimate.CI again, but 
+CI.est.res = mcleod.estimate.CI(X = X, N = N,
+        # turn this flag to true
+        compute_P_values_over_grid = T,
+        # and this flag to false
+        compute_CI_curves = F,
+        # for this example, we use a fixed value of rho=0.25
+        CI_param = mcleod.CI.estimation.parameters(rho.set.value = 0.25),
+        # this can be used to print progress
+        verbose = T)
+
+```
+
+
+The Pvalues for all GE/LE hypotheses are found in the following fields of the returned object:
+
+```{r,cache=TRUE,eval=FALSE}
+# Grid of P-values for GE hypotheses. Rows are CDF values, cols are quantiles.
+# See rownames and colnames for details.
+CI.est.res$pvalues_grid$GE.pval.grid
+
+# Grid of P-values for LE hypotheses. Rows are CDF values, cols are quantiles.
+# See rownames and colnames for details.
+CI.est.res$pvalues_grid$LE.pval.grid
 
 ```
 
 
 # GLMs with a random effect intercept of a general distribution
+This section discusses models of the form $X_i\sim bin(N_i,P_i)$, where $P_i$ follows the hierarchical model $log(P_i/(1-P_i))=\gamma_i + \vec{\beta}^T \vec{Z}_i$, and where $\gamma_i$ is sampled from the Polya-tree framework of Figure 1, $\vec{\beta}$ is a vector of $p$ slopes, and $\vec{Z}_i$ is a vector of sample covariates (with no intercept term).
 
-## Generative model
+In order to introduce covariates into the model, we assume $\vec{\beta}$ is distributed $\vec{\beta}\sim N(\vec{0},\Sigma)$, where $\Sigma$ is a diagonal matrix with entries defined by the user. By default, $\Sigma$ is set to be the unit matrix. In addition to a multivariate normal prior, our code also supports: (1) non-informative priors for slope coefficients, by setting diagona entries of $\Sigma$ to negative values: (2) Priors of a general distribution, see example below.
       
-## Sampling from the posterior
+Covariates are incorporated into the MCMC algorithm using a Metropolis-Hastings step: At the first iteration, the algorithm samples values for $\vec{\beta}$, and $\vec{\pi}$. In each iteration, the algorithm first samples values for the $\gamma_i$'s given $\vec{\pi}$ and $\vec{\delta}$. Afterwards the algorithm samples values for $\vec{\pi}$ and $\vec{\beta}$ given the value of the $\gamma_i$'s, to be used in the next iteration. The value for $\vec{\pi}$ is sampled using a Gibbs sampling step, as in the setting with no covariates. The value of $\vec{\beta}$ is sampled using a Metropolis-Hastings step and the proposal distribution $N(\vec{\beta}',\Sigma_{Proposal})$, where $\vec{\beta}'$ is the vector of slopes for the current iteration, and $\Sigma_{Proposal}$ is a diagonal matrix (the default matrix has the value $0.05$ across all diagonal entries). In order for the proposal. Generally, it is best to initialize the coefficients vector $\vec{\beta}$ using Binomial regression, see example below.
+
+In additional to the Binomial model, the package also supports a Poisson regression model of the form $X_i\sim Pois(\lambda_i), log(\lambda_i)\sim \gamma_i + \vec{\beta}^T \vec{Z}_i$, see example below. In addition, our code supports offset terms (covariates with a slope fixed to 1).
+
+The model assumes $N_i, \vec{Z_i}$, and $\gamma_i$ are jointly independent.
       
-## Logistic regression with a general random intercept
+## Binomial regression with a general random intercept
 
 ### Example 1: Coefficients intialized at 0
+
 ```{r,cache=TRUE,eval=FALSE}
 N = 30
 K = 200
