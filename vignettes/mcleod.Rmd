@@ -557,70 +557,82 @@ suppressWarnings({plot.posterior(res)})
 ```
 
 ## Setting the prior distributions on coefficient to be other than normal
+In the final example for this section, we show how to set prior distribution for beta to other distribution than a multivariate normal distribution. The only constraint for the prior for $\vec{\beta}$ is that different components for the prior need to be independent.
 
+We generate data with two covariates and a random normal intercept:
 ```{r,cache=TRUE,eval=FALSE}
-N = 30
-K = 200
+N = 30 #nr draws per sample
+K = 200 #nr samples
 set.seed(1)
-covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K)
-real_beta_1 = -1
+covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K) #generate covariates
+real_beta_1 = -1 #true values for slopes
 real_beta_2 = 1
-x = rbinom(K,size = N,prob = inv.log.odds(rnorm(K,0,sd = 1) + real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
+#generate data:
+x = rbinom(K,size = N,prob = inv.log.odds(rnorm(K,0,sd = 1)
+          + real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
 n = rep(N,K)
 ```
 
+We use logistic regression to init the MCMC chain for $\vec{\beta}$:
 ```{r,cache=TRUE,eval=FALSE}
 model_dt = data.frame(c = x,nc = n-x)
 model_dt = cbind(model_dt,covariates)
 model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
 ```
 
-
+We define the prior for $\vec{\beta}$. Our code requires that the prior bu inserted as a series of partitioning points forming segments on the real line. In addition, the user must supply the probability for the slope parameter to be in any fo the segments. For this example, we assume a Cauchy prior for components of $\vec{\beta}$:
 ```{r, cache=TRUE,eval=FALSE}
+#we descretize the range (-5,5)
 beta_prior_points = seq(-5,5,0.01)
 
+# for each segment, we compute the probability to be in the segment
 beta_prior_probs = pcauchy(beta_prior_points[-1]) - 
                   pcauchy(beta_prior_points[-length(beta_prior_points)])
 
+# we normalize, since we drop the tails out of (-5,5)
 beta_prior_probs = beta_prior_probs/ sum(beta_prior_probs)
   
 ```
 
+Next we plot the distribution. Our code will assume the prior is uniform within each segment:
 ```{r, cache=TRUE,eval=FALSE}
  plot(beta_prior_points[-1],beta_prior_probs,type = 'l',xlab = 'theta',ylab = 'probability in bin of beta_prior_probs')
 ```
- 
+Since we have two components in $\vec{\beta}$, we pass a matrix for the probabilities. Rows correspond to segments formed between points in `beta_prior_points`, and columns correspond to components of $\vec{\beta}$. For this example we use the same prior for both slope coefficients, but this does not need to be the case for all times.
+
 ```{r, cache=TRUE,eval=FALSE}
 beta_prior_probs = matrix(c(beta_prior_probs, beta_prior_probs),ncol = 2)
 ```
 
-
+We pass the support for the priors (`beta_prior_points`) and the density values in the different segments (`beta_prior_probs`) to `mcleod.covariates.estimation.parameters`:
 ```{r, cache=TRUE,eval=FALSE}
 coeffs_obj = mcleod.covariates.estimation.parameters(
-  beta_init = model$coefficients[-1],                                                                Manual_Prior_Values = beta_prior_points,                                                           Manual_Prior_Probs = beta_prior_probs)
+      beta_init = model$coefficients[-1],                                                      Manual_Prior_Values = beta_prior_points,                                                 Manual_Prior_Probs = beta_prior_probs)
 ```
 
+... and pass the resulting object as a parameter to `mcleod`:
 ```{r, cache=TRUE,eval=FALSE}
 res = mcleod(x, n, covariates = covariates,
                covariates_estimation_parameters = coeffs_obj)
 ```
   
+Finally, we obtain the estimated slope parameters:
 ```{r, cache=TRUE,eval=FALSE}
 mcleod::results.covariate.coefficients.posterior(res,plot.posterior = F)
 ```
 
 
 # Additional topics
+This section discusses additional advanced topics
 
 ## Changing hyper-parameters for the priors of the mixing distribution:
-
-
+We show to to change the hyper-parameters for the priors of the mixing distributions. We start with the following code snippet, which generates 2000 samples from a Beta-binomial distribution, with parameters $\alpha_1=2$, $\alpha_2=2$, and 20 draws per sample.
 ```{r, cache=TRUE,eval=FALSE}
 
 set.seed(1)
 
 K = 2000 # Number of samples
-n.vec = rep(2,K) #number of draws for each sample
+n.vec = rep(20,K) #number of draws for each sample
 
 # function for sampling a beta binomial (2,2)
 generate_sample_Beta_2_2 = function(K){ 
@@ -629,16 +641,25 @@ generate_sample_Beta_2_2 = function(K){
   return(x.vec)
 }
 
+#Generate date
 x.vec = generate_sample_Beta_2_2(K)
 
 #run sampler:
-mcleod_res = mcleod(x.vec,n.vec,a.limits = c(-4,4),exact.numeric.integration = T,
-                    prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,Beta.Heirarchical.Levels = 5),
-                    computational_parameters = mcleod.computational.parameters(nr.gibbs = 2000,nr.gibbs.burnin = 1000))
+mcleod_res = mcleod(x.vec,n.vec,a.limits = c(-4,4),
+            # HBeta prior with 5 levels     
+            prior_param = mcleod.prior.parameters(
+              prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,
+              Beta.Heirarchical.Levels = 5),
+            # Set number of MCMC samples
+            computational_parameters = mcleod.computational.parameters(
+              nr.gibbs = 2000,nr.gibbs.burnin = 1000)
+            )
 
 mcleod::plot.posterior(mcleod_res)
 
 ```
+
+Next, we show how to change hyper parameters for the Polya tree (heirarchica Beta) prior. This involves passing two matrices of sizes $(L,2^{(L-1)})$, one for the $\alpha_1$ parameters and one for the $\alpha_2$ parameters of the different nodes in the Polya tree. In each matrix, the $l$th row will define the corresponding parameters for the $l$th level of the tree. The $2^{(l-1)}$ leftmost parameters of the $l$th row will define the parameters of the nodes on the $l$th level, from left to right.
 
 ```{r, cache=TRUE,eval=FALSE}
 
@@ -653,6 +674,7 @@ L = 5 # number of levels
 alpha_L = matrix(NA,nrow = L,ncol = 2^(L-1)) # hyper-parameter matrices 
 alpha_U = matrix(NA,nrow = L,ncol = 2^(L-1))
 
+# Fill all entries to a value of 2
 for(l in 1:L){
   for(k in 1:2^(l-1)){
     alpha_L[l,k] = 2
@@ -662,41 +684,62 @@ for(l in 1:L){
 
 # we pass the hyper-paramers to the mcleod.prior.parameters(...) function
 mcleod_res = mcleod(x.vec,n.vec,
-                    a.limits = c(-4,4),
-                    exact.numeric.integration = T,
-                    prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,
-                                                          Beta.Heirarchical.Levels = L,
-                                                          Prior_Hyper_Parameters_BetaH_L = alpha_L,
-                                                          Prior_Hyper_Parameters_BetaH_U = alpha_U),
-                    computational_parameters = mcleod.computational.parameters(nr.gibbs = 2000,
-                                                                               nr.gibbs.burnin = 1000)
-                    )
+    a.limits = c(-4,4),
+    #pass prior hyper parameters
+    prior_param = mcleod.prior.parameters(
+          prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,
+          Beta.Heirarchical.Levels = L,
+          #NOTE: THESE ARE THE MATRICES FOR THE HYPER-PARAMETERS:
+          Prior_Hyper_Parameters_BetaH_L = alpha_L,
+          Prior_Hyper_Parameters_BetaH_U = alpha_U),
+    # set the number of iterations
+    computational_parameters = mcleod.computational.parameters(
+      nr.gibbs = 2000,
+      nr.gibbs.burnin = 1000)
+  )
 
 mcleod::plot.posterior(mcleod_res)
 
 ```
-
+ We got a slightly different mixing distribution for the same data. 
+ 
+Next, we show how the change the hyper parameters for the two-level Dirichlet Tree.This requires passing a single matrix with two rows and number of columns corresponding to the number of segments in the mixing distribution. The first row sets the hyper-parameters for the Dirichlet variable at the top of the tree. The second row sets the hyper-parameter for the Dirichlet variables at the middle level. Values correspond to segments from left to right. Each `Two.Layer.Dirichlet.Intervals / Two.Layer.Dirichlet.Nodes.in.First.Layer` set of values is used to form a Dirichlet variable.
+ 
 ```{r, cache=TRUE,eval=FALSE}
 
-
+# Set tree structure
 Nodes_in_first_layer = 8
 Total_nr_nodes = 64
 
+#set matrix for hyper parameters.
 Two_Level_Dirichlet_Tree_Hyperparameters = matrix(NA,nrow = 2,ncol = Total_nr_nodes)
 
+#Dirichlet at top of tree is Dirichlet(2,2,2,2,2,2,2,2)
 Two_Level_Dirichlet_Tree_Hyperparameters[1,1:Nodes_in_first_layer] = 2
+
+# At the middle level we have 8 Dirichlet random variables.
+# We set all of them to be Dirichlet(2,2,2,2,2,2,2,2) as well.
+
 Two_Level_Dirichlet_Tree_Hyperparameters[2,1:Total_nr_nodes] = 2
 
 # we pass the hyper-paramers to the mcleod.prior.parameters(...) function
 mcleod_res = mcleod(x.vec,n.vec,
     a.limits = c(-4,4),
     exact.numeric.integration = T,
-    prior_param = mcleod.prior.parameters(prior.type = MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
-                              Two.Layer.Dirichlet.Intervals = Total_nr_nodes,
-                              Two.Layer.Dirichlet.Nodes.in.First.Layer =  Nodes_in_first_layer,
-                               Prior_Hyper_Parameters_2LDT = Two_Level_Dirichlet_Tree_Hyperparameters),
-    computational_parameters = mcleod.computational.parameters(nr.gibbs = 2000,
-                                                               nr.gibbs.burnin = 1000)
+    #Define prior
+    prior_param = mcleod.prior.parameters(
+      #Define as 2-layer Dirichlet tree
+      prior.type = MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
+      #set tree structure
+      Two.Layer.Dirichlet.Intervals = Total_nr_nodes,
+      Two.Layer.Dirichlet.Nodes.in.First.Layer =  Nodes_in_first_layer,
+      #NOTE: HERE WE PASS THE HYPER-PARAMETERS
+      Prior_Hyper_Parameters_2LDT = Two_Level_Dirichlet_Tree_Hyperparameters),
+    
+    #Set the number of iterations
+    computational_parameters = mcleod.computational.parameters(
+      nr.gibbs = 2000,
+      nr.gibbs.burnin = 1000)
 )
 
 mcleod::plot.posterior(mcleod_res)

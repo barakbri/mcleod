@@ -206,7 +206,7 @@ mcleod.covariates.estimation.parameters = function(proposal_sd = c(0.05),
   
   if(!is.null(Manual_Prior_Values)){
     if(length(Manual_Prior_Values) - 1 != dim(Manual_Prior_Probs)[1]){
-      stop('Manual_Prior_Values must be longer by one entery than nr rows of Manual_Prior_Probs')      
+      stop('Manual_Prior_Values must be longer by one entry than nr rows of Manual_Prior_Probs')      
     }
     if(!all.equal(Manual_Prior_Values,sort(Manual_Prior_Values))){
       stop('Manual_Prior_Values must be sorted')
