@@ -370,120 +370,190 @@ In additional to the Binomial model, the package also supports a Poisson regress
 The model assumes $N_i, \vec{Z_i}$, and $\gamma_i$ are jointly independent.
       
 ## Binomial regression with a general random intercept
+We show two examples for Binomial regression with a random intercept
 
 ### Example 1: Coefficients intialized at 0
+The first example has two normally distributed covariates, with slopes being $\vec{\beta} = (-1,1)$. The $\gamma_i$'s are distributed Cauchy with a scale of $0.5$. The following code snippet generates the data:
 
 ```{r,cache=TRUE,eval=FALSE}
-N = 30
-K = 200
+N = 30 #Number of draws per binomial observations
+K = 200 #Number of samples
 set.seed(1)
-covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K)
+covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K) #Generate covariates
 colnames(covariates) = c('covariate 1','covariate 2')
+#define slopes:
 real_beta_1 = -1
 real_beta_2 = 1
+#sample
 x = rbinom(K,size = N,
            prob = inv.log.odds(rcauchy(K,location = 0,scale = 0.5) +
                      real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
 n = rep(N,K)
 
-head(round(cbind(x,n,covariates),digits = 2))
+#%%%%%%%%%%%%%%%%%%%%%%
+#Present the data:
+#%%%%%%%%%%%%%%%%%%%%%%
+head(round(cbind(X = x,N = n,covariates),digits = 2))
 ```
+The simplest way to incorporate covariates in the model is to use the argument named `covariates` to pass a matrix of the covariates. No additional tuning of parameters is needed, but it is best if the covariates are normalized. The model is fitted using the following command:
 
 ```{r,cache=TRUE,eval=FALSE}
 res = mcleod(x, n, covariates = covariates)
 ```
 
+The function `results.covariate.coefficients.posterior` is used to plot the values sampled for $\vec{\beta}$ in the MCMC algoritm. Points in red are the "burn-in" period, see details on how to change, below.
 ```{r,cache=TRUE,eval=FALSE}
 coeffs = mcleod::results.covariate.coefficients.posterior(res)
 ```
+The returned object includes the posterior means for the slope coefficients, and the acceptance rate for the MH steps, used for sampling the values of $\vec{\beta}$. See the documentation for `results.covariate.coefficients.posterior` for information on additional graphs, used for diagnostics of the proposal distribution and acceptance rate.
 
 ```{r,cache=TRUE,eval=FALSE}
 print(coeffs)
 ```
+The MCMC samples for $\vec{\beta}$ can be obtained via `res$additional$original_stat_res$beta_smp`. Note that the values of $\vec{\beta}$ are initiated from $\vec{0}$.
 
+```{r,cache=TRUE,eval=FALSE}
+head(t(res$additional$original_stat_res$beta_smp))
+```
+
+The posterior distribution of $f_{\gamma_i|\vec{\pi}}$ can still plotted via:
 ```{r,cache=TRUE,eval=FALSE}
 plot.posterior(res)
 ```
 
-### Example 2: Coefficients intialized by logistic regression, change priors for $\beta$s
+### Example 2: Coefficients intialized by normal random intercept binomiall regression, change priors for $\vec{\beta}$
+
+In the second example, we have a single covariate and a bimodal random intercept distribution. We show how to (a) change the initial values for $\vec{\beta}$ and (b) how to change the prior. The next code snippet generates the example data:
 
 ```{r,cache=TRUE,eval=FALSE}
-  N = 30
-  K = 300
+  N = 30 # Number of draws per sample
+  K = 300 #Number of samples
   set.seed(2)
-  covariates = matrix(rexp(K),nrow = K)
-  real_beta = -0.5
+  covariates = matrix(rexp(K),nrow = K) # exponentially distributed coefficients
+  real_beta = -0.5 #the real value of the coefficient
   
   u = sample(c(0,1),size = K,replace = T)
-  
   x = rbinom(K,size = N,
            prob =inv.log.odds(rnorm(K,-1+3*u,sd = 0.3) +
                                 real_beta*covariates))
   n = rep(N,K)
+  
+  ###%%%%%%%%%%%%%%%%%%
+  ### plot the distribution of X
+  ###%%%%%%%%%%%%%%%%%%
+  hist(x,main ='Dist. of Xi across samples',breaks = 30)
 ```
 
-```{r,cache=TRUE,eval=FALSE}
-  model_dt = data.frame(c = x,nc = n-x)
-  model_dt = cbind(model_dt,covariates)
-  model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
-  model$coefficients[-1]
-```
+We choose better init values for $\vec{\beta}$, by running a binomial regression assuming the $\gamma_i$'s are normal. The results are used as init for our model.
 
 ```{r,cache=TRUE,eval=FALSE}
+library(lme4) #used for normal random intercept regression models
+model_dt = data.frame(c = x,nc = n-x) #successes and failures
+model_dt = cbind(model_dt,covariates) #add the covariates
+n_Z = ncol(covariates) #number of covariates
+Z_labels = paste0('Z',1:n_Z); #labels for all cols
+names(model_dt) = c('c','nc',  Z_labels);
+# construct a formula for the model
+formula_test = paste0("cbind(c,nc)~ ",paste0('Z',1:n_Z,collapse = ' + ')," + (1|obs)");
+model_dt$obs = 1:nrow(model_dt); #index for observations
+#fit model
+glmer.model_random_intercept <- glmer(formula_test, 
+                            data=model_dt, family="binomial");
+# extract fitted slopes (intercept not needed)
+mcleod_init_basic = glmer.model_random_intercept@beta[-1]
+
+```
+
+In order to change the init for the MCMC algorithm, we pass `mcleod_init_basic` as an argument to `mcleod.covariates.estimation.parameters`. In addition, we set the SD for the prior for beta to $1.5$.
+```{r,cache=TRUE,eval=FALSE}
+  
+  #Generate object with parameters for covariate estimation
   coeffs_obj  = mcleod.covariates.estimation.parameters(
-                  beta_init = model$coefficients[-1],
+                  beta_init = mcleod_init_basic,
                   beta_prior_sd = c(1.5))
 
+
+  comp_params = mcleod.computational.parameters(nr.gibbs = 3000)
+  # In addition to covariates, pass coeffs_obj as an argument 
   res = mcleod(x,
                n,
                covariates = covariates,
-               covariates_estimation_parameters = coeffs_obj
+               covariates_estimation_parameters = coeffs_obj,
+               computational_parameters = comp_params
                )
   
 ```
 
 
+We obtain the posterior slope in the next code snippet. Note that we turn off the graphs for the posterior.
 ```{r,cache=TRUE,eval=FALSE}
 coeffs = mcleod::results.covariate.coefficients.posterior(res,plot.posterior = F)
 print(coeffs)
 ```
-
+In addition, we plot the estimated CDF for the distribution of the $\gamma_i$'s
 ```{r,cache=TRUE,eval=FALSE}
 plot.posterior(res)
 ```
 
 ## Poisson regression with a general random intercept and offset term
+
+The next example shows how run poisson regression with a general random interept.
+The next code snippet generates the data, with a single covariate and a bi-modal distribution for the intercept. In addition, we include another extrinsic variable, $C_i$, so the model equation is of the form:
+
+$$X_i\sim Pois(\lambda_i); log(\lambda_i) = \gamma_i +\beta Z_i + log(C_i).$$
+
+The $C_i$'s are known, and we show to incorporate them into the model using an offset term. The next code snippet generates and plots the data. Note the massive differences in orders of magnitude for $X_i$'s, due to the change in $C_i$'s, which are distributed uniformly between 1 and 100.
+
+```{r,cache=TRUE,eval=FALSE}
+  
+  K = 200 #Number of samples
+  set.seed(2)
+  # A exponentially distributed covariate:
+  covariates = matrix(rexp(K,rate = 2),nrow = K) 
+  # Value of the slope coefficient:
+  real_beta = 0.5
+  
+  #indicator for the component in the bimodel intercept distribution.
+  u = sample(c(0,1),size = K,replace = T) 
+  #draw a random intrinsic size, known to the user.
+  extrinsic_size = runif(n = K,1,100)
+  offset = log(extrinsic_size) #convert to log scale.
+  
+  #generate data:
+  x = rpois(K,
+      lambda = extrinsic_size * exp(rnorm(K,2 + 3*u,0.5) + real_beta* covariates)
+            )
+  
+  #Plot
+  hist(x,main='Dist. of Xi for the Poisson regression with offset term')
+  
+```
+We run the Poisson regression by setting `Noise_Type = MCLEOD.POISSON.ERRORS`. The next code snippet also defines (a) the covariates, (b) the offset term and (c) the limits for $\vec{a}$.
+
 ```{r,cache=TRUE,eval=FALSE}
 
-   
-  K = 200
-  set.seed(2)
-  covariates = matrix(rexp(K,rate = 2),nrow = K)
-  real_beta = 0.5
-  u = sample(c(0,1),size = K,replace = T)
-  extrinsic_size = runif(n = K,1,100)
-  offset = log(extrinsic_size)
+ #set the number of iterations
+ comp_obj = mcleod.computational.parameters(nr.gibbs = 1000,nr.gibbs.burnin = 500)
   
-  x = rpois(K,lambda = extrinsic_size * exp(rnorm(K,2 + 3*u,0.5) + real_beta* covariates) )
-  
-  
-  comp_obj = mcleod.computational.parameters(nr.gibbs = 1000,nr.gibbs.burnin = 500)
-  
-  res = mcleod(x, n.smp = NULL,a.limits = c(-2,8),
+  res = mcleod(x, n.smp = NULL, #n.smp is null for Pois regression
+               a.limits = c(-2,8), #set \vec{a}
                computational_parameters = comp_obj,
-               covariates = covariates,
-               Noise_Type = MCLEOD.POISSON.ERRORS,
-               offset_vec = offset
+               covariates = covariates, # pass covariates
+               Noise_Type = MCLEOD.POISSON.ERRORS, #Poisson regression
+               offset_vec = offset #pass offset term
                )
-```
 
+```
+ 
+We obtain the posterior distribution for the slope parameter:
 ```{r,cache=TRUE,eval=FALSE}
 mcleod::results.covariate.coefficients.posterior(res)
 
 ```
 
+... and the random effect distribution:
 ```{r,cache=TRUE,eval=FALSE}
-plot.posterior(res)
+suppressWarnings({plot.posterior(res)})
 ```
 
 ## Setting the prior distributions on coefficient to be other than normal

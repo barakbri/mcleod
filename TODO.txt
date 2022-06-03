@@ -10,6 +10,8 @@
 later tasks:
 - get density by iteration,
 - get CDF by iteration
+- get beta by iteration
+- get proposals by iteration
 - get posterior mean/ median of density
 - add check rho is muliple of grid size
 - get CIs from object
