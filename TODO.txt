@@ -1,24 +1,23 @@
 #todo
-- finish vignette - covariates
-- write readme
-- update package description
+
 - finish documentation for internal functions:
   mcleod.CI.rho.calibration.constructor
   compute_CI_curves_function
-
-
+  
 later tasks:
 - get density by iteration,
 - get CDF by iteration
+- get posterior mean/ median of density
+- get CIs from object
 - get beta by iteration
 - get proposals by iteration
-- get posterior mean/ median of density
 - add check rho is muliple of grid size
-- get CIs from object
+- add function for init regression parameters
 
+
+later tasks 2:
 - add function for finding gamma_i for data (train and test)
 - add function for finding prediction CIs given X_i (or for the non-covariate case).
-- add function for init regression parameters
 
 - add code examples to documentation
 - unit test - add simple use cases

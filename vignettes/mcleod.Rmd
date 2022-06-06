@@ -1,7 +1,7 @@
 ---
 title: "package mcleod: Monte Carlo for Estimating Latent Over-Dispersion"
 author: "Barak Brill, Daniel Yekutieli"
-date: "August 14, 2019"
+date: "June 6, 2022"
 output: 
   pdf_document:
     toc: true
@@ -9,9 +9,10 @@ output:
     number_sections: true
 
 vignette: |
-    %\VignetteIndexEntry{mcleod}
-    %\VignetteEncoding{UTF-8}
-    %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteIndexEntry{mcleod: Monte Carlo for Estimating Latent Over-Dispersion}
+  %\VignetteAuthor{Barak Brill, Daniel Yekutieli}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{R.rsp::rsp}
 ---
 
 ```{r setup, include=FALSE}
@@ -57,7 +58,7 @@ In order to obtain an estimator for $\vec{\pi}$ (and $f_{\gamma|\pi}$), we run t
 ## Deconvolution for binomial errors
 
 We generate 300 samples, with $X_i\sim bin(30,P_i),$ and $log(P_i/(1-P_i))$ sampled from a mixture $0.5\cdot N(-1,0.3^2) + 0.5\cdot N(2,0.3^2)$.
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 N = 30
 K = 300
 set.seed(1)
@@ -68,31 +69,33 @@ head(cbind(x,n))
 ```
 
 The simplest was to obtain deconvolution estimates is to run the function `mcleod`, receiving the $X_i$'s and $N_i$'s:
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 res = mcleod(x, n)
 ```
 
 The posterior samples for $\vec{\pi}$ can be obtained using the following entry `res$additional$original_stat_res$pi_smp`. The matrix has $I$ rows, corresponding to the segents of the prior distribution, and columns corresponding the MCMC iterations. For example, the CDF for the 100th MCMC sample for $\vec{\pi}$ can be obtained via:
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 iter_number = 100
 
 plot(res$parameters_list$a.vec, #the X axis is the series of breaks defined by \vec{a}
-     c(0,cumsum(res$additional$original_stat_res$pi_smp[,iter_number])) #Y is the cumulative probability: starts at zero, and sums over the values of \vec{\pi} for the different segments
+     # Y is the cumulative probability: starts at zero, and sums over 
+     # the values of \vec{\pi} for the different segments
+     c(0,cumsum(res$additional$original_stat_res$pi_smp[,iter_number])) 
      , type = 'l' )
 ```
 We can plot the posterior means of the CDF of the mixing distribution, along with a point cloud for the distribution of samples, using the following command:
 
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 plot.posterior(res)
 ```
   
 We proceed to show how various parameters can be changed. We can change the limits for $\vec{a}$ using the argument `a.limits`:
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 res = mcleod(x, n, a.limits = c(-5,5))
 ```
 
 We can change the prior and hyperparameters for the mixing distribution by constructing an object using `mcleod.prior.parameters`, and passing it as an argument to `prior_parameters`. For example, here we consruct a finer estimate of the mixing distribution, using a tree with $6$ layers.
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 prior_obj  = mcleod.prior.parameters( #construct object defining the prior
   prior.type =MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL, #type of prior
   Beta.Heirarchical.Levels = 6
@@ -103,18 +106,21 @@ res = mcleod(x, n, prior_parameters = prior_obj) #pass object to main function a
 
 Another type of prior is the two layer dirichlet tree. This prior requires the number of intervals (corresponding to leaves), and the number of nodes in the first layer.The prior can be defined using the following function:
 
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 prior_obj  = mcleod.prior.parameters(
   prior.type =MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET, # define a 2-layer Dirichlet tree
   Two.Layer.Dirichlet.Intervals = 64, #number of segments
-  Two.Layer.Dirichlet.Nodes.in.First.Layer = 8 # Intervals must be integer multiple of this number
+  # Note: Two.Layer.Dirichlet.Intervals must
+  # be an integer multiple of 
+  #Two.Layer.Dirichlet.Nodes.in.First.Layer
+  Two.Layer.Dirichlet.Nodes.in.First.Layer = 8
   )
 
 res = mcleod(x, n, prior_parameters = prior_obj) #pass as argument
 ```
 
 We can change the number of MCMC iterations, together with the number of iterations taken as "burn-in" period, using the function `mcleod.computational.parameters`:
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 comp_obj = mcleod.computational.parameters(nr.gibbs = 500, #define the number of iter.s
                                              nr.gibbs.burnin = 250) 
 
@@ -124,7 +130,7 @@ res = mcleod(x, n, computational_parameters = comp_obj) # pass object as argumen
 ## Deconvolution for Poisson errors
 We show to estimate the mixing distribution when the data is sampled using a Poisson distribution. In our example $\log(\lambda_i)$ is distributed via a mixture of two normal components: $0.5*N(2,0.5^2) + 0.5*N(5,0.5^2)$. 
 
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 
   K = 200 # number of samples
   set.seed(1)
@@ -136,7 +142,7 @@ We show to estimate the mixing distribution when the data is sampled using a Poi
 
 For Poisson distributed data, we run the `mcleod` function with `n.smp` set to `NULL`, and setting  `Noise_Type` to `MCLEOD.POISSON.ERRORS`. Other than that, parameters may be passed to `computational_parameters` and `prior_parameters` as in the previous examples. The following example also plots the posterior distribution.
 
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
   res = mcleod(x, n.smp = NULL,a.limits = c(-2,8),Noise_Type = MCLEOD.POISSON.ERRORS)
   
   plot.posterior(res)
@@ -275,7 +281,7 @@ We move to a more advanced example, showing how (a) $\rho$ can be estimated from
 
 ```
 
-Running the code with the following parameters leads to finer CI:s
+Running the code with the following parameters leads to finer CI's
 
 ![Estimated mixing distribution (pointwise posterior median in red), 95% pointwise CIs (in black) and true mixing distribution (in blue). Estimation done over a finer grid compared to Figure 3.](./Deconvolution_Example_2.png)
 
@@ -375,7 +381,7 @@ We show two examples for Binomial regression with a random intercept
 ### Example 1: Coefficients intialized at 0
 The first example has two normally distributed covariates, with slopes being $\vec{\beta} = (-1,1)$. The $\gamma_i$'s are distributed Cauchy with a scale of $0.5$. The following code snippet generates the data:
 
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 N = 30 #Number of draws per binomial observations
 K = 200 #Number of samples
 set.seed(1)
@@ -397,27 +403,27 @@ head(round(cbind(X = x,N = n,covariates),digits = 2))
 ```
 The simplest way to incorporate covariates in the model is to use the argument named `covariates` to pass a matrix of the covariates. No additional tuning of parameters is needed, but it is best if the covariates are normalized. The model is fitted using the following command:
 
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 res = mcleod(x, n, covariates = covariates)
 ```
 
 The function `results.covariate.coefficients.posterior` is used to plot the values sampled for $\vec{\beta}$ in the MCMC algoritm. Points in red are the "burn-in" period, see details on how to change, below.
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE,fig.dim = c(8, 6)}
 coeffs = mcleod::results.covariate.coefficients.posterior(res)
 ```
 The returned object includes the posterior means for the slope coefficients, and the acceptance rate for the MH steps, used for sampling the values of $\vec{\beta}$. See the documentation for `results.covariate.coefficients.posterior` for information on additional graphs, used for diagnostics of the proposal distribution and acceptance rate.
 
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 print(coeffs)
 ```
 The MCMC samples for $\vec{\beta}$ can be obtained via `res$additional$original_stat_res$beta_smp`. Note that the values of $\vec{\beta}$ are initiated from $\vec{0}$.
 
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 head(t(res$additional$original_stat_res$beta_smp))
 ```
 
 The posterior distribution of $f_{\gamma_i|\vec{\pi}}$ can still plotted via:
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 plot.posterior(res)
 ```
 
@@ -425,7 +431,7 @@ plot.posterior(res)
 
 In the second example, we have a single covariate and a bimodal random intercept distribution. We show how to (a) change the initial values for $\vec{\beta}$ and (b) how to change the prior. The next code snippet generates the example data:
 
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
   N = 30 # Number of draws per sample
   K = 300 #Number of samples
   set.seed(2)
@@ -446,7 +452,7 @@ In the second example, we have a single covariate and a bimodal random intercept
 
 We choose better init values for $\vec{\beta}$, by running a binomial regression assuming the $\gamma_i$'s are normal. The results are used as init for our model.
 
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 library(lme4) #used for normal random intercept regression models
 model_dt = data.frame(c = x,nc = n-x) #successes and failures
 model_dt = cbind(model_dt,covariates) #add the covariates
@@ -465,7 +471,7 @@ mcleod_init_basic = glmer.model_random_intercept@beta[-1]
 ```
 
 In order to change the init for the MCMC algorithm, we pass `mcleod_init_basic` as an argument to `mcleod.covariates.estimation.parameters`. In addition, we set the SD for the prior for beta to $1.5$.
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
   
   #Generate object with parameters for covariate estimation
   coeffs_obj  = mcleod.covariates.estimation.parameters(
@@ -486,12 +492,12 @@ In order to change the init for the MCMC algorithm, we pass `mcleod_init_basic` 
 
 
 We obtain the posterior slope in the next code snippet. Note that we turn off the graphs for the posterior.
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 coeffs = mcleod::results.covariate.coefficients.posterior(res,plot.posterior = F)
 print(coeffs)
 ```
 In addition, we plot the estimated CDF for the distribution of the $\gamma_i$'s
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 plot.posterior(res)
 ```
 
@@ -504,7 +510,7 @@ $$X_i\sim Pois(\lambda_i); log(\lambda_i) = \gamma_i +\beta Z_i + log(C_i).$$
 
 The $C_i$'s are known, and we show to incorporate them into the model using an offset term. The next code snippet generates and plots the data. Note the massive differences in orders of magnitude for $X_i$'s, due to the change in $C_i$'s, which are distributed uniformly between 1 and 100.
 
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
   
   K = 200 #Number of samples
   set.seed(2)
@@ -530,7 +536,7 @@ The $C_i$'s are known, and we show to incorporate them into the model using an o
 ```
 We run the Poisson regression by setting `Noise_Type = MCLEOD.POISSON.ERRORS`. The next code snippet also defines (a) the covariates, (b) the offset term and (c) the limits for $\vec{a}$.
 
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 
  #set the number of iterations
  comp_obj = mcleod.computational.parameters(nr.gibbs = 1000,nr.gibbs.burnin = 500)
@@ -546,13 +552,13 @@ We run the Poisson regression by setting `Noise_Type = MCLEOD.POISSON.ERRORS`. T
 ```
  
 We obtain the posterior distribution for the slope parameter:
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 mcleod::results.covariate.coefficients.posterior(res)
 
 ```
 
 ... and the random effect distribution:
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 suppressWarnings({plot.posterior(res)})
 ```
 
@@ -560,7 +566,7 @@ suppressWarnings({plot.posterior(res)})
 In the final example for this section, we show how to set prior distribution for beta to other distribution than a multivariate normal distribution. The only constraint for the prior for $\vec{\beta}$ is that different components for the prior need to be independent.
 
 We generate data with two covariates and a random normal intercept:
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 N = 30 #nr draws per sample
 K = 200 #nr samples
 set.seed(1)
@@ -574,14 +580,14 @@ n = rep(N,K)
 ```
 
 We use logistic regression to init the MCMC chain for $\vec{\beta}$:
-```{r,cache=TRUE,eval=FALSE}
+```{r,cache=TRUE,eval=TRUE}
 model_dt = data.frame(c = x,nc = n-x)
 model_dt = cbind(model_dt,covariates)
 model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
 ```
 
 We define the prior for $\vec{\beta}$. Our code requires that the prior bu inserted as a series of partitioning points forming segments on the real line. In addition, the user must supply the probability for the slope parameter to be in any fo the segments. For this example, we assume a Cauchy prior for components of $\vec{\beta}$:
-```{r, cache=TRUE,eval=FALSE}
+```{r, cache=TRUE,eval=TRUE}
 #we descretize the range (-5,5)
 beta_prior_points = seq(-5,5,0.01)
 
@@ -595,29 +601,33 @@ beta_prior_probs = beta_prior_probs/ sum(beta_prior_probs)
 ```
 
 Next we plot the distribution. Our code will assume the prior is uniform within each segment:
-```{r, cache=TRUE,eval=FALSE}
- plot(beta_prior_points[-1],beta_prior_probs,type = 'l',xlab = 'theta',ylab = 'probability in bin of beta_prior_probs')
+```{r, cache=TRUE,eval=TRUE}
+ plot(beta_prior_points[-1],beta_prior_probs,
+      type = 'l',xlab = 'theta',
+      ylab = 'probability in bin of beta_prior_probs')
 ```
 Since we have two components in $\vec{\beta}$, we pass a matrix for the probabilities. Rows correspond to segments formed between points in `beta_prior_points`, and columns correspond to components of $\vec{\beta}$. For this example we use the same prior for both slope coefficients, but this does not need to be the case for all times.
 
-```{r, cache=TRUE,eval=FALSE}
+```{r, cache=TRUE,eval=TRUE}
 beta_prior_probs = matrix(c(beta_prior_probs, beta_prior_probs),ncol = 2)
 ```
 
 We pass the support for the priors (`beta_prior_points`) and the density values in the different segments (`beta_prior_probs`) to `mcleod.covariates.estimation.parameters`:
-```{r, cache=TRUE,eval=FALSE}
+```{r, cache=TRUE,eval=TRUE}
 coeffs_obj = mcleod.covariates.estimation.parameters(
-      beta_init = model$coefficients[-1],                                                      Manual_Prior_Values = beta_prior_points,                                                 Manual_Prior_Probs = beta_prior_probs)
+      beta_init = model$coefficients[-1],
+      Manual_Prior_Values = beta_prior_points,
+      Manual_Prior_Probs = beta_prior_probs)
 ```
 
 ... and pass the resulting object as a parameter to `mcleod`:
-```{r, cache=TRUE,eval=FALSE}
+```{r, cache=TRUE,eval=TRUE}
 res = mcleod(x, n, covariates = covariates,
                covariates_estimation_parameters = coeffs_obj)
 ```
   
 Finally, we obtain the estimated slope parameters:
-```{r, cache=TRUE,eval=FALSE}
+```{r, cache=TRUE,eval=TRUE}
 mcleod::results.covariate.coefficients.posterior(res,plot.posterior = F)
 ```
 
@@ -627,7 +637,7 @@ This section discusses additional advanced topics
 
 ## Changing hyper-parameters for the priors of the mixing distribution:
 We show to to change the hyper-parameters for the priors of the mixing distributions. We start with the following code snippet, which generates 2000 samples from a Beta-binomial distribution, with parameters $\alpha_1=2$, $\alpha_2=2$, and 20 draws per sample.
-```{r, cache=TRUE,eval=FALSE}
+```{r, cache=TRUE,eval=TRUE}
 
 set.seed(1)
 
@@ -661,14 +671,15 @@ mcleod::plot.posterior(mcleod_res)
 
 Next, we show how to change hyper parameters for the Polya tree (heirarchica Beta) prior. This involves passing two matrices of sizes $(L,2^{(L-1)})$, one for the $\alpha_1$ parameters and one for the $\alpha_2$ parameters of the different nodes in the Polya tree. In each matrix, the $l$th row will define the corresponding parameters for the $l$th level of the tree. The $2^{(l-1)}$ leftmost parameters of the $l$th row will define the parameters of the nodes on the $l$th level, from left to right.
 
-```{r, cache=TRUE,eval=FALSE}
+```{r, cache=TRUE,eval=TRUE}
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #Example how to change hyper-parameters.
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #For, example, how to change all hyper parameters to 2
 # We form two matrices, for $\alpha^{L}$ and $\alpha^{U}$.
-# In each matrix, the [l,i] entry gives the appropriate hyper parameter for the ith node on the lth level.
+# In each matrix, the [l,i] entry gives the appropriate hyper parameter
+# for the ith node on the lth level.
 
 L = 5 # number of levels
 alpha_L = matrix(NA,nrow = L,ncol = 2^(L-1)) # hyper-parameter matrices 
@@ -705,7 +716,7 @@ mcleod::plot.posterior(mcleod_res)
  
 Next, we show how the change the hyper parameters for the two-level Dirichlet Tree.This requires passing a single matrix with two rows and number of columns corresponding to the number of segments in the mixing distribution. The first row sets the hyper-parameters for the Dirichlet variable at the top of the tree. The second row sets the hyper-parameter for the Dirichlet variables at the middle level. Values correspond to segments from left to right. Each `Two.Layer.Dirichlet.Intervals / Two.Layer.Dirichlet.Nodes.in.First.Layer` set of values is used to form a Dirichlet variable.
  
-```{r, cache=TRUE,eval=FALSE}
+```{r, cache=TRUE,eval=TRUE}
 
 # Set tree structure
 Nodes_in_first_layer = 8

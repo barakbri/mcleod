@@ -342,7 +342,6 @@ class Gibbs_Sampler{
     
     ll_proposal = NumericVector(n_gibbs);
     ll_current = NumericVector(n_gibbs);
-    
     ///////////////////compute p_k_i
     
     //handling precomputation of P_k_i
@@ -353,7 +352,6 @@ class Gibbs_Sampler{
       p_k_i = NumericMatrix(K,I);  
       compute_p_k_i(x_vec,n_vec,theta,a_vec,p_k_i);  
     }
-    
     
     //call the Gibbs sampler:
     if(Prior_Type == 0)
@@ -653,7 +651,6 @@ class Gibbs_Sampler{
     bool do_computation = true;
     for(int k = 0; k < K ; k++)
     {
-      
       do_computation = true;
       
       if(Pki_hashmap_do_hashing){
@@ -669,9 +666,7 @@ class Gibbs_Sampler{
         for(int j=0;j<a_v_plus_theta.length();j++){
           a_v_plus_theta(j) = a_v(j) + theta(k) + offset_vec(k);
         }
-        
         compute_p_k_i_vec( x_v(k), n_v(k), a_v_plus_theta );
-        
         if(Pki_hashmap_do_hashing){
           Pki_hashmap[Pki_hashmap_temp_key] = p_k_i_vec_computation_result;
         }
@@ -1167,7 +1162,6 @@ List rcpp_Gibbs_Prob_Results(NumericVector x_vec,
                        do_P_k_i_hashing,
                        P_k_i_hashing_resolution,
                        offset_vec);
-  
   List ret;
   ret["p_k_i"]             = _gibbs.get_p_k_i();
   ret["n_smp"]             = _gibbs.get_n_smp();
