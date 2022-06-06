@@ -306,7 +306,7 @@ mcleod	<- function( x.smp,
                      covariates_estimation_parameters = NULL,
                      input_P_k_i = NULL,
                      exact.numeric.integration = TRUE,
-                     offset_vec = rep(0,length(n.smp)),
+                     offset_vec = rep(0,length(x.smp)),
                      nr_threads = 1
                      )
 {
