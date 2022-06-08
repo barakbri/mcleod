@@ -1946,3 +1946,13 @@ mcleod.estimate.CI.single.q = function(X, N, q,
   ret = c('Lower' = Lower,'Upper' = Upper)
   return(ret)
 }
+
+
+mcleod.get.CIs.mixing.dist = function(CI.est.res){
+  dt_CIs = data.frame(
+    log.odds = CI.est.res$bank$CI_param$theta_vec,
+    Lower = CI.est.res$computed_curves$q_star_GE,
+    Upper = CI.est.res$computed_curves$q_star_LE 
+  )
+  return(dt_CIs)  
+}
