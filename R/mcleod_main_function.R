@@ -529,7 +529,9 @@ mcleod	<- function( x.smp,
                                                           family = ifelse(Noise_Type == MCLEOD.BINOMIAL.ERRORS,'binomial','poisson'))
     }
   }
-    
+  if(!covariates_given){
+    beta_init = c(0)
+  }  
   if(!is.list(x.smp)){
     #%%% call Rcpp wrapper, for the case x.smp IS NOT a list
     res = Wrapper_rcpp_Gibbs(x.smp,
@@ -817,4 +819,160 @@ init_mcleod_random_intercept_regression = function(x,n,covariates,offset_p,famil
   
   #return result
   return(mcleod_init_basic)
+}
+
+
+
+#' Title
+#'
+#' @param X 
+#' @param mcleod_res 
+#' @param covariates 
+#' @param method 
+#' @param offset_vec 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+mcleod.posterior.estimates.random.effect = function(X,N,mcleod_res,covariates = NULL,method = 'mean',offset_vec = rep(0,length(X))){
+  
+  if(!(method %in% c('mean','mode'))){
+    stop(' method must be either "mean" or "mode" ')
+  }
+  if(length(X)!= length(offset_vec)){
+    stop('offset must be same length as X')
+  }
+  nr.gibbs.burnin = mcleod_res$parameters_list$nr.gibbs.burnin
+  a.vec = mcleod_res$parameters_list$a.vec
+  pi_smp = (t(mcleod_res$additional$original_stat_res$pi_smp))[-(1:nr.gibbs.burnin),]
+  pi_All = apply(pi_smp,2,mean)
+  Noise_Type = mcleod_res$parameters_list$Noise_Type
+  is_Noise_Poisson = (Noise_Type == MCLEOD.POISSON.ERRORS) #if false, it is binomial
+  
+  if(!is_Noise_Poisson){
+    if(length(N)!=length(X))
+      stop('for binomial errors, N must be same length as X')
+  }else{
+    if(!is.null(N))
+      stop('for Poisson errors, N must be set to NULL')
+  }
+  if(!xor(mcleod_res$parameters_list$covariates_given,
+         is.null(covariates))){
+    stop('If mcleod_res trained on data with covariates, covariates must also be given for this data. If mcleod_res trained on data with no covariates, additional covariates cannot be introduced here.')
+  }else{
+    #check covariates
+    if(mcleod_res$parameters_list$covariates_given)
+      if(nrow(covariates)!= length(X))
+        stop('nrow of covariates must be as length of X: each observation must have covaraites')
+  }
+  
+  # get the posterior mean of slope coefficients, if available
+  if(!is.null(covariates)){
+    posterior_mean_vec = apply(mcleod_res$additional$original_stat_res$beta_smp[,-c(1:nr.gibbs.burnin),drop=F],1,mean)  
+    if(length(posterior_mean_vec) != ncol(covariates)){
+      stop('number of covariates used for training mcleod model, and for covariates argument must be the same')
+    }
+  }else{
+    posterior_mean_vec = 0
+  }
+  
+  n = length(x)
+  Post.k.i = matrix(NA,nrow = n,ncol = length(a.vec)-1)
+  
+  compute_shift = function(k,posterior_mean_vec){
+    if(!is.null(covariates)){
+      sample_shift_in_log_odds_scale = sum(covariates[k,] * posterior_mean_vec + offset_vec[k])  
+    }else{
+      sample_shift_in_log_odds_scale = 0
+    }
+    return(sample_shift_in_log_odds_scale)
+  }
+  
+  estimate_posterior_prob_vec = function(k,posterior_mean_vec,pi_All){
+    sample_shift_in_log_odds_scale = compute_shift(k,posterior_mean_vec)
+    if(!is_Noise_Poisson){
+      integrand = function(u){
+        dbinom(as.numeric(X[k]),size = N[k],
+               prob = mcleod::inv.log.odds(u + sample_shift_in_log_odds_scale))
+      }
+    }else{
+      integrand = function(u){
+        dpois(as.numeric(X[k]),
+              lambda = exp(u + sample_shift_in_log_odds_scale))
+      }
+    }
+   
+    Post.k = rep(NA,length(a.vec)-1)
+    for(a_index in 1:(length(a.vec)-1)){
+      #a_index = 1
+      Post.k[a_index] = integrate(integrand,lower = a.vec[a_index],
+                                  a.vec[a_index+1])$value*pi_All[a_index]
+    }
+    Post.k = Post.k/sum(Post.k)
+    return(Post.k)
+  }
+  
+  aux_compute_mean = function(k,Post.k.i_vec,posterior_mean_vec){
+    sample_shift_in_log_odds_scale = compute_shift(k,posterior_mean_vec)
+    ret = 0
+    for(i in 1:length(Post.k.i_vec)){
+      N_integral = 100
+      seq_integral =  seq(from = a.vec[i],to = a.vec[i]+1,  length.out = N_integral)
+      if(!is_Noise_Poisson){
+        conditional_f_gamma_given_X = dbinom(x = X[k],
+                                             size = N[k],
+                                             prob = mcleod::inv.log.odds(theta = seq_integral +sample_shift_in_log_odds_scale))        
+      }else{
+        conditional_f_gamma_given_X = dpois(x = X[k],
+                                             lambda = exp(theta = seq_integral +sample_shift_in_log_odds_scale))
+      }
+
+      if(sum(conditional_f_gamma_given_X) != 0){
+        conditional_f_gamma_given_X = conditional_f_gamma_given_X/sum(conditional_f_gamma_given_X)
+        ret  = ret  + Post.k.i_vec[i ] * sum(seq_integral * conditional_f_gamma_given_X)  
+      }else{
+        ret  = ret  + Post.k.i_vec[i ] * mean(seq_integral)
+      }
+      
+    }
+    return(ret)
+  }
+  
+  aux_compute_mode = function(k,posterior_mean_vec){
+    sample_shift_in_log_odds_scale = compute_shift(k,posterior_mean_vec)
+    ret = 0
+    prob = -Inf
+    for(i in 1:length(pi_All)){
+      u_values = seq(from = a.vec[i],to =a.vec[i+1], by = (a.vec[i+1] - a.vec[i])/10)
+      for(u in u_values){
+        if(!is_Noise_Poisson){
+          temp_prob = dbinom(as.numeric(X[k]),size = N[k],
+                             prob = mcleod::inv.log.odds(u + sample_shift_in_log_odds_scale))*pi_All[i]          
+        }else{
+          temp_prob = dpois(as.numeric(X[k]),
+                             lambda = exp(u + sample_shift_in_log_odds_scale))*pi_All[i]          
+        }
+        
+        if(temp_prob>=prob){
+          prob = temp_prob
+          ret = u
+        }
+      }
+    }
+    return(ret)
+  }
+  
+  estimated_random_effects = rep(NA,n)
+  for(k in 1:n){
+    if(method == 'mean'){
+      Post.k.i[k,] = estimate_posterior_prob_vec(k = k,posterior_mean_vec = posterior_mean_vec,pi_All = pi_All)
+      estimated_random_effects[k] = aux_compute_mean(k,Post.k.i[k,],posterior_mean_vec) 
+    }else{
+      estimated_random_effects[k] = aux_compute_mode(k,posterior_mean_vec)
+    }
+  }
+  
+  return(estimated_random_effects)
+  
 }

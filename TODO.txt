@@ -18,8 +18,8 @@ I get CIs from object
 - add warning rho is muliple of grid size
 I add function for init regression parameters
 
-- add function for finding gamma_i for data (train and test)
-- add function for finding prediction CIs given X_i (or for the non-covariate case).
+I add function for finding gamma_i for data (train and test)
+- add function for finding prediction CIs given X_i (or for the non-covariate case) and the covariate case
 
 later:
 - add code examples to documentation
