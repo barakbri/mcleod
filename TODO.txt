@@ -5,7 +5,7 @@
   compute_CI_curves_function
   init_mcleod_random_intercept_regression
   
-later tasks (Imp/Doc/V):
+later tasks (Imp/Doc/Vignette):
 I get density by iteration,
 I get CDF by iteration
 I get posterior mean/ median of density
@@ -15,13 +15,14 @@ I get proposals by iteration
 I get was proposal accepted by iteration 
 
 I get CIs from object
-- add warning rho is muliple of grid size
+
 I add function for init regression parameters
 
 I add function for finding gamma_i for data (train and test)
-- add function for finding prediction CIs given X_i (or for the non-covariate case) and the covariate case
+I add function for finding prediction CIs ( for the non-covariate case and the covariate case)
 
 later:
+- add warning rho is muliple of grid size
 - add code examples to documentation
 - unit test - add simple use cases
 - register function for printing main object and CI object.

@@ -25,6 +25,15 @@ exportPattern("results.covariate.coefficients.posterior")
 exportPattern("inv.log.odds")
 exportPattern("log.odds")
 
+exportPattern("mcleod.predictive.CI")
+exportPattern("mcleod.posterior.estimates.random.effect")
+exportPattern("mcleod.get.CIs.mixing.dist")
+
+
+
+
+
+
 
 
 

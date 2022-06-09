@@ -781,7 +781,6 @@ mcleod.get.posterior.mixing.dist = function(res,aggregate_by = mean,specific_ite
   ret$pi_smp = pi_smp
 }
 
-#poisson
 init_mcleod_random_intercept_regression = function(x,n,covariates,offset_p,family = 'binomial'){
   
   model_dt = data.frame(c = x,nc = n-x) #successes and failures
@@ -823,6 +822,52 @@ init_mcleod_random_intercept_regression = function(x,n,covariates,offset_p,famil
 
 
 
+checks.input.posthoc.analysis = function(X, N, mcleod_res, offset_vec, is_Noise_Poisson,covariates,skip_checks_X_N){
+  if(class(mcleod_res) != CLASS.NAME.MCLEOD){
+    stop('input argument for mcleod_res must be an object returned from function mcleod')
+  }
+  
+  nr.gibbs.burnin = mcleod_res$parameters_list$nr.gibbs.burnin
+  if(!skip_checks_X_N){
+    if(length(X)!= length(offset_vec)){
+      stop('offset must be same length as X')
+    }
+    if(!is_Noise_Poisson){
+      if(length(N)!=length(X))
+        stop('for binomial errors, N must be same length as X')
+    }else{
+      if(!is.null(N))
+        stop('for Poisson errors, N must be set to NULL')
+    }  
+  }
+  if(!xor(mcleod_res$parameters_list$covariates_given,
+          is.null(covariates))){
+    stop('If mcleod_res trained on data with covariates, covariates must also be given for this data. If mcleod_res trained on data with no covariates, additional covariates cannot be introduced here.')
+  }else{
+    #check covariates
+    if(mcleod_res$parameters_list$covariates_given & !skip_checks_X_N)
+      if(nrow(covariates)!= length(X))
+        stop('nrow of covariates must be size of data: each observation must have covaraites')
+  }
+  
+  # get the posterior mean of slope coefficients, if available
+  if(!is.null(covariates)){
+    posterior_mean_vec = apply(mcleod_res$additional$original_stat_res$beta_smp[,-c(1:nr.gibbs.burnin),drop=F],1,mean)  
+    if(length(posterior_mean_vec) != ncol(covariates)){
+      stop('number of covariates used for training mcleod model, and for covariates argument must be the same')
+    }
+    if(!(is.null(offset_vec) & is.null(covariates)))
+      if(length(offset_vec) != nrow(covariates)){
+        stop( 'length of offset_vec and nrow(covariates) must be the same')
+      }
+  }else{
+    posterior_mean_vec = 0
+  }
+  ret = list()
+  ret$posterior_mean_vec = posterior_mean_vec
+  return(ret)
+}
+
 #' Title
 #'
 #' @param X 
@@ -840,9 +885,6 @@ mcleod.posterior.estimates.random.effect = function(X,N,mcleod_res,covariates = 
   if(!(method %in% c('mean','mode'))){
     stop(' method must be either "mean" or "mode" ')
   }
-  if(length(X)!= length(offset_vec)){
-    stop('offset must be same length as X')
-  }
   nr.gibbs.burnin = mcleod_res$parameters_list$nr.gibbs.burnin
   a.vec = mcleod_res$parameters_list$a.vec
   pi_smp = (t(mcleod_res$additional$original_stat_res$pi_smp))[-(1:nr.gibbs.burnin),]
@@ -850,33 +892,15 @@ mcleod.posterior.estimates.random.effect = function(X,N,mcleod_res,covariates = 
   Noise_Type = mcleod_res$parameters_list$Noise_Type
   is_Noise_Poisson = (Noise_Type == MCLEOD.POISSON.ERRORS) #if false, it is binomial
   
-  if(!is_Noise_Poisson){
-    if(length(N)!=length(X))
-      stop('for binomial errors, N must be same length as X')
-  }else{
-    if(!is.null(N))
-      stop('for Poisson errors, N must be set to NULL')
-  }
-  if(!xor(mcleod_res$parameters_list$covariates_given,
-         is.null(covariates))){
-    stop('If mcleod_res trained on data with covariates, covariates must also be given for this data. If mcleod_res trained on data with no covariates, additional covariates cannot be introduced here.')
-  }else{
-    #check covariates
-    if(mcleod_res$parameters_list$covariates_given)
-      if(nrow(covariates)!= length(X))
-        stop('nrow of covariates must be as length of X: each observation must have covaraites')
-  }
+  checks_result = checks.input.posthoc.analysis(X = X,
+                                                N = N,
+                                                mcleod_res = mcleod_res,
+                                                offset_vec = offset_vec,
+                                                is_Noise_Poisson = is_Noise_Poisson,
+                                                covariates = covariates,
+                                                skip_checks_X_N = F)
   
-  # get the posterior mean of slope coefficients, if available
-  if(!is.null(covariates)){
-    posterior_mean_vec = apply(mcleod_res$additional$original_stat_res$beta_smp[,-c(1:nr.gibbs.burnin),drop=F],1,mean)  
-    if(length(posterior_mean_vec) != ncol(covariates)){
-      stop('number of covariates used for training mcleod model, and for covariates argument must be the same')
-    }
-  }else{
-    posterior_mean_vec = 0
-  }
-  
+  posterior_mean_vec = checks_result$posterior_mean_vec
   n = length(x)
   Post.k.i = matrix(NA,nrow = n,ncol = length(a.vec)-1)
   
@@ -976,3 +1000,95 @@ mcleod.posterior.estimates.random.effect = function(X,N,mcleod_res,covariates = 
   return(estimated_random_effects)
   
 }
+
+
+mcleod.predictive.CI = function(N,mcleod_res,covariates = NULL,method = 'mean', offset_vec = NULL, CI.coverage = 0.95,Nr_Simulated_Values = 1000){
+  
+  N.gibbs = mcleod_res$parameters_list$nr.gibbs
+  N.gibbs.burnin = mcleod_res$parameters_list$nr.gibbs.burnin
+  a.vec = mcleod_res$parameters_list$a.vec
+  
+  
+  Noise_Type = mcleod_res$parameters_list$Noise_Type
+  is_Noise_Poisson = (Noise_Type == MCLEOD.POISSON.ERRORS) #if false, it is binomial
+  
+  if(is_Noise_Poisson){
+    if(!is.null(covariates)){
+      n = nrow(covariates)
+    }else{
+      n=1
+    }
+  }else{
+    n =length(N)  
+  }
+  
+  if(is.null(offset_vec)){
+    offset_vec = rep(0,n)
+  }
+  
+  checks_result = checks.input.posthoc.analysis(X = NULL,N = N,
+                                                mcleod_res = mcleod_res,
+                                                offset_vec = offset_vec,
+                                                is_Noise_Poisson = is_Noise_Poisson,
+                                                covariates = covariates,
+                                                skip_checks_X_N = T)  
+    
+  Lower_mcleod = rep(NA,n)
+  Upper_mcleod = rep(NA,n)  
+  
+  for(i_to_sample_for in 1:n){
+    sample_gammas = rep(NA,Nr_Simulated_Values)
+    beta_sampled_vec = NULL
+    
+    if(!is.null(covariates)){
+      beta_sampled_vec = matrix(data = NA,nrow = Nr_Simulated_Values,ncol = ncol(covariates))
+    }
+    
+    
+    for(j in 1:Nr_Simulated_Values){
+      ind_post_sample = sample((N.gibbs.burnin+1):N.gibbs,size = 1)
+      if(!is.null(covariates))
+        beta_sampled_vec[j,] = mcleod_res$additional$original_stat_res$beta_smp[,ind_post_sample]
+      pi_vec =  mcleod_res$additional$original_stat_res$pi_smp[,ind_post_sample]
+      sample_gammas[j] = sample(1:length(pi_vec),size = 1,prob = pi_vec)
+    }
+    
+    sample_gammas = runif(n = Nr_Simulated_Values, min = a.vec[sample_gammas],max = a.vec[sample_gammas+1])
+    
+    Linear_Predictor = sample_gammas + offset_vec[i_to_sample_for]
+    if(!is.null(covariates)){
+      Linear_Predictor = Linear_Predictor + beta_sampled_vec %*% 
+        t(covariates[i_to_sample_for,,drop=F])
+    }
+    
+    if(!is_Noise_Poisson){
+      sample_prob = mcleod::inv.log.odds( Linear_Predictor )  
+    }else{
+      sample_prob = exp( Linear_Predictor )
+    }
+    
+    if(!is_Noise_Poisson){
+      X_sampled_for_obs = rbinom(n = Nr_Simulated_Values, size = N[i_to_sample_for],
+                                 prob = sample_prob)  
+    }else{
+      X_sampled_for_obs = rpois(n = Nr_Simulated_Values,lambda = sample_prob)
+    }
+    
+    alpha.interval = (1-CI.coverage)
+    Q_Lower = quantile(X_sampled_for_obs,probs = alpha.interval/2)
+    Q_Upper = quantile(X_sampled_for_obs,probs = 1-alpha.interval/2)
+    Lower_mcleod[i_to_sample_for] = Q_Lower
+    Upper_mcleod[i_to_sample_for] = Q_Upper
+    
+  }
+  ret = list()
+  ret$Lower = Lower_mcleod
+  ret$Upper = Upper_mcleod
+  return(ret)
+}
+
+
+  
+  
+  
+  
