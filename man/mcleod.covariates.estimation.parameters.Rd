@@ -7,7 +7,7 @@
 mcleod.covariates.estimation.parameters(
   proposal_sd = c(0.05),
   beta_prior_sd = c(1),
-  beta_init = c(0),
+  beta_init = NULL,
   Manual_Prior_Values = NULL,
   Manual_Prior_Probs = NULL,
   do_P_k_i_hashing = F,
@@ -19,7 +19,7 @@ mcleod.covariates.estimation.parameters(
 
 \item{beta_prior_sd}{vector of standard deviations for the prior. The prior for beta is assumed to be N(0,diag(beta_prior_sd)). Setting an entry to a negative value (e.g. -1) will use an uninformative prior (constant) for that component of beta.}
 
-\item{beta_init}{Initial values for \eqn{\vec{\beta}} in the MCMC sampler.}
+\item{beta_init}{Initial values for \eqn{\vec{\beta}} in the MCMC sampler. If set to \code{NULL}, will use a normal random intercept regression for initial estimate.}
 
 \item{Manual_Prior_Values}{When using a predefined prior for beta, a vector of sorted values defining the paritioning points for a piece-wise constant prior for beta.}
 
@@ -40,7 +40,7 @@ The default prior assumed for \eqn{\vec{\beta}} is a multivariate normal prior, 
 
 Alternatively, the user may define a non normal prior for each slope coefficient. This is done by supplying the the function with a series piece-wise constant density functions serving as priors for the different slope coefficients.
 A piecewise constant prior density function with M segments has M+1 partitioning points. These are supplied using the argument \code{Manual_Prior_Values}. The density values for each segment are given by \code{Manual_Prior_Probs}, which has M rows (one for each segment), and number of columns equal to the number of covariates.
-The parameter \code{beta_init} sets the initial values for \eqn{\vec{\beta}} in the MCMC sampler. The default value is a vector of zeros, however it is better to use non-cold-start values, e.g. by using values from a binomial regression with a normally distributed random-intercept term. See the package vignette for an example on how to perform such an initialization.
+The parameter \code{beta_init} sets the initial values for \eqn{\vec{\beta}} in the MCMC sampler. The default value is \code{NULL}, meaning a normal random intercept regression will be used to guess an initial estimate. The type of regression used is either Binomial or Poisson, depending on the sampling distribution defined when calling \code{\link{mcleod}}.
 }
 \examples{
 See the package vignette

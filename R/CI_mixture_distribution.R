@@ -71,6 +71,7 @@ verify_q_and_theta_vec = function(q_vec,q_vec_for_computation,theta_vec,theta_ve
 #' @param rho.estimation.perm When estimating rho adaptively- sets the number of permutations used to construct the pointwise confidence intervals for the holdout data
 #' @param rho.q_for_calibration When estimating rho adaptively- CIs for the CDF values will be built at the quantiles matching these values in the holdout data.  
 #' @param rho.theta_for_calibration When estimating rho adaptively- if this parameter is set to a value other than null, the adaptive estimation of rho will be performed using CIs built for this value of theta (random effect value)
+#' @param rho.alpha.CI The confidence level used to construct pointwise confidence intervals for the holdout data.
 #' @param rho.calibration.nr.points.for.pv.exterpolation When estimating rho adaptively- for how many point should a P-value be computed, in order to interpolate the PV (at a given theta) across q, and find the edges of the CI (for the given theta)
 #' @param q_vec_for_computation When running mcleod.estimate.CI() with compute_P_values_over_grid set to true - this will evaluate one sided P-values only for the percentiles defined by q_vec_for_computation, and not for all values defined by q_vec. This is used internally by mcleod.estimate.CI.single.q(), when constructing CIs for the mixing distributions across values of theta (quantile), for a single value of (percentile).
 #' @param theta_vec_for_computation When running mcleod.estimate.CI() with compute_P_values_over_grid set to true - this will evaluate one sided P-values only for the quantiles defined by theta_vec_for_computation, and not for all values defined by theta_vec. This is used internally by mcleod.estimate.CI.single.theta(), when constructing CIs for the mixing distributions across values of q (percentile), for a single value of theta (quantile).
@@ -813,18 +814,18 @@ mcleod.CI.find.ai.by.theta.and.rho=function(res_mcleod_object, theta, rho, is_GE
 #'
 #' @return an object of type 'mcleod.CI.obj.rho' with the following fields
 #' \itemize{
-#' \item{rho_approx_fun_LE}{ - BAR}
-#' \item{rho_approx_fun_GE }{ - BAR}
-#' \item{bank }{ - BAR}
-#' \item{rho_approx_fun_LE_specific_non_smoothed }{ - BAR}
-#' \item{rho_approx_fun_GE_specific_non_smoothed }{ - BAR}
-#' \item{rho_approx_fun_LE_specific_smoothed }{ - BAR}
-#' \item{rho_approx_fun_GE_specific_smoothed }{ - BAR}
-#' \item{curve_LE_q_by_theta_and_rho }{ - BAR}
-#' \item{curve_GE_q_by_theta_and_rho }{ - BAR}
-#' \item{distances }{ - BAR}
-#' \item{scores}{ - BAR}
-#' \item{selected_rho}{ - BAR}
+#' \item{rho_approx_fun_LE}{ - a function, giving the value of rho for LE hypotheses, for each value of theta* tested. If user asked for a fixed value of rho, this function returns a constant.}
+#' \item{rho_approx_fun_GE }{ -  - a function, giving the value of rho for GE hypotheses, for each value of theta* tested. If user asked for a fixed value of rho, this function returns a constant.}
+#' \item{bank }{ - updated cache to be inserted back in the calling function}
+#' \item{rho_approx_fun_LE_specific_non_smoothed }{ - a function, giving the value of rho for LE hypotheses, for each value of theta* tested, for case the user used the parameter \code{rho.calibration.method='specific'}. This function is computed anyway, and if the user picked 'specific', it is copied to \code{rho_approx_fun_LE} and used in actual testing.}
+#' \item{rho_approx_fun_GE_specific_non_smoothed }{ - same as \code{rho_approx_fun_LE_specific_non_smoothed}, only for GE hypotheses.}
+#' \item{rho_approx_fun_LE_specific_smoothed }{ - A kernel smoothed version of \code{rho_approx_fun_LE_specific_non_smoothed}, currently not used in computations.}
+#' \item{rho_approx_fun_GE_specific_smoothed }{ - Same as \code{rho_approx_fun_LE_specific_smoothed}, only for GE hypotheses.}
+#' \item{curve_LE_q_by_theta_and_rho }{ - a matrix, giving for each theta point on which the CI is optimized (row), and each value of rho (col), the upper bound (upper edge of CI) for the CDF value.}
+#' \item{curve_GE_q_by_theta_and_rho }{ - a matrix, giving for each theta point on which the CI is optimized (row), and each value of rho (col), the lower bound (lower edge of CI) for the CDF value.}
+#' \item{distances }{ - Available only if user selected \code{rho.calibration.method} to be 'max' or 'sum'. Gives the element-wise subtraction of \code{curve_GE_q_by_theta_and_rho} from \code{curve_LE_q_by_theta_and_rho}, thus giving the length of confidence intervals for each theta point and value of rho.}
+#' \item{scores}{ - Available only if user selected \code{rho.calibration.method} to be 'max' or 'sum'. Aggregation of \code{distances} by column-wise max or sum.}
+#' \item{selected_rho}{ - Available only if user selected \code{rho.calibration.method} to be 'max' or 'sum'. value of rho corresponding to the minimum entry of \code{scores}.}
 #' }
 #' @export
 #' @keywords internal
@@ -1270,14 +1271,14 @@ compute_P_values_over_grid_function=function(bank_original,rho_calibration_obj,r
 
 #' Function performs efficient computation of pointwise CIs, for a given confidence level
 #'
-#' @param bank_original 
-#' @param res_mcleod_data 
-#' @param rho_calibration_obj 
-#' @param median_curve 
-#' @param alpha.one.sided 
-#' @param verbose 
+#' @param bank_original Cache object, produced by 
+#' @param res_mcleod_data result of \code{mcleod} for the test data
+#' @param rho_calibration_obj object of type \code{"mcleod.CI.obj.rho"}
+#' @param median_curve median curve for the data, generated by running \code{compute_medians_curve} on the test data
+#' @param alpha.one.sided T1E for one-sided testing
+#' @param verbose Should progress be printed to screen
 #'
-#' @return a list with the following entries: \code{q_star_LE} - ; \code{q_star_GE} - ; \code{bank} - 
+#' @return a list with the following entries: \code{q_star_LE} - grid of upper bound, by points in \code{theta_vec}; \code{q_star_GE} -  grid of lower bounds, by points in \code{theta_vec}; \code{bank} - updated cache object, to be placed in calling function. For \code{q_star_LE} and \code{q_star_GE} the names attribute gives the values of theta for which pointwise confidence intervals are computed.
 #' @export
 #' @keywords internal
 compute_CI_curves_function = function(
@@ -1343,10 +1344,6 @@ compute_CI_curves_function = function(
       if(is.na(rejected_ind[u])) #in case a pvalue cannot be computed, assume we did not reject
         rejected_ind[u] = F  
       
-      # if(u==1 & rejected_ind[u] == F ){
-      #   rejected_ind = rep(F,length(ind_to_select_from))
-      #   break
-      # }
       if(!rejected_ind[u]) #if we didn't reject, we can stop. We have found the lower edge of the CI for this value of theta
         break
       
@@ -1948,6 +1945,27 @@ mcleod.estimate.CI.single.q = function(X, N, q,
 }
 
 
+
+
+#' Extract pointwise confidence intervals for the CDF of the mixing distribution, from result of function \code{mcleod.estimate.CI}
+#' 
+#' Pointwise confidence intervals computed in confidence levels set by \code{mcleod.estimate.CI}.
+#' 
+#' @details Resolution of \code{log.odds} given by parameter \code{theta_vec} in \code{mcleod.CI.estimation.parameters} (used to define object passed to \code{mcleod.estimate.CI}).
+#'
+#' @param CI.est.res Result of \code{\link{mcleod.estimate.CI}}, run with parameter \code{compute_CI_curves} set to \code{T}
+#'
+#' @return a data frame with three columns: 
+#' #' \itemize{
+#' \item{\code{log.odds}}{ - specificying points in the suppor of the mixing distribution, in terms of \eqn{P/log(1-P)}.}
+#' \item{\code{Lower}}{ - Specifying a lower bound on the CDF, for the corresponding value of \code{log.odds}.}
+#' \item{\code{Upper}}{ - Specifying an upper bound on the CDF, for the corresponding value of \code{log.odds}.}
+#' }
+#'   ; 
+#' @export
+#'
+#' @examples
+#' see package vignette
 mcleod.get.CIs.mixing.dist = function(CI.est.res){
   dt_CIs = data.frame(
     log.odds = CI.est.res$bank$CI_param$theta_vec,

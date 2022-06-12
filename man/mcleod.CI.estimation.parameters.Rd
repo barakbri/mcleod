@@ -5,7 +5,7 @@
 \title{Constructs container for parameters used when building CIs for the mixing distribution}
 \usage{
 mcleod.CI.estimation.parameters(
-  q_vec = seq(0.1, 0.9, 0.1),
+  q_vec = seq(0.05, 0.95, 0.05),
   theta_vec = seq(-3, 3, 0.25),
   a.limits = c(-5, 5),
   sampling_distribution = "binomial",
@@ -56,6 +56,8 @@ mcleod.CI.estimation.parameters(
 \item{rho.q_for_calibration}{When estimating rho adaptively- CIs for the CDF values will be built at the quantiles matching these values in the holdout data.}
 
 \item{rho.theta_for_calibration}{When estimating rho adaptively- if this parameter is set to a value other than null, the adaptive estimation of rho will be performed using CIs built for this value of theta (random effect value)}
+
+\item{rho.alpha.CI}{The confidence level used to construct pointwise confidence intervals for the holdout data.}
 
 \item{rho.calibration.nr.points.for.pv.exterpolation}{When estimating rho adaptively- for how many point should a P-value be computed, in order to interpolate the PV (at a given theta) across q, and find the edges of the CI (for the given theta)}
 

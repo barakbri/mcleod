@@ -38,18 +38,18 @@ mcleod.CI.rho.calibration.constructor(
 \value{
 an object of type 'mcleod.CI.obj.rho' with the following fields
 \itemize{
-\item{rho_approx_fun_LE}{ - BAR}
-\item{rho_approx_fun_GE }{ - BAR}
-\item{bank }{ - BAR}
-\item{rho_approx_fun_LE_specific_non_smoothed }{ - BAR}
-\item{rho_approx_fun_GE_specific_non_smoothed }{ - BAR}
-\item{rho_approx_fun_LE_specific_smoothed }{ - BAR}
-\item{rho_approx_fun_GE_specific_smoothed }{ - BAR}
-\item{curve_LE_q_by_theta_and_rho }{ - BAR}
-\item{curve_GE_q_by_theta_and_rho }{ - BAR}
-\item{distances }{ - BAR}
-\item{scores}{ - BAR}
-\item{selected_rho}{ - BAR}
+\item{rho_approx_fun_LE}{ - a function, giving the value of rho for LE hypotheses, for each value of theta* tested. If user asked for a fixed value of rho, this function returns a constant.}
+\item{rho_approx_fun_GE }{ -  - a function, giving the value of rho for GE hypotheses, for each value of theta* tested. If user asked for a fixed value of rho, this function returns a constant.}
+\item{bank }{ - updated cache to be inserted back in the calling function}
+\item{rho_approx_fun_LE_specific_non_smoothed }{ - a function, giving the value of rho for LE hypotheses, for each value of theta* tested, for case the user used the parameter \code{rho.calibration.method='specific'}. This function is computed anyway, and if the user picked 'specific', it is copied to \code{rho_approx_fun_LE} and used in actual testing.}
+\item{rho_approx_fun_GE_specific_non_smoothed }{ - same as \code{rho_approx_fun_LE_specific_non_smoothed}, only for GE hypotheses.}
+\item{rho_approx_fun_LE_specific_smoothed }{ - A kernel smoothed version of \code{rho_approx_fun_LE_specific_non_smoothed}, currently not used in computations.}
+\item{rho_approx_fun_GE_specific_smoothed }{ - Same as \code{rho_approx_fun_LE_specific_smoothed}, only for GE hypotheses.}
+\item{curve_LE_q_by_theta_and_rho }{ - a matrix, giving for each theta point on which the CI is optimized (row), and each value of rho (col), the upper bound (upper edge of CI) for the CDF value.}
+\item{curve_GE_q_by_theta_and_rho }{ - a matrix, giving for each theta point on which the CI is optimized (row), and each value of rho (col), the lower bound (lower edge of CI) for the CDF value.}
+\item{distances }{ - Available only if user selected \code{rho.calibration.method} to be 'max' or 'sum'. Gives the element-wise subtraction of \code{curve_GE_q_by_theta_and_rho} from \code{curve_LE_q_by_theta_and_rho}, thus giving the length of confidence intervals for each theta point and value of rho.}
+\item{scores}{ - Available only if user selected \code{rho.calibration.method} to be 'max' or 'sum'. Aggregation of \code{distances} by column-wise max or sum.}
+\item{selected_rho}{ - Available only if user selected \code{rho.calibration.method} to be 'max' or 'sum'. value of rho corresponding to the minimum entry of \code{scores}.}
 }
 }
 \description{

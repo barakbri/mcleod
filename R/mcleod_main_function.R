@@ -931,23 +931,31 @@ checks.input.posthoc.analysis = function(X, N, mcleod_res, offset_vec, is_Noise_
   return(ret)
 }
 
-#' Title
+#' Compute posterior estimates for \eqn{P_i} and \eqn{\lambda_i}
+#' 
+#' Function computes posterior estimates for \eqn{P_i} and \eqn{\lambda_i} for observations, based on observed counts and fitted \code{\link{mcleod}} model. The function receives as input the fitted mcleod model, as well as the observables for the data: the observed counts (X, for both Poisson and Binomial observations), number of draws (relevant for binomial observations), covariates and offset term. The type of data supplied (Binomial/Poisson, with or without covariates) should be identical to the type of data used to fit the \code{\link{mcleod}} model supplied.
+#' 
+#' @details For data with covariates, the returned values are estimates for \eqn{\gamma_i}, the observation specific random intercept term.
 #'
-#' @param X 
-#' @param mcleod_res 
-#' @param covariates 
-#' @param method 
-#' @param offset_vec 
+#' @param X A vector of integers, with each entry corresponding to an observations. For binomial data, the number of successful draws for each observations. For Poisson data, the number of counts for each observation. 
+#' @param N For binomial data, a vector giving the number of draws for each observations. Entries correspond to entries in \code{X}. For Poisson data, set to \code{NULL}.
+#' @param mcleod_res Model fitted using \code{\link{mcleod}}, holding an estimate of the mixing distribution.
+#' @param covariates A matrix of covariates, with rows corresponding to the entries of X, and columns corresponding to the covariates used when fitting \code{mcleod_res}. If the mixing distribution was estimated without covariates, covariates cannot be used here, set the value of this parameter to \code{NULL}.
+#' @param method Type of estimator for \eqn{P_i} \ \eqn{\lambda_i} \ \eqn{\gamma_i}. Use \code{'mean'} for posterior mean, and \code{'mode'} for posterior mode. 
+#' @param offset_vec A vector of offset values, for the linear predictor term. See full definition in the function vignette.
 #'
-#' @return
+#' @return Vector of estimates for \eqn{P_i} (for binomial data) , \eqn{\lambda_i} (for Poisson data), or \eqn{\gamma_i} (observation's random intercept, for data with covariates). Entries correspond to entries of \code{X}
 #' @export
 #'
 #' @examples
+#' See package vignette
 mcleod.posterior.estimates.random.effect = function(X,N,mcleod_res,covariates = NULL,method = 'mean',offset_vec = rep(0,length(X))){
   
   if(!(method %in% c('mean','mode'))){
     stop(' method must be either "mean" or "mode" ')
   }
+  
+  #extract parameters
   nr.gibbs.burnin = mcleod_res$parameters_list$nr.gibbs.burnin
   a.vec = mcleod_res$parameters_list$a.vec
   pi_smp = (t(mcleod_res$additional$original_stat_res$pi_smp))[-(1:nr.gibbs.burnin),]
@@ -955,6 +963,7 @@ mcleod.posterior.estimates.random.effect = function(X,N,mcleod_res,covariates = 
   Noise_Type = mcleod_res$parameters_list$Noise_Type
   is_Noise_Poisson = (Noise_Type == MCLEOD.POISSON.ERRORS) #if false, it is binomial
   
+  #run input checks
   checks_result = checks.input.posthoc.analysis(X = X,
                                                 N = N,
                                                 mcleod_res = mcleod_res,
@@ -963,10 +972,12 @@ mcleod.posterior.estimates.random.effect = function(X,N,mcleod_res,covariates = 
                                                 covariates = covariates,
                                                 skip_checks_X_N = F)
   
-  posterior_mean_vec = checks_result$posterior_mean_vec
+  posterior_mean_vec = checks_result$posterior_mean_vec #posterior mean for slopes
   n = length(x)
-  Post.k.i = matrix(NA,nrow = n,ncol = length(a.vec)-1)
+  Post.k.i = matrix(NA,nrow = n,ncol = length(a.vec)-1) #P_k_i matrix, specifiying for each obs (row), the probability of it being sampled given that theta was uniformally distributied in the ith (column) segment of the a.grid
   
+  
+  #internal function used for computing the offset terms for the kth observations, due to both covariates and offset
   compute_shift = function(k,posterior_mean_vec){
     if(!is.null(covariates)){
       sample_shift_in_log_odds_scale = sum(covariates[k,] * posterior_mean_vec + offset_vec[k])  
@@ -976,8 +987,11 @@ mcleod.posterior.estimates.random.effect = function(X,N,mcleod_res,covariates = 
     return(sample_shift_in_log_odds_scale)
   }
   
+  #internal function used to compute the kth row of matrix Post.k
   estimate_posterior_prob_vec = function(k,posterior_mean_vec,pi_All){
     sample_shift_in_log_odds_scale = compute_shift(k,posterior_mean_vec)
+    
+    #define integrands
     if(!is_Noise_Poisson){
       integrand = function(u){
         dbinom(as.numeric(X[k]),size = N[k],
@@ -989,7 +1003,8 @@ mcleod.posterior.estimates.random.effect = function(X,N,mcleod_res,covariates = 
               lambda = exp(u + sample_shift_in_log_odds_scale))
       }
     }
-   
+    
+    #perform integration to compute probability in each segment of the agrid
     Post.k = rep(NA,length(a.vec)-1)
     for(a_index in 1:(length(a.vec)-1)){
       #a_index = 1
@@ -1000,11 +1015,12 @@ mcleod.posterior.estimates.random.effect = function(X,N,mcleod_res,covariates = 
     return(Post.k)
   }
   
+  #internal function used for computing the posterior mean of the kth observation
   aux_compute_mean = function(k,Post.k.i_vec,posterior_mean_vec){
-    sample_shift_in_log_odds_scale = compute_shift(k,posterior_mean_vec)
+    sample_shift_in_log_odds_scale = compute_shift(k,posterior_mean_vec) #compute shift
     ret = 0
-    for(i in 1:length(Post.k.i_vec)){
-      N_integral = 100
+    for(i in 1:length(Post.k.i_vec)){ #compute posterior mean by summing over segments
+      N_integral = 100 #in each segment integrate over N_integral points
       seq_integral =  seq(from = a.vec[i],to = a.vec[i]+1,  length.out = N_integral)
       if(!is_Noise_Poisson){
         conditional_f_gamma_given_X = dbinom(x = X[k],
@@ -1014,7 +1030,7 @@ mcleod.posterior.estimates.random.effect = function(X,N,mcleod_res,covariates = 
         conditional_f_gamma_given_X = dpois(x = X[k],
                                              lambda = exp(theta = seq_integral +sample_shift_in_log_odds_scale))
       }
-
+      # compute integral in segment and add to sum
       if(sum(conditional_f_gamma_given_X) != 0){
         conditional_f_gamma_given_X = conditional_f_gamma_given_X/sum(conditional_f_gamma_given_X)
         ret  = ret  + Post.k.i_vec[i ] * sum(seq_integral * conditional_f_gamma_given_X)  
@@ -1026,13 +1042,14 @@ mcleod.posterior.estimates.random.effect = function(X,N,mcleod_res,covariates = 
     return(ret)
   }
   
+  #internal function used for computing the posterior mode of the kth observation
   aux_compute_mode = function(k,posterior_mean_vec){
     sample_shift_in_log_odds_scale = compute_shift(k,posterior_mean_vec)
     ret = 0
     prob = -Inf
-    for(i in 1:length(pi_All)){
-      u_values = seq(from = a.vec[i],to =a.vec[i+1], by = (a.vec[i+1] - a.vec[i])/10)
-      for(u in u_values){
+    for(i in 1:length(pi_All)){ # go over segments of the pi grid
+      u_values = seq(from = a.vec[i],to =a.vec[i+1], by = (a.vec[i+1] - a.vec[i])/10) #with in each segment, pick 10 equally spaced points
+      for(u in u_values){ #check for each point if it is the posterior mode
         if(!is_Noise_Poisson){
           temp_prob = dbinom(as.numeric(X[k]),size = N[k],
                              prob = mcleod::inv.log.odds(u + sample_shift_in_log_odds_scale))*pi_All[i]          
@@ -1050,6 +1067,7 @@ mcleod.posterior.estimates.random.effect = function(X,N,mcleod_res,covariates = 
     return(ret)
   }
   
+  #this part performs the actual computation: iterate over observations and compute the posterior mean/mode for each one.
   estimated_random_effects = rep(NA,n)
   for(k in 1:n){
     if(method == 'mean'){
@@ -1060,76 +1078,102 @@ mcleod.posterior.estimates.random.effect = function(X,N,mcleod_res,covariates = 
     }
   }
   
+  # return results
   return(estimated_random_effects)
   
 }
 
 
-mcleod.predictive.CI = function(N,mcleod_res,covariates = NULL,method = 'mean', offset_vec = NULL, CI.coverage = 0.95,Nr_Simulated_Values = 1000){
-  
+
+
+#' Compute prediction intervals for out-of-sample observations
+#' 
+#' The function computes prediction intervals, for out-of-sample observations (i.e., not part of the training set), based on a \code{\link{mcleod}} model. The type of observations for which predictive intervals are computed (Binomial/Poisson, with or without covariates), is determined by the type of model passed as \code{mcleod_res}. For binomial samples, the function receives \code{N}, a vector specifying the number of draws for each observations. The function then returns predictive intervals for each observations, see section 'return' below. For Poisson samples without covariates, all samples are identically distributed, and the function returns a single prediction interval. If the model supplied under \code{mcleod_res} uses covariates, the function must also be supplied covariates for each observation. Covariates are inserted under \code{covariates}, as matrix with rows corresponding to observations, and columns corresponding to the variables used to fit \code{mcleod_res}. For binomial samples, the number of rows of \code{covariates} must be identical to the length of \code{N}. For Poisson samples, if covariates are given, the function will compute predictive intervals for multiple Poisson samples, corresponding to the rows of \code{covariates}.
+#' 
+#' @details The function computes prediction intervals by simulating counts using the fitted model, i.e., sampling values from the random effect from the fitted prior, adjusting for covariates and offset terms, and using Binomial/Poisson sampling to generate counts. A higher number of simulation replicates, determined by \code{Nr_Simulated_Values}, means more accurate prediction intervals. For most applications, 1000 replicates are satisfactory. However, if tail probabilities are needed (e.g. 0.9999 prediction interval), a larger value for \code{Nr_Simulated_Values} needs to be set.
+#'
+#' @param N For binomial data, a vector specifying the number of draws for each sample. For Poisson data, set to \code{NULL}.
+#' @param mcleod_res Model fitted using \code{\link{mcleod}}.
+#' @param covariates Matrix of covariates for the out-of-sample observations with rows corresponding to observations, and columns corresponding to the variables used to fit \code{mcleod_res}.
+#' @param offset_vec A vector of offset values for the linear predictor. For binomial data, must have length equal to \code{length(N)} and \code{nrow(covariates)}. For Poisson data, must have length equal to  \code{nrow(covariates)}.
+#' @param Interval.Coverage Coverage probability for the prediction interval.
+#' @param Nr_Simulated_Values Number of simulation replicates, used for computed prediction intervals.
+#'
+#' @return A list with two vectors named \code{Lower} and \code{Upper}, giving the lower and upper ends of prediction intervals, respectively. for the out-of-sample observations defined by \code{N},\code{covariates} and \code{offset_vec}.
+#' @export
+#'
+#' @examples
+#' See package vignette
+mcleod.predictive.interval = function(N,mcleod_res,covariates = NULL, offset_vec = NULL, Interval.Coverage = 0.95,Nr_Simulated_Values = 1000){
+  #extract parameters from mcleod res object
   N.gibbs = mcleod_res$parameters_list$nr.gibbs
   N.gibbs.burnin = mcleod_res$parameters_list$nr.gibbs.burnin
   a.vec = mcleod_res$parameters_list$a.vec
   
-  
   Noise_Type = mcleod_res$parameters_list$Noise_Type
   is_Noise_Poisson = (Noise_Type == MCLEOD.POISSON.ERRORS) #if false, it is binomial
   
+  #number of samples to generate. if it is Poisson, only the nrow of covariates matrix determines for how many samples do we need to compute limits
   if(is_Noise_Poisson){
     if(!is.null(covariates)){
       n = nrow(covariates)
     }else{
-      n=1
+      n=1 #If Poisson and no covariates, all samples are equally distributed, so need to report only one value
     }
   }else{
-    n =length(N)  
+    n =length(N)  #If binomial samples, than output size determined by N (vector with nr. draws per observations). we will check that nrow(covariates)==length(N)
   }
   
   if(is.null(offset_vec)){
     offset_vec = rep(0,n)
   }
   
+  # check input
   checks_result = checks.input.posthoc.analysis(X = NULL,N = N,
                                                 mcleod_res = mcleod_res,
                                                 offset_vec = offset_vec,
                                                 is_Noise_Poisson = is_Noise_Poisson,
                                                 covariates = covariates,
                                                 skip_checks_X_N = T)  
-    
+  # Arrays for the returned results
   Lower_mcleod = rep(NA,n)
   Upper_mcleod = rep(NA,n)  
   
-  for(i_to_sample_for in 1:n){
-    sample_gammas = rep(NA,Nr_Simulated_Values)
+  for(i_to_sample_for in 1:n){ #for each observation, we will generate Nr_Simulated_Values simulated values
+    sample_gammas = rep(NA,Nr_Simulated_Values) #will hold sampled gammas from the posterior
     beta_sampled_vec = NULL
     
     if(!is.null(covariates)){
       beta_sampled_vec = matrix(data = NA,nrow = Nr_Simulated_Values,ncol = ncol(covariates))
     }
     
-    
+    #sample joint samples of \vec{\beta} and \vec{\pi}
     for(j in 1:Nr_Simulated_Values){
       ind_post_sample = sample((N.gibbs.burnin+1):N.gibbs,size = 1)
       if(!is.null(covariates))
         beta_sampled_vec[j,] = mcleod_res$additional$original_stat_res$beta_smp[,ind_post_sample]
       pi_vec =  mcleod_res$additional$original_stat_res$pi_smp[,ind_post_sample]
-      sample_gammas[j] = sample(1:length(pi_vec),size = 1,prob = pi_vec)
+      sample_gammas[j] = sample(1:length(pi_vec),size = 1,prob = pi_vec) #given pi vec, sample interval index for gamma
     }
     
+    #following lines are across all observations - in vector notation, sampling all Nr_Simulated_Values concurrently
     sample_gammas = runif(n = Nr_Simulated_Values, min = a.vec[sample_gammas],max = a.vec[sample_gammas+1])
     
+    #Compute linear predictor. It is sampled gamma + offset
     Linear_Predictor = sample_gammas + offset_vec[i_to_sample_for]
-    if(!is.null(covariates)){
+    if(!is.null(covariates)){ #if covariates are available, compute additional shift due to covariates
       Linear_Predictor = Linear_Predictor + beta_sampled_vec %*% 
         t(covariates[i_to_sample_for,,drop=F])
     }
     
+    # transform from theta to P\lambda
     if(!is_Noise_Poisson){
       sample_prob = mcleod::inv.log.odds( Linear_Predictor )  
     }else{
       sample_prob = exp( Linear_Predictor )
     }
     
+    #transform from P/lambda to X
     if(!is_Noise_Poisson){
       X_sampled_for_obs = rbinom(n = Nr_Simulated_Values, size = N[i_to_sample_for],
                                  prob = sample_prob)  
@@ -1137,13 +1181,16 @@ mcleod.predictive.CI = function(N,mcleod_res,covariates = NULL,method = 'mean', 
       X_sampled_for_obs = rpois(n = Nr_Simulated_Values,lambda = sample_prob)
     }
     
-    alpha.interval = (1-CI.coverage)
+    #for the current observation, compute CI using uppoer and lower quantiles
+    alpha.interval = (1-Interval.Coverage)
     Q_Lower = quantile(X_sampled_for_obs,probs = alpha.interval/2)
     Q_Upper = quantile(X_sampled_for_obs,probs = 1-alpha.interval/2)
     Lower_mcleod[i_to_sample_for] = Q_Lower
     Upper_mcleod[i_to_sample_for] = Q_Upper
     
   }
+  
+  #report quantiles for each observations
   ret = list()
   ret$Lower = Lower_mcleod
   ret$Upper = Upper_mcleod

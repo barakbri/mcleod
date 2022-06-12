@@ -2,12 +2,13 @@
 % Please edit documentation in R/mcleod_main_function.R
 \name{results.covariate.coefficients.posterior}
 \alias{results.covariate.coefficients.posterior}
-\title{Obtain posterior means and plot graphs for the slope coefficients, for the mcleod model with covariates}
+\title{Obtain MCMC samples. posterior means, and graphs for the slope coefficients, for the mcleod model with covariates}
 \usage{
 results.covariate.coefficients.posterior(
   mcleod.obj,
   plot.posterior = T,
-  plot.MH.proposal.by.iteration = F
+  plot.MH.proposal.by.iteration = F,
+  aggregate_by = mean
 )
 }
 \arguments{
@@ -16,12 +17,21 @@ results.covariate.coefficients.posterior(
 \item{plot.posterior}{If set to True (default is True): plot a series of figures showing the values of the slope coefficients by MCMC iteration number. Burnin iterations (excluded from the computation of posterior means) are shown in red.}
 
 \item{plot.MH.proposal.by.iteration}{If set to True (default is False): plot a series of figures showing the values of the slope coefficients for the slope vectors sampled as suggestions by the MCMC iteration number. Accepted iterations are shown in red.}
+
+\item{aggregate_by}{the function by which to aggregate by. Pass the function \code{mean} (in R base) to compute the posterior mean of slope coefficients. Pass the function \code{median} (also in R base) to compute the posterior median.}
 }
 \value{
-Returns a list with two entries: \code{posterior.means}- a vector with estiamtes for the posterior means of the slope coefficients (see model description in \code{\link{mcleod}}); and \code{acceptance.rate} the ratio of times proposals for slope vectors were accepted in the MCMC sampler.
+Returns a list with the following entries:
+\itemize{
+\item{posterior.means}{ - a vector with estimates for the posterior means of the slope coefficients (see model description in \code{\link{mcleod}})}
+\item{acceptance.rate}{ - the ratio of times proposals for slope vectors were accepted in the MCMC sampler.}
+\item{beta_smp}{ - a matrix of size (nr MCMC samples, nr covariates), giving the MCMC samples for \eqn{\beta}}
+\item{beta_suggestion}{ - a matrix of size (nr MCMC samples, nr covariates), giving the values sampled as suggestions for \eqn{\beta} in each sample of the algorithm.}
+\item{proposal_approved}{ - a vector detailing for each MCMC sample if the suggestion sampled for \eqn{\beta} (in the MH step, see vignette and paper) was accepted (value = 1) or rejected (value = 0).}
+}
 }
 \description{
-The function receives the output of \code{\link{mcleod}}, when trying to estimate the mixing distribution with additional covariates, and performs the following actions: 1) returns the posterior means for the slope coefficients, and the mean acceptance rate for the MCMC sampler; 2) plots a graph of the values of the slope coefficients, by MCMC iteration number (see additional details for the function parameters); plot the suggested vectors of slope coefficients, sampled by the MCMC algorithm at each iteration, and whether the suggested vector was accepted in each iteration (see additional details below).
+The function receives the output of \code{\link{mcleod}}, when trying to estimate the mixing distribution with additional covariates, and performs the following actions: 1) returns the posterior means for the slope coefficients, and the mean acceptance rate for the MCMC sampler; 2) plots a graph of the values of the slope coefficients, by MCMC iteration number (see additional details for the function parameters); 3) plot the suggested vectors of slope coefficients, sampled by the MCMC algorithm at each iteration, and whether the suggested vector was accepted in each iteration (see additional details below); and 4) returns the MCMC samples and the MCMC suggestions for the slope coefficients (toghether with an indicator if the suggested value for \eqn{\vec{\beta}} was accepted in each iteration).
 }
 \examples{
 See package vignette
