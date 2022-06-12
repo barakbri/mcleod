@@ -3,23 +3,23 @@
 - finish documentation for internal functions:
   mcleod.CI.rho.calibration.constructor
   compute_CI_curves_function
-  init_mcleod_random_intercept_regression
-  
+D  init_mcleod_random_intercept_regression
+D add function for init regression parameters
+
 later tasks (Imp/Doc/Vignette):
-I get density by iteration,
-I get CDF by iteration
-I get posterior mean/ median of density
+D get density by iteration,
+D get CDF by iteration
+D get posterior mean/ median of density
 
-I get beta by iteration
-I get proposals by iteration
-I get was proposal accepted by iteration 
-
-I get CIs from object
-
-I add function for init regression parameters
+D get beta by iteration
+D get proposals by iteration
+D get was proposal accepted by iteration 
 
 I add function for finding gamma_i for data (train and test)
 I add function for finding prediction CIs ( for the non-covariate case and the covariate case)
+
+I get CIs from object
+
 
 later:
 - add warning rho is muliple of grid size
