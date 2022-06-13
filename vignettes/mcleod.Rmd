@@ -22,30 +22,29 @@ library(mcleod)
 
 # Introduction
 
-The `mcleod` package includes models for the mixing distribution of binomial and Poisson mixtures.
-Specifically, let $X_i, i=1,...,n,$ denote $n$ binomial samples distributed via $X_i\sim bin(N_i,P_i)$, where the $N_i$'s are some known constants and the $P_i$'s are random variable from an unknown distribution. The `mcleod` package allows users to estimate the distribution of $P_i$'s and construct confidence intervals for its quantiles and CDF values. For the Poisson case, the mixing distribution is modeled using $X_i\sim Pois(\lambda_i)$, where the $\lambda_i$'s are drawn from an unknown distribution estimated from the data. 
+The `mcleod` package allows the user to model the mixing distribution of binomial and Poisson mixtures. Specifically, let $X_i, i=1,...,n,$ denote $n$ binomial samples distributed via $X_i\sim bin(N_i,P_i)$, where the $N_i$'s are some known constants and the $P_i$'s are i.i.d. random variables from an unknown distribution. The `mcleod` package allows users to estimate the distribution of $P_i$'s and construct confidence intervals for its quantiles and CDF values. For the Poisson case, the mixing distribution is modeled using $X_i\sim Pois(\lambda_i)$, where the $\lambda_i$'s are drawn from an unknown distribution estimated from the data. 
 
-In addition, the package allows users to fit a random intercept model of the following form: $X_i\sim bin(N_i,P_i)$ ; $log(P_i/(1-P_i)) = \gamma_i +\vec{\beta}^T \vec{Z}_i$, where $\gamma_i$ is an intercept term drawn from general distribution, whose CDF is estimated from the data, $\vec{Z}_i$ is a vector of sample covariates, and $\vec{\beta}$ is a vector of slope coefficients, also estiamted from the data. For the Poisson case, the mcleod package allows for the following model: $X_i\sim Pois(\lambda_i)$; $log(\lambda_i) = \gamma_i +\vec{\beta}^T \vec{Z}_i$.
+In addition, the package allows users to fit a random intercept model of the following form: $X_i\sim bin(N_i,P_i)$ ; $log(P_i/(1-P_i)) = \gamma_i +\vec{\beta}^T \vec{Z}_i$, where $\gamma_i$ is an intercept term drawn from general distribution, whose CDF is estimated from the data, $\vec{Z}_i$ is a vector of sample covariates, and $\vec{\beta}$ is a vector of slope coefficients, also estimated from the data. For the Poisson case, the mcleod package allows for the following model: $X_i\sim Pois(\lambda_i)$; $log(\lambda_i) = \gamma_i +\vec{\beta}^T \vec{Z}_i$.
 
-The document is structured as follows. In Section 2 we introducing the generative model for the setting with no covariates, and briefly discuss how the estimation procedure for the mixing distribution. In Section 3 we show how point estimates for the CDF of the mixing distribution can be obtained using the package. In Section 4 we briefly discuss how confidence intervals for the quantiles and percentiles of the mixing distribution are constructed and show several code examples. In Section 5 we discuss the different random intercept models implemented in the `mcleod` package and provide example for fitting those models to data. In Section 5 we discuss some advances topics.
+The document is structured as follows. In Section 2 we introducing the generative model for the setting with no covariates, and briefly explain how the mixing distribution is estimated. In Section 3 we show how point estimates for the CDF of the mixing distribution can be obtained using the package. In Section 4 we briefly discuss how confidence intervals for the quantiles and percentiles of the mixing distribution are constructed and show several code examples. In Section 5 we discuss the different random intercept models implemented in the `mcleod` package and provide example for fitting those models to data. In Section 6 we discuss some advanced topics.
 
 # The generative model
-   We present the approach for modeling the mixing distribution in the binomial case, where $X_i\sim bin(N_i,P_i)$ and $P_i$ is a random variable. The approach for modeling Poisson samples is similar, and involves modeling $log(\lambda_i)$ as a random sample from the modeled presented below.
+   We present the approach for modeling the mixing distribution in the binomial case, where $X_i\sim bin(N_i,P_i)$ and and the density of $log(P_i/(1-P_i))$ is estimated from the data. The approach for modeling Poisson samples is similar, and involves modeling the distribution of $log(\lambda_i)$ instead.
    
-   Let $\gamma_i \equiv log(P_i/(1-P_i))$. Since the $P_i$'s are not observed (only indirectly through the $X_i$'s), we use a heirarhical Bayesian approach for modeling the distribution from which $P_i$'s are drawn. Let $I$ be some complete power of $2$, e.g., 32 or 64. Let $\vec{a}=(a_0,a_1,...,a_I), a_0<a_1<...<a_I,$ be a vector with $I+1$ entries marking $I+1$ partitioning point on the real line. We approximate the density function for the distribution of $\gamma_i$'s using a piece-wise constant density function, with "jumps" at the $I-1$ internal points of $\vec{a}$. This density function is characterized by $I$ unique function values, which we will denote using the vector $\vec{\pi}=(\pi_1,\pi_2,...,\pi_I)$. The conditional density function of $\gamma_i$'s $\vec{\pi}$ is given by:
+   Let $\gamma_i \equiv log(P_i/(1-P_i))$. The $P_i$'s are not observed (only indirectly through the $X_i$'s). We take an hierarchical Bayesian approach for modeling distribution of $P_i$'s. Let $I$ be some complete power of $2$, e.g., 32 or 64. Let $\vec{a}=(a_0,a_1,...,a_I), a_0<a_1<...<a_I,$ be a vector with $I+1$ entries marking $I+1$ partitioning point on the real line. We approximate the density function for the distribution of $\gamma_i$'s using a piece-wise constant density function, with "jumps" at the $I-1$ internal points of $\vec{a}$. This density function is characterized by $I$ unique function values, which we will denote using the vector $\vec{\pi}=(\pi_1,\pi_2,...,\pi_I)$. The conditional density function of $\gamma_i$'s given $\vec{\pi}$ is:
     $$f_{\gamma|\pi}(u) = \pi_1\cdot \frac{\mathbb{1}_{[a_0,a_1)}\left(u\right)}{a_1-a_0} + ... + \pi_I\cdot \frac{\mathbb{1}_{[a_{I-1},a_I]}\left(u\right)}{a_I-a_{I-1}},$$ 
-   where $\mathbb{1}_{[a_0,a_1)}(u)$ is the indicator function, receiving the value $1$ if $u$ is in the interval $[a_0,a_1)$. In order to estiamte the parameter vector $\vec{\pi}$, we assume a Polya tree prior: we assume $I-1$ Beta random variables are positioned in a binary tree-like hierarchy, and that the values of $\vec{\pi}$ are formed by multiplying the values Beta random variables in the paths formed by the tree, as explained in Figure 1. As a default choice we assume all Beta random variables in the Polya tree are $Beta(1,1)$, however, other hyper-parameter choices are also supported by the package, see additional details in Section 6.
+   where $\mathbb{1}_{[a_0,a_1)}(u)$ is the indicator function, receiving the value $1$ if $u$ is in the interval $[a_0,a_1)$. In order to estimate the parameter vector $\vec{\pi}$, we assume a Polya tree prior: we assume $I-1$ Beta random variables are positioned in a binary tree-like hierarchy, and that the values of $\vec{\pi}$ are formed by multiplying the values Beta random variables in the paths formed by the tree, as explained in Figure 1. As a default choice we assume all Beta random variables in the Polya tree are $Beta(1,1)$, however, other hyper-parameter choices are also supported by the package, see additional details in Section 6.
    
 The function $f_{\gamma|\pi}$ is estimated by sampling vectors from the posterior distribution of $\vec{\pi}|\vec{X}$ using an MCMC algorithm breifly described in Section 1.1.  We finish this section with two important notes:
 
 (1) It is assumed that $N_i$ and $P_i$ are independent.
 
-(2) The `mcleod` package also supports a second type of prior for $\vec{\pi}$, called a Dirichlet tree prior. The Dirichlet tree prior assumes the values of $\pi$ are formed by a two layer tree with the following structure: the root of the tree is associated with a Dirichlet random variable with $I_1$ components. Each of the components corresponds with a child node (in the second layer of the tree), which in turn, is associated with a Dirichlet random variable with $I_2$ components. Overall, the tree has $I=I_1\cdot I_2$ leaves, associated with $I$ entries in the vector $\vec{\pi}$. The probability vector $\vec{\pi}$ for this model is formed by multipling the values of Dirichlet vector components, as descending down the tree, in manner similar to Figure 1. The MCMC algorithm for estimating $\vec{\pi}$ for this type of prior is similar to the one presented in Section 1.1.
+(2) The `mcleod` package also supports a second type of prior for $\vec{\pi}$, called a Dirichlet tree prior. The Dirichlet tree prior assumes the values of $\pi$ are formed by a two layer tree with the following structure: the root of the tree is associated with a Dirichlet random variable with $I_1$ components. Each of the components correspond to with a child node (in the second layer of the tree), which in turn, is associated with a Dirichlet random variable with $I_2$ components. Overall, the tree has $I=I_1\cdot I_2$ leaves, associated with $I$ entries in the vector $\vec{\pi}$. The probability vector $\vec{\pi}$ for this model is formed by multipling the values of Dirichlet vector components, as descending down the tree, in manner similar to Figure 1. The MCMC algorithm for estimating $\vec{\pi}$ for this type of prior is similar to the one presented in Section 1.1.
    
    ![Generative model of the $\gamma_i$'s](./Diagram.png)
    
 ## Sampling from the posterior distribution
-   The MCMC algorithm used for sampling from the posterior distribution of $\vec{\pi}$ can be breifly explained as follows:
+   The MCMC algorithm used for sampling from the posterior distribution of $\vec{\pi}$ can be briefly described as follows:
    (1) Given $\vec{\pi}=\vec{v}$, one can draw a sample from the posterior distribution of $\gamma_i|X_i=x_i,\vec{\pi}=\vec{v}$.
    (2) Similarly, given the values of $\gamma_i$'s, one can draw of sample from the posterior distribution of $\vec{\pi}|\vec{\gamma},\vec{X}$, where $\vec{\gamma},\vec{X}$ are the samples for $\gamma_i$'s and $X_i$'s, respectively.
    (3) In the $i$th iteration, the MCMC algorithm samples values for the $\gamma_i$'s (using (1), and based on the algorithm current idea of $\vec{\pi}$). Next, using the $\gamma_i$'s sampled (and the posterior distribution of (2)), the algorithm samples a new value for $\vec{\pi}$. This process is performed iteratively, in order to receive an MCMC set of samples for both $\vec{\pi}$ and the $\gamma_i$'s. 
@@ -65,6 +64,8 @@ set.seed(1)
 u = sample(c(0,1),size = K,replace = T)
 x = rbinom(K,size = N,prob =inv.log.odds(rnorm(K,-1+3*u,sd = 0.3)))
 n = rep(N,K)
+
+#%%% Peak at data:
 head(cbind(x,n))
 ```
 
@@ -73,15 +74,36 @@ The simplest was to obtain deconvolution estimates is to run the function `mcleo
 res = mcleod(x, n)
 ```
 
-The posterior samples for $\vec{\pi}$ can be obtained using the following entry `res$additional$original_stat_res$pi_smp`. The matrix has $I$ rows, corresponding to the segents of the prior distribution, and columns corresponding the MCMC iterations. For example, the CDF for the 100th MCMC sample for $\vec{\pi}$ can be obtained via:
-```{r,cache=TRUE,eval=TRUE}
+The posterior samples for $\vec{\pi}$ are available under `res$additional$original_stat_res$pi_smp`. The matrix has $I$ rows, corresponding to the segments of the prior distribution, and columns corresponding the MCMC iterations. For example, the CDF for the 100th MCMC sample for $\vec{\pi}$ can be obtained via:
+```{r,cache=TRUE,eval=FALSE}
 iter_number = 100
+res$additional$original_stat_res$pi_smp[,iter_number]
+```
+We can obtain both the posterior mean density and the posterior mean of the CDF using the function `mcleod.get.posterior.mixing.dist`:
+```{r,cache = TRUE, eval = TRUE}
+posterior_mixing_dist = mcleod.get.posterior.mixing.dist(res)
+```
 
-plot(res$parameters_list$a.vec, #the X axis is the series of breaks defined by \vec{a}
-     # Y is the cumulative probability: starts at zero, and sums over 
-     # the values of \vec{\pi} for the different segments
-     c(0,cumsum(res$additional$original_stat_res$pi_smp[,iter_number])) 
-     , type = 'l' )
+The grid $\vec{a}$ can be retrieved using the entry `a.vec`:
+```{r,cache = TRUE, eval = TRUE}
+head(posterior_mixing_dist$a.vec)
+```
+The posterior mean of $\vec{\pi}$ is available under `pi_smp`:
+```{r,cache = TRUE, eval = TRUE}
+head(posterior_mixing_dist$pi_smp)
+```
+See the documentation for `mcleod.get.posterior.mixing.dist` for an explanation on how to obtain the component-wise posterior median of $\vec{\pi}$. The density for the posterior mean can be obtained via the entry `density`, which is an `R`function. The next code snippet shows how to plot the (pointwise, across log-odds) posterior mean of the density function:
+
+```{r,cache = TRUE, eval = TRUE}
+x_points = seq(-5,5,0.01)
+plot(x_points, posterior_mixing_dist$density(x_points),
+     type = 'l',xlab = 'theta',ylab = 'Density')
+```
+Similarly, we also have the estimated CDF, obtained ia the entry named `CDF`. We plot the estimate for the CDF in the next code snippet:
+```{r,cache = TRUE, eval = TRUE}
+x_points = seq(-5,5,0.01)
+plot(x_points, posterior_mixing_dist$CDF(x_points),
+     type = 'l',xlab = 'theta',ylab = 'Density')
 ```
 We can plot the posterior means of the CDF of the mixing distribution, along with a point cloud for the distribution of samples, using the following command:
 
@@ -89,6 +111,7 @@ We can plot the posterior means of the CDF of the mixing distribution, along wit
 plot.posterior(res)
 ```
   
+### Changing model parameters
 We proceed to show how various parameters can be changed. We can change the limits for $\vec{a}$ using the argument `a.limits`:
 ```{r,cache=TRUE,eval=TRUE}
 res = mcleod(x, n, a.limits = c(-5,5))
@@ -127,6 +150,42 @@ comp_obj = mcleod.computational.parameters(nr.gibbs = 500, #define the number of
 res = mcleod(x, n, computational_parameters = comp_obj) # pass object as argument
 ```
 
+### Posterior estimates for $P_i$
+After fitting a `mcleod model` for the data, we can obtain posterior estimates for $P_i$ given $X_i$ and the estimate for the mixing distribution. This can be done both for the training data, and for out-of-sample observations. The function `mcleod.posterior.estimates.random.effect` is called with the values of $X_i$, $N_i$ and the fitted model. The next code snippet shows how to compute the posterior mean for $log(P_i/(1-P_i))$, for two observations: one with $X_1=5,N_1=30$, and one with $X_2=35,N_2=40$.
+
+```{r,cache=TRUE,eval=TRUE}
+estimated.log.odds = mcleod.posterior.estimates.random.effect(
+  #A vector, giving for each observation the number of successful draws     
+  X = c(5,35),
+  #A vector, giving for each observation the total number of draws
+  N = c(30,40),
+  #the fitted model for the mixing distribution
+  res)
+
+#%% The estimated value for log(P_i/(1-P_i)):
+estimated.log.odds
+
+```
+
+We can convert the estimated log-odds to the probability scale using `inv.log.odds`:
+
+```{r,cache=TRUE,eval=TRUE}
+inv.log.odds(estimated.log.odds)
+```
+Note that we can run the function `mcleod.posterior.estimates.random.effect` with the argument `method='mode'`, in order to compute the posterior mode estimates for $log(P_i/(1-P_i))$
+
+### Predictive intervals for $X_i$
+We can compute predictive intervals for $X_i$, for out-of-sample observations, using the function `mcleod.predictive.interval`. The function receives the values of $N_i$'s for the out-of sample observations, and returns the lower and upper bounds. For example, in order to compute 95% predictive intervals for two observations, with $N_1=30, N_2 = 60$, we run:
+
+
+```{r,cache=TRUE,eval=TRUE}
+mcleod.predictive.interval(
+  N = c(30,60),
+  mcleod_res = res,
+  Interval.Coverage = 0.95)
+```
+The returned object contains two vectors, named `Lower` and `Upper`, containing the lower and upper ends of the predictive intervals, corresponding to the observations defined by `N`.
+
 ## Deconvolution for Poisson errors
 We show to estimate the mixing distribution when the data is sampled using a Poisson distribution. In our example $\log(\lambda_i)$ is distributed via a mixture of two normal components: $0.5*N(2,0.5^2) + 0.5*N(5,0.5^2)$. 
 
@@ -148,6 +207,38 @@ For Poisson distributed data, we run the `mcleod` function with `n.smp` set to `
   plot.posterior(res)
 ```
 
+### Posterior estimates for $\lambda_i$
+Posterior estimates for $log(\lambda_i)$ can be obtained via `mcleod.posterior.estimates.random.effect`, as for binomial data. The next code snippet obtains the posterior mean for $log(\lambda_i)$, for observations with $X_1=10$ and $X_2=200$. Note the `N` is set to `NULL`.
+
+
+```{r,cache=TRUE,eval=TRUE}
+estimated.log.lambda = mcleod.posterior.estimates.random.effect(
+  #Number of obs. counts per Poisson sample
+  X = c(10,200),
+  #Set N to NULL
+  N = NULL,
+  #the fitted model for the mixing distribution
+  res)
+
+#%% The estimated value for log(lambda_i):
+estimated.log.lambda
+
+```
+The estimated value can be converted back to the $lambda_i$ scale by exponentiation:
+
+```{r,cache=TRUE,eval=TRUE}
+exp(estimated.log.lambda)
+```
+
+### Predictive intervals for $X_i$
+A predictive interval for $X_i$ can be obtained via `mcleod.predictive.interval`, as for binomial data. Note that since $N_i$ is not defined for the data, all observations are i.i.d., and we have a single predictive interval:
+
+```{r,cache=TRUE,eval=TRUE}
+mcleod.predictive.interval(
+  N = NULL,
+  mcleod_res = res,
+  Interval.Coverage = 0.95)
+```
 # Constructing confidence intervals for the CDF of rate parameters
 This section explains how to construct point-wise confidence intervals for the CDF of the posterior distribution of $P_i$'s, given the data. We begin by briefly explaining the method, and then proceed to show code snippets explaining how the computation is done in practice.
 
@@ -427,7 +518,11 @@ The posterior distribution of $f_{\gamma_i|\vec{\pi}}$ can still plotted via:
 plot.posterior(res)
 ```
 
-### Example 2: Coefficients intialized by normal random intercept binomiall regression, change priors for $\vec{\beta}$
+### Posterior estimates for $\gamma_i$
+
+### Predictive intervals for $X_i$ for a random intercept Binomial regression
+
+### Example 2: How to set different initialization and change priors for $\vec{\beta}$
 
 In the second example, we have a single covariate and a bimodal random intercept distribution. We show how to (a) change the initial values for $\vec{\beta}$ and (b) how to change the prior. The next code snippet generates the example data:
 
@@ -561,6 +656,10 @@ mcleod::results.covariate.coefficients.posterior(res)
 ```{r,cache=TRUE,eval=TRUE}
 suppressWarnings({plot.posterior(res)})
 ```
+
+### Posterior estimates for $\gamma_i$
+
+### Predictive intervals for $X_i$ for a random intercept Poisson regression
 
 ## Setting the prior distributions on coefficient to be other than normal
 In the final example for this section, we show how to set prior distribution for beta to other distribution than a multivariate normal distribution. The only constraint for the prior for $\vec{\beta}$ is that different components for the prior need to be independent.

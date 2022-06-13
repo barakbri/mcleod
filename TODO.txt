@@ -3,29 +3,29 @@
 Monday: Vignette
 
 Add example for:
-( ) get density by iteration,
-( ) get CDF by iteration
-( ) get posterior mean/ median of density
+
+( )  get CIs from object
+
+( )  Explain on init for Beta regression
 
 ( ) get beta by iteration
 ( ) get proposals by iteration
 ( ) get was proposal accepted by iteration 
 
-( )  get CIs from object
 ( )  add function for finding gamma_i for data (train and test)
 ( )  add function for finding prediction CIs ( for the non-covariate case and the covariate case)
 
-( )  Explain on init for Beta regression
 
-
-Tuesday: - add code examples to documentation, unit test
+( ) unit test
+Tuesday: - add code examples to documentation, 
 
 
 later:
-- add warning rho is muliple of grid size
-- add code examples to documentation
 - unit test - add simple use cases
+- add code examples to documentation
 - register function for printing main object and CI object.
+
+- add warning rho is muliple of grid size
 - add citations to papers and dissertation
 
 

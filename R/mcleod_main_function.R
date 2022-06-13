@@ -782,9 +782,10 @@ mcleod.get.posterior.mixing.dist = function(res,aggregate_by = mean,specific_ite
     stop('input argument res for mcleod.get.posterior.mixing.dist must be an object returned from function mcleod')
   }
   
-  if(specific_iter<1 | specific_iter> res$parameters_list$nr.gibbs){
-    stop(paste0('specific_iter must be a valid MCMC iteration between 1 and ',res$parameters_list$nr.gibbs))
-  }
+  if(!is.null(specific_iter))
+    if(specific_iter<1 | specific_iter> res$parameters_list$nr.gibbs){
+      stop(paste0('specific_iter must be a valid MCMC iteration between 1 and ',res$parameters_list$nr.gibbs))
+    }
   
   #get the MCMC samples distribution
   pi_smp = t(res$additional$original_stat_res$pi_smp)
@@ -811,6 +812,7 @@ mcleod.get.posterior.mixing.dist = function(res,aggregate_by = mean,specific_ite
   ret$density = density
   ret$a.vec = a.vec
   ret$pi_smp = pi_smp
+  return(ret)
 }
 
 
@@ -973,7 +975,7 @@ mcleod.posterior.estimates.random.effect = function(X,N,mcleod_res,covariates = 
                                                 skip_checks_X_N = F)
   
   posterior_mean_vec = checks_result$posterior_mean_vec #posterior mean for slopes
-  n = length(x)
+  n = length(X)
   Post.k.i = matrix(NA,nrow = n,ncol = length(a.vec)-1) #P_k_i matrix, specifiying for each obs (row), the probability of it being sampled given that theta was uniformally distributied in the ith (column) segment of the a.grid
   
   
