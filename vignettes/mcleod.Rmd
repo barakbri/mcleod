@@ -735,13 +735,6 @@ x = rbinom(K,size = N,prob = inv.log.odds(rnorm(K,0,sd = 1)
 n = rep(N,K)
 ```
 
-We use logistic regression to init the MCMC chain for $\vec{\beta}$:
-```{r,cache=TRUE,eval=TRUE}
-model_dt = data.frame(c = x,nc = n-x)
-model_dt = cbind(model_dt,covariates)
-model <- glm(cbind(c,nc) ~.,family=binomial,data=model_dt)
-```
-
 We define the prior for $\vec{\beta}$. Our code requires that the prior bu inserted as a series of partitioning points forming segments on the real line. In addition, the user must supply the probability for the slope parameter to be in any fo the segments. For this example, we assume a Cauchy prior for components of $\vec{\beta}$:
 ```{r, cache=TRUE,eval=TRUE}
 #we descretize the range (-5,5)
@@ -771,7 +764,6 @@ beta_prior_probs = matrix(c(beta_prior_probs, beta_prior_probs),ncol = 2)
 We pass the support for the priors (`beta_prior_points`) and the density values in the different segments (`beta_prior_probs`) to `mcleod.covariates.estimation.parameters`:
 ```{r, cache=TRUE,eval=TRUE}
 coeffs_obj = mcleod.covariates.estimation.parameters(
-      beta_init = model$coefficients[-1],
       Manual_Prior_Values = beta_prior_points,
       Manual_Prior_Probs = beta_prior_probs)
 ```
