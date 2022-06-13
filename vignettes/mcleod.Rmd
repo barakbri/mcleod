@@ -453,21 +453,21 @@ CI.est.res$pvalues_grid$LE.pval.grid
 ```
 
 
-# GLMs with a random effect intercept of a general distribution
-This section discusses models of the form $X_i\sim bin(N_i,P_i)$, where $P_i$ follows the hierarchical model $log(P_i/(1-P_i))=\gamma_i + \vec{\beta}^T \vec{Z}_i$, and where $\gamma_i$ is sampled from the Polya-tree framework of Figure 1, $\vec{\beta}$ is a vector of $p$ slopes, and $\vec{Z}_i$ is a vector of sample covariates (with no intercept term).
+# GLMs with a random intercept of a general distribution
+This section discusses models of the form $X_i\sim bin(N_i,P_i)$, where $P_i$ follows the hierarchical model $log(P_i/(1-P_i))=\gamma_i + \vec{\beta}^T \vec{Z}_i$, and where $\gamma_i$ is sampled from the Polya-tree framework shown in Figure 1, $\vec{\beta}$ is a vector of $p$ slopes, and $\vec{Z}_i$ is a vector of sample covariates (with no intercept term).
 
-In order to introduce covariates into the model, we assume $\vec{\beta}$ is distributed $\vec{\beta}\sim N(\vec{0},\Sigma)$, where $\Sigma$ is a diagonal matrix with entries defined by the user. By default, $\Sigma$ is set to be the unit matrix. In addition to a multivariate normal prior, our code also supports: (1) non-informative priors for slope coefficients, by setting diagona entries of $\Sigma$ to negative values: (2) Priors of a general distribution, see example below.
+In order to introduce covariates into the model, we assume $\vec{\beta}$ is distributed $\vec{\beta}\sim N(\vec{0},\Sigma)$, where $\Sigma$ is a diagonal matrix. By default, $\Sigma$ is set to be the unit matrix. In addition to a multivariate normal prior, our code also supports: (1) non-informative priors for slope coefficients, by setting diagona entries of $\Sigma$ to negative values: (2) Priors of a general distribution, see example below.
       
-Covariates are incorporated into the MCMC algorithm using a Metropolis-Hastings step: At the first iteration, the algorithm samples values for $\vec{\beta}$, and $\vec{\pi}$. In each iteration, the algorithm first samples values for the $\gamma_i$'s given $\vec{\pi}$ and $\vec{\delta}$. Afterwards the algorithm samples values for $\vec{\pi}$ and $\vec{\beta}$ given the value of the $\gamma_i$'s, to be used in the next iteration. The value for $\vec{\pi}$ is sampled using a Gibbs sampling step, as in the setting with no covariates. The value of $\vec{\beta}$ is sampled using a Metropolis-Hastings step and the proposal distribution $N(\vec{\beta}',\Sigma_{Proposal})$, where $\vec{\beta}'$ is the vector of slopes for the current iteration, and $\Sigma_{Proposal}$ is a diagonal matrix (the default matrix has the value $0.05$ across all diagonal entries). In order for the proposal. Generally, it is best to initialize the coefficients vector $\vec{\beta}$ using Binomial regression, see example below.
+Covariates are incorporated into the MCMC algorithm using the following appraoch. At the first iteration, the algorithm samples values for $\vec{\beta}$, and $\vec{\pi}$. In each iteration, the algorithm first samples values for the $\gamma_i$'s given $\vec{\pi}$ and $\vec{\delta}$. Afterwards the algorithm samples values for $\vec{\pi}$ and $\vec{\beta}$, given the value of the $\gamma_i$'s, to be used in the next iteration. The value for $\vec{\pi}$ is sampled using a Gibbs sampling step, as in the setting with no covariates. The value of $\vec{\beta}$ is sampled using a Metropolis-Hastings step and the proposal distribution $N(\vec{\beta}',\Sigma_{Proposal})$, where $\vec{\beta}'$ is the vector of slopes for the current iteration, and $\Sigma_{Proposal}$ is a diagonal matrix (the default matrix has the value $0.05$ across all diagonal entries). The coefficients vector $\vec{\beta}$ is initialized using a normal random intercept regression model.
 
-In additional to the Binomial model, the package also supports a Poisson regression model of the form $X_i\sim Pois(\lambda_i), log(\lambda_i)\sim \gamma_i + \vec{\beta}^T \vec{Z}_i$, see example below. In addition, our code supports offset terms (covariates with a slope fixed to 1).
+In additional to the Binomial model, the package also supports a Poisson regression model of the form $X_i\sim Pois(\lambda_i), log(\lambda_i)\sim \gamma_i + \vec{\beta}^T \vec{Z}_i$, see example below. In addition, our code supports offset terms for the linear predictor (covariates with a slope fixed to 1).
 
 The model assumes $N_i, \vec{Z_i}$, and $\gamma_i$ are jointly independent.
       
 ## Binomial regression with a general random intercept
 We show two examples for Binomial regression with a random intercept
 
-### Example 1: Coefficients intialized at 0
+### Example 1: deafult parameters
 The first example has two normally distributed covariates, with slopes being $\vec{\beta} = (-1,1)$. The $\gamma_i$'s are distributed Cauchy with a scale of $0.5$. The following code snippet generates the data:
 
 ```{r,cache=TRUE,eval=TRUE}
@@ -490,7 +490,7 @@ n = rep(N,K)
 #%%%%%%%%%%%%%%%%%%%%%%
 head(round(cbind(X = x,N = n,covariates),digits = 2))
 ```
-The simplest way to incorporate covariates in the model is to use the argument named `covariates` to pass a matrix of the covariates. No additional tuning of parameters is needed, but it is best if the covariates are normalized. The model is fitted using the following command:
+In order to incorporate covariates in the model, pass the matrix of covariates to the argument named `covariates`. Since we set $\Sigma$ to be the unit matrix, it is best if the covariates are normalized. The model is fitted using the following command:
 
 ```{r,cache=TRUE,eval=TRUE}
 res = mcleod(x, n, covariates = covariates)
@@ -502,27 +502,73 @@ coeffs = mcleod::results.covariate.coefficients.posterior(res)
 ```
 The returned object includes the posterior means for the slope coefficients, and the acceptance rate for the MH steps, used for sampling the values of $\vec{\beta}$. See the documentation for `results.covariate.coefficients.posterior` for information on additional graphs, used for diagnostics of the proposal distribution and acceptance rate.
 
+The posterior means for $\vec{\beta}$:
 ```{r,cache=TRUE,eval=TRUE}
-print(coeffs)
-```
-The MCMC samples for $\vec{\beta}$ can be obtained via `res$additional$original_stat_res$beta_smp`. Note that the values of $\vec{\beta}$ are initiated from $\vec{0}$.
-
-```{r,cache=TRUE,eval=TRUE}
-head(t(res$additional$original_stat_res$beta_smp))
+coeffs$posterior.means
 ```
 
+The mean acceptance rate for Metropolis Hastings steps:
+```{r,cache=TRUE,eval=TRUE}
+coeffs$acceptance.rate
+```
+
+The MCMC samples for $\vec{\beta}$:
+```{r,cache=TRUE,eval=TRUE}
+head(t(coeffs$beta_smp))
+```
+
+
+The suggested values for $\vec{\beta}$, sampled for MH iterations:
+```{r,cache=TRUE,eval=TRUE}
+head(t(coeffs$beta_suggestion))
+```
+
+
+For each iteration, was the suggested value for $\vec{\beta}$ accepted (1) or rejected (0):
+
+```{r,cache=TRUE,eval=TRUE}
+head(coeffs$proposal_approved)
+```
 The posterior distribution of $f_{\gamma_i|\vec{\pi}}$ can still plotted via:
 ```{r,cache=TRUE,eval=TRUE}
 plot.posterior(res)
 ```
 
 ### Posterior estimates for $\gamma_i$
+Posterior estimates for $\gamma_i$ can be obtained using `mcleod.posterior.estimates.random.effect` as for the case with no covariates. The code snippet below estimates the values of $\gamma_i$ for two observations: The first observation is $X_1 = 15,N_1 = 30, \vec{Z}_1 = (0,0)$ ; and the second observation is $X_2 = 40,N_2 = 50, \vec{Z}_2 = (-0.5,0.5)$.
+
+
+```{r,cache=TRUE,eval=TRUE}
+estimated.gamma_is = mcleod.posterior.estimates.random.effect(
+  #A vector, giving for each observation the number of successful draws     
+  X = c(15,40),
+  #A vector, giving for each observation the total number of draws
+  N = c(30,50),
+  #the fitted model for the mixing distribution
+  mcleod_res = res,
+  #Covariates matrix
+  covariates = rbind(c(   0,  0),
+                     c(-0.5,0.5))
+  )
+
+#%% The estimated value for gamma_i's:
+estimated.gamma_is
+```
 
 ### Predictive intervals for $X_i$ for a random intercept Binomial regression
+Predictive intervals for the value of $X_i$ in out of sample observations can be obtained using `mcleod.predictive.interval`, as for the case with no covariates. The following code snippet generates predictive intervals for two out of sample observations with the following $N_i$'s and covariates: the first observation has $N_1 = 30, \vec{Z}_1 = (-2,2)$ ; and the second observation has $N_2 = 50, \vec{Z}_2 = (1,-1)$.
 
-### Example 2: How to set different initialization and change priors for $\vec{\beta}$
+```{r,cache=TRUE,eval=TRUE}
+mcleod.predictive.interval(
+  N = c(30,50),
+  mcleod_res = res,
+  covariates = rbind(c(   -2,  2),
+                     c(  1,-1)),
+  Interval.Coverage = 0.95)
+```
 
-In the second example, we have a single covariate and a bimodal random intercept distribution. We show how to (a) change the initial values for $\vec{\beta}$ and (b) how to change the prior. The next code snippet generates the example data:
+### Example 2: How to set different initialization, prior and suggestion distribution for $\vec{\beta}$
+By default, the initial MCMC values for $\vec{\beta}$ are set using a random normal intercept binomial regression. However, these values, as well as the prior and proposal distributions for $\vec{\beta}$ may be modified by the user. In the second example, we have a single covariate and a bimodal random intercept distribution. We show how to (a) change the initial values for $\vec{\beta}$, (b) how to change the prior for $\vec{\beta}$, and (c) how to change the proposal distribution for $\vec{\beta}$. The next code snippet generates the example data:
 
 ```{r,cache=TRUE,eval=TRUE}
   N = 30 # Number of draws per sample
@@ -543,33 +589,15 @@ In the second example, we have a single covariate and a bimodal random intercept
   hist(x,main ='Dist. of Xi across samples',breaks = 30)
 ```
 
-We choose better init values for $\vec{\beta}$, by running a binomial regression assuming the $\gamma_i$'s are normal. The results are used as init for our model.
+For this example we set the inital values for $\vec{\beta}$ to be $0$ (using the argument `beta_init` below). In addition, we set the standard deviationfor the prior of beta to be $1.5$ (using the argument `beta_prior_sd`). Finally, we change $\Sigma_{proposal}$ to have a value of 0.025, using the argument `proposal_sd`.
 
-```{r,cache=TRUE,eval=TRUE}
-library(lme4) #used for normal random intercept regression models
-model_dt = data.frame(c = x,nc = n-x) #successes and failures
-model_dt = cbind(model_dt,covariates) #add the covariates
-n_Z = ncol(covariates) #number of covariates
-Z_labels = paste0('Z',1:n_Z); #labels for all cols
-names(model_dt) = c('c','nc',  Z_labels);
-# construct a formula for the model
-formula_test = paste0("cbind(c,nc)~ ",paste0('Z',1:n_Z,collapse = ' + ')," + (1|obs)");
-model_dt$obs = 1:nrow(model_dt); #index for observations
-#fit model
-glmer.model_random_intercept <- glmer(formula_test, 
-                            data=model_dt, family="binomial");
-# extract fitted slopes (intercept not needed)
-mcleod_init_basic = glmer.model_random_intercept@beta[-1]
-
-```
-
-In order to change the init for the MCMC algorithm, we pass `mcleod_init_basic` as an argument to `mcleod.covariates.estimation.parameters`. In addition, we set the SD for the prior for beta to $1.5$.
 ```{r,cache=TRUE,eval=TRUE}
   
   #Generate object with parameters for covariate estimation
   coeffs_obj  = mcleod.covariates.estimation.parameters(
-                  beta_init = mcleod_init_basic,
-                  beta_prior_sd = c(1.5))
+                  beta_init = 0,
+                  beta_prior_sd = 1.5,
+                  proposal_sd = 0.025)
 
 
   comp_params = mcleod.computational.parameters(nr.gibbs = 3000)
@@ -584,24 +612,26 @@ In order to change the init for the MCMC algorithm, we pass `mcleod_init_basic` 
 ```
 
 
-We obtain the posterior slope in the next code snippet. Note that we turn off the graphs for the posterior.
-```{r,cache=TRUE,eval=TRUE}
-coeffs = mcleod::results.covariate.coefficients.posterior(res,plot.posterior = F)
-print(coeffs)
-```
-In addition, we plot the estimated CDF for the distribution of the $\gamma_i$'s
-```{r,cache=TRUE,eval=TRUE}
-plot.posterior(res)
-```
+We obtain the posterior slope in the next code snippet. Note that we turn off the graphs for the posterior. Insead, we ask for a graph showing the MH proposals for $\vec{\beta}$. Accepted proposals are shown in red, while rejected proposals are shown in black.
 
+```{r,cache=TRUE,eval=TRUE}
+# we retreive the posterior samples for the slopws. 
+# In addition, instead of plotting the posterior samples,
+# we plot the PROPOSALS, with acccepted proposals shown
+#in red, rejections in black
+coeffs = mcleod::results.covariate.coefficients.posterior(res,
+                plot.posterior = F,
+                plot.MH.proposal.by.iteration = T)
+
+print(coeffs$posterior.means)
+```
 ## Poisson regression with a general random intercept and offset term
 
-The next example shows how run poisson regression with a general random interept.
-The next code snippet generates the data, with a single covariate and a bi-modal distribution for the intercept. In addition, we include another extrinsic variable, $C_i$, so the model equation is of the form:
+The next example shows how run a Poisson regression with a general random intercept term. The data is generated using a single covariate and a bi-modal distribution for the intercept. In addition, we include another extrinsic variable, $C_i$, so the model equation is of the form:
 
 $$X_i\sim Pois(\lambda_i); log(\lambda_i) = \gamma_i +\beta Z_i + log(C_i).$$
 
-The $C_i$'s are known, and we show to incorporate them into the model using an offset term. The next code snippet generates and plots the data. Note the massive differences in orders of magnitude for $X_i$'s, due to the change in $C_i$'s, which are distributed uniformly between 1 and 100.
+The $C_i$'s are known, and we show to incorporate them into the model using an offset term. The next code snippet generates and plots the data. Note the massive differences in orders of magnitude for $X_i$'s, due to the $C_i$'s, which are distributed uniformly between 1 and 100.
 
 ```{r,cache=TRUE,eval=TRUE}
   
@@ -624,7 +654,7 @@ The $C_i$'s are known, and we show to incorporate them into the model using an o
             )
   
   #Plot
-  hist(x,main='Dist. of Xi for the Poisson regression with offset term')
+  hist(x,main='Dist. of Xi for Poisson regression with offset term',breaks = 50)
   
 ```
 We run the Poisson regression by setting `Noise_Type = MCLEOD.POISSON.ERRORS`. The next code snippet also defines (a) the covariates, (b) the offset term and (c) the limits for $\vec{a}$.
@@ -632,7 +662,7 @@ We run the Poisson regression by setting `Noise_Type = MCLEOD.POISSON.ERRORS`. T
 ```{r,cache=TRUE,eval=TRUE}
 
  #set the number of iterations
- comp_obj = mcleod.computational.parameters(nr.gibbs = 1000,nr.gibbs.burnin = 500)
+ comp_obj = mcleod.computational.parameters(nr.gibbs = 3000,nr.gibbs.burnin = 500)
   
   res = mcleod(x, n.smp = NULL, #n.smp is null for Pois regression
                a.limits = c(-2,8), #set \vec{a}
@@ -644,20 +674,49 @@ We run the Poisson regression by setting `Noise_Type = MCLEOD.POISSON.ERRORS`. T
 
 ```
  
-We obtain the posterior distribution for the slope parameter:
+We obtain the posterior distribution for the slope parameter, plot a graph of the MCMC samples, and print the posterior mean of the slope coefficient:
 ```{r,cache=TRUE,eval=TRUE}
-mcleod::results.covariate.coefficients.posterior(res)
-
+coeffs = mcleod::results.covariate.coefficients.posterior(res)
+print(coeffs$posterior.means)
 ```
 
-... and the random effect distribution:
+We also plot the estimate for the distribution of $\gamma_i$'s:
 ```{r,cache=TRUE,eval=TRUE}
-suppressWarnings({plot.posterior(res)})
+posterior_dist_gamma = mcleod.get.posterior.mixing.dist(res)
+
+x_points = seq(-2,8,0.01)
+plot(x_points, posterior_mixing_dist$density(x_points),
+     type = 'l',xlab = 'theta',ylab = 'Density')
 ```
 
 ### Posterior estimates for $\gamma_i$
+In the next code snippet, we obtain Posterior estimates for $\gamma_i$, for samples with $i=1,2,3$ in the training data. The inputs include the observed $X_i$'s, covariates, and offsets (values pass to argument `offset_vec` are $log(C_i)$). Note that we set `N` to `NULL`.
+
+
+```{r,cache=TRUE,eval=TRUE}
+estimated.gamma_is = mcleod.posterior.estimates.random.effect(
+  X = x[1:3],
+  N = NULL,
+  mcleod_res = res,
+  covariates = covariates[1:3,,drop=F],
+  offset_vec = offset[1:3])
+
+#%% The estimated value for log(P_i/(1-P_i)):
+estimated.gamma_is
+
+```
 
 ### Predictive intervals for $X_i$ for a random intercept Poisson regression
+Predictive intervals are obtained using the function `mcleod.predictive.interval`. The next code snippet computes predictive intervals for two observations: the first observation with $Z_1 = 0 , C_1 = 1$; and the second observation with $Z_2 = -1, C_2 = 3$.
+
+```{r,cache=TRUE,eval=TRUE}
+mcleod.predictive.interval(
+  N = NULL,
+  covariates = matrix(c(0, -1),ncol = 1),
+  offset_vec = c(log(1) , log(3)),
+  mcleod_res = res,
+  Interval.Coverage = 0.95)
+```
 
 ## Setting the prior distributions on coefficient to be other than normal
 In the final example for this section, we show how to set prior distribution for beta to other distribution than a multivariate normal distribution. The only constraint for the prior for $\vec{\beta}$ is that different components for the prior need to be independent.
@@ -725,7 +784,8 @@ res = mcleod(x, n, covariates = covariates,
   
 Finally, we obtain the estimated slope parameters:
 ```{r, cache=TRUE,eval=TRUE}
-mcleod::results.covariate.coefficients.posterior(res,plot.posterior = F)
+coeffs = mcleod::results.covariate.coefficients.posterior(res,plot.posterior = F)
+coeffs$posterior.means
 ```
 
 
@@ -809,7 +869,8 @@ mcleod_res = mcleod(x.vec,n.vec,
 mcleod::plot.posterior(mcleod_res)
 
 ```
- We got a slightly different mixing distribution for the same data. 
+ 
+We got a slightly different mixing distribution for the same data. 
  
 Next, we show how the change the hyper parameters for the two-level Dirichlet Tree.This requires passing a single matrix with two rows and number of columns corresponding to the number of segments in the mixing distribution. The first row sets the hyper-parameters for the Dirichlet variable at the top of the tree. The second row sets the hyper-parameter for the Dirichlet variables at the middle level. Values correspond to segments from left to right. Each `Two.Layer.Dirichlet.Intervals / Two.Layer.Dirichlet.Nodes.in.First.Layer` set of values is used to form a Dirichlet variable.
  

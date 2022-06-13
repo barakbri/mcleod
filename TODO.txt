@@ -1,24 +1,5 @@
 #todo
 
-Monday: Vignette
-
-Add example for:
-
-( )  Explain on init for Beta regression
-
-( ) get beta by iteration
-( ) get proposals by iteration
-( ) get was proposal accepted by iteration 
-
-( )  add function for finding gamma_i for data (train and test)
-( )  add function for finding prediction CIs ( for the non-covariate case and the covariate case)
-
-
-( ) unit test
-Tuesday: - add code examples to documentation, 
-
-
-later:
 - unit test - add simple use cases
 - add code examples to documentation
 - register function for printing main object and CI object.
