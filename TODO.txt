@@ -4,8 +4,6 @@ Monday: Vignette
 
 Add example for:
 
-( )  get CIs from object
-
 ( )  Explain on init for Beta regression
 
 ( ) get beta by iteration

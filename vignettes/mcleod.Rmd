@@ -332,15 +332,11 @@ The above code snippet was run before-hand, and the result is displayed here as 
 
 ![Estimated mixing distribution (pointwise posterior median in red), 95% pointwise CIs (in black) and true mixing distribution (in blue)](./Deconvolution_Example_1.png)
 
-The exact values for the CI can be extracted via:
+The exact values for the CI can be extracted via the function `mcleod.get.CIs.mixing.dist`:
 
 ```{r,cache=TRUE,eval=FALSE}
 
-dt_CIs = data.frame(
-  log.odds = CI.est.res$bank$CI_param$theta_vec,
-  Lower = CI.est.res$computed_curves$q_star_GE,
-  Upper = CI.est.res$computed_curves$q_star_LE 
-)
+dt_CIs = mcleod.get.CIs.mixing.dist(CI.est.res)
 
 dt_CIs
 
@@ -388,7 +384,8 @@ The following code snippet computes a CI for the median of the mixing distributi
   
   CI.res = mcleod.estimate.CI.single.q(X = X,N = N,q = 0.5, #the wanted CDF value
      #set resolution:
-   CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-3,3,0.05)), 
+   CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-3,3,0.05),
+                                              rho.set.value = 0.25), 
            verbose = F) # can ask to print progress. Takes around 2 minutes.
   
   CI.res
@@ -408,7 +405,8 @@ The following code snippet computes a CI for the CDF value of the mixing distrib
     # the quantile for which the CI is needed
     theta = 0,
     # resolution for the CI, in terms of CDF values
-    CI_param = mcleod.CI.estimation.parameters(q_vec = seq(0.05,0.95,0.01)) )
+    CI_param = mcleod.CI.estimation.parameters(q_vec = seq(0.05,0.95,0.01),
+                                               rho.set.value = 0.25) )
 
   CI.res
   
