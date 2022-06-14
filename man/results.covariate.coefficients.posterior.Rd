@@ -35,4 +35,35 @@ The function receives the output of \code{\link{mcleod}}, when trying to estimat
 }
 \examples{
 See package vignette
+#'  # For full description of package model and workflow,
+ # including this function, Type browseVignettes(package = 'mcleod') 
+ # in the R console and check the package vignette
+
+library(mcleod)
+#############################
+# Example: Binomial regression with a random normal intercept
+#############################
+# Generate data:
+N = 30 #Number of draws per binomial observations
+K = 200 #Number of samples
+set.seed(1)
+covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K) #Generate covariates
+colnames(covariates) = c('covariate 1','covariate 2')
+#define slopes:
+real_beta_1 = -1
+real_beta_2 = 1
+#sample
+x = rbinom(K,size = N,
+prob = inv.log.odds(rcauchy(K,location = 0,scale = 0.5) +
+real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
+n = rep(N,K)
+
+# Fit model:
+res = mcleod(x, n, covariates = covariates)
+
+#Plot posterior for coefficients:
+coeffs = mcleod::results.covariate.coefficients.posterior(res)
+
+# Posterior mean for coefficients:
+coeffs$posterior.means
 }

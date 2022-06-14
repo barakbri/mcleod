@@ -325,7 +325,97 @@ mcleod.computational.parameters = function(nr.gibbs = 500,
 #' @return an object of type 'mcleod.covariates.estimation.parameters.obj'
 #' @export
 #'
-#' @examples See the package vignette
+#' @examples
+#'  # For full description of package model and workflow,
+#'  # including this function, Type browseVignettes(package = 'mcleod') 
+#'  # in the R console and check the package vignette
+#'
+#' library(mcleod)
+#' #############################
+#' # Example 1: Binomial regression with a random normal intercept
+#' # Example shows how to change the Standard deviation for  
+#' # for the prior and the proposal distributions
+#' #############################
+#' N = 30 # Number of draws per sample
+#' K = 300 #Number of samples
+#' set.seed(2)
+#' covariates = matrix(rexp(K),nrow = K) # exponentially distributed coefficients
+#' real_beta = -0.5 #the real value of the coefficient
+#'  
+#' u = sample(c(0,1),size = K,replace = T)
+#' x = rbinom(K,size = N,
+#'          prob =inv.log.odds(rnorm(K,-1+3*u,sd = 0.3) +
+#'                               real_beta*covariates))
+#' n = rep(N,K)
+#' 
+#' hist(x,main ='Dist. of Xi across samples',breaks = 30)
+#' 
+#' #Generate object with parameters for covariate estimation
+#' coeffs_obj  = mcleod.covariates.estimation.parameters(
+#'                 beta_prior_sd = 1.5,
+#'                 proposal_sd = 0.025)
+#' 
+#' 
+#' comp_params = mcleod.computational.parameters(nr.gibbs = 3000)
+#' # In addition to covariates, pass coeffs_obj as an argument 
+#' res = mcleod(x,
+#'              n,
+#'              covariates = covariates,
+#'              covariates_estimation_parameters = coeffs_obj,
+#'              computational_parameters = comp_params
+#'              )
+#'
+#' #############################
+#' # Example 2: Specifying non-normal prior for \vec{\beta}
+#' #############################
+#' # In this example, we have a bivariate vector of covariates, and
+#' # specify a cauchy prior for \vec{\beta}
+#'
+#' # Generate data:
+#'
+#' N = 30 #nr draws per sample
+#' K = 200 #nr samples
+#' set.seed(1)
+#' covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K) #generate covariates
+#' real_beta_1 = -1 #true values for slopes
+#' real_beta_2 = 1
+#' #generate data:
+#' x = rbinom(K,size = N,prob = inv.log.odds(rnorm(K,0,sd = 1)
+#'           + real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
+#' n = rep(N,K)
+#'
+#' # We proceed to generete a discetized representation of the prior
+#' # we descretize the range (-5,5)
+#' beta_prior_points = seq(-5,5,0.01)
+#' 
+#' # for each segment, we compute the probability for the slope to be in the segment
+#' beta_prior_probs = pcauchy(beta_prior_points[-1]) - 
+#'                   pcauchy(beta_prior_points[-length(beta_prior_points)])
+#' 
+#' # we renormalize, since we cropped the support to be (-5,5)
+#' beta_prior_probs = beta_prior_probs/ sum(beta_prior_probs)
+#' 
+#' # plot the prior
+#' plot(beta_prior_points[-1],beta_prior_probs,
+#'       type = 'l',xlab = 'theta',
+#'       ylab = 'probability in bin of beta_prior_probs')
+#' 
+#' # since we have two covariates, we duplicate the prior 
+#' # across two columns. Generally we can have different priors
+#' # for different components of \vec{\beta}
+#' beta_prior_probs = matrix(c(beta_prior_probs, beta_prior_probs),ncol = 2)
+#' 
+#' #generate prior definitions' object with the new prior dist.:
+#' coeffs_obj = mcleod.covariates.estimation.parameters(
+#'       Manual_Prior_Values = beta_prior_points,
+#'       Manual_Prior_Probs = beta_prior_probs)
+#' 
+#' #fit model and get results:
+#' res = mcleod(x, n, covariates = covariates,
+#'                covariates_estimation_parameters = coeffs_obj)
+#' 
+#' coeffs = mcleod::results.covariate.coefficients.posterior(res,plot.posterior = F)
+#' coeffs$posterior.means
 mcleod.covariates.estimation.parameters = function(proposal_sd = c(0.05),
                                            beta_prior_sd = c(1),
                                            beta_init = NULL,
@@ -1044,6 +1134,44 @@ plot.posterior	<- function(mcleod.obj, plot_only_point_estimate = F)
 #'
 #' @examples
 #' See package vignette
+#' #'  # For full description of package model and workflow,
+#'  # including this function, Type browseVignettes(package = 'mcleod') 
+#'  # in the R console and check the package vignette
+#'
+#' library(mcleod)
+#' #############################
+#' # Example: Binomial regression with a random normal intercept
+#' #############################
+#' # Generate data:
+#' N = 30 #Number of draws per binomial observations
+#' K = 200 #Number of samples
+#' set.seed(1)
+#' covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K) #Generate covariates
+#' colnames(covariates) = c('covariate 1','covariate 2')
+#' #define slopes:
+#' real_beta_1 = -1
+#' real_beta_2 = 1
+#' #sample
+#' x = rbinom(K,size = N,
+#' prob = inv.log.odds(rcauchy(K,location = 0,scale = 0.5) +
+#' real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
+#' n = rep(N,K)
+#' 
+#' # Fit model:
+#' res = mcleod(x, n, covariates = covariates)
+#' 
+#' # Plot posterior for coefficients (burn-in in red):
+#' coeffs = mcleod::results.covariate.coefficients.posterior(res)
+#' 
+#' # Posterior mean for coefficients:
+#' coeffs$posterior.means
+#' 
+#' # MCMC samples for \vec{\beta}
+#' head(t(coeffs$beta_smp))
+#' 
+#' # Plot Metropolis Hastings proposals for \vec{\beta}.
+#' # Accepted proposals in red, rejections in black.
+#' coeffs = mcleod::results.covariate.coefficients.posterior(res,plot.posterior = F,plot.MH.proposal.by.iteration = T)
 results.covariate.coefficients.posterior = function(mcleod.obj, plot.posterior = T, plot.MH.proposal.by.iteration = F,aggregate_by = mean){
 
   if(class(mcleod.obj) != CLASS.NAME.MCLEOD){
@@ -1344,11 +1472,153 @@ checks.input.posthoc.analysis = function(X, N, mcleod_res, offset_vec, is_Noise_
 #' @param method Type of estimator for \eqn{P_i} \ \eqn{\lambda_i} \ \eqn{\gamma_i}. Use \code{'mean'} for posterior mean, and \code{'mode'} for posterior mode. 
 #' @param offset_vec A vector of offset values, for the linear predictor term. See full definition in the function vignette.
 #'
-#' @return Vector of estimates for \eqn{P_i} (for binomial data) , \eqn{\lambda_i} (for Poisson data), or \eqn{\gamma_i} (observation's random intercept, for data with covariates). Entries correspond to entries of \code{X}
+#' @return Vector of estimates for \eqn{log(P_i/(1-P_i))} (for binomial data) , \eqn{log(\lambda_i)} (for Poisson data), or \eqn{\gamma_i} (observation's random intercept, for data with covariates). Entries correspond to entries of \code{X}
 #' @export
 #'
 #' @examples
-#' See package vignette
+#'  # For full description of package model and workflow,
+#'  # including this function, Type browseVignettes(package = 'mcleod') 
+#'  # in the R console and check the package vignette
+#' #############################
+#' # Example 1: Binomial sampling, no covariates. 
+#' #############################
+#' 
+#' # Generate Data:
+#' N = 30
+#' K = 300
+#' set.seed(1)
+#' u = sample(c(0,1),size = K,replace = T)
+#' x = rbinom(K,size = N,prob =inv.log.odds(rnorm(K,-1+3*u,sd = 0.3)))
+#' n = rep(N,K)
+#' head(cbind(x,n))
+#' 
+#' # Fit model
+#' res = mcleod(x, n)
+#' 
+#' # Estimate log(P_i/(1-P_i)) for the training data (can also be done for out-of-sample data)
+#' estimated_log_odds = mcleod.posterior.estimates.random.effect(X = x,
+#'                      N = n,mcleod_res = res)
+#' 
+#' # The following values are the estimated "log-odds",
+#' # given x,n and the fitted mcleod model
+#' head(estimated_log_odds)
+#' 
+#' # Values can be convert to P scale using inv.log.odds(...):
+#' head(inv.log.odds(head(estimated_log_odds)))
+#' 
+#' #############################
+#' # Example 2: Poisson sampling, no covariates. 
+#' #############################
+#' 
+#' # Generate Data:
+#' K = 200 # number of samples
+#' set.seed(1)
+#' #u sets right or left component in the mix. dist. for each obs.:
+#' u = sample(c(0,1),size = K,replace = T)
+#' u2 = exp(rnorm(K,2 + 3*u,0.5)) # The true values of lambda_i
+#' x = rpois(K,lambda = u2 ) #sample the obs
+#' 
+#' # Fit model
+#' res = mcleod(x, n.smp = NULL,a.limits = c(-2,8),
+#'              Noise_Type = MCLEOD.POISSON.ERRORS)
+#' 
+#' # Estimate log(lambda) for the training data 
+#' # (can also be done for out-of-sample data)
+#' estimated_log_lambda = mcleod.posterior.estimates.random.effect(X = x,
+#'                             N = NULL, mcleod_res = res)
+#' head(estimated_log_lambda)
+#' 
+#' # Values can be convert to lambda scale using exp(...):
+#' head(exp(estimated_log_lambda))
+#' 
+#' # We can check accuracy of estimated lambda_i to true vailes using this plot:
+#' #plot(log(u2),estimated_log_lambda)
+#' #abline(0,1,col = 'red')
+#' 
+#' # Prediction intervals for out-of-sample observations:
+#' # Note that there are no N_i or covariates, so all observations are i.i.d.,
+#' # thus, the function reports a single prediction interval:
+#' 
+#' 
+#' #############################
+#' # Example 3: Binomial regression with 
+#' # two covariates and a random intercept
+#' #############################
+#' 
+#' # Generate data:
+#' N = 30 #Number of draws per binomial observations
+#' K = 200 #Number of samples
+#' set.seed(1)
+#' covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K) #Generate covariates
+#' colnames(covariates) = c('covariate 1','covariate 2')
+#' #define slopes:
+#' real_beta_1 = -1
+#' real_beta_2 = 1
+#' random_inter = rcauchy(K,location = 0,scale = 0.5)
+#' #sample
+#' x = rbinom(K,size = N,
+#'           prob = inv.log.odds(random_inter +
+#'           real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
+#' n = rep(N,K)
+#' 
+#' # fit model:
+#' res = mcleod(x, n, covariates = covariates)
+#' 
+#' # we estimate the random intercept using:
+#' gamma_estimate = mcleod.posterior.estimates.random.effect(X = x, N = n, mcleod_res = res, covariates = covariates, method = 'mean')
+#' 
+#' # we can check estimates accuracy by comparing to true values:
+#' # plot(gamma_estimate,random_inter,xlim = c(-2,2),ylim = c(-2,2))
+#' # abline(0,1,col = 'red')
+#' 
+#' #############################
+#' # Example 4: Poisson regression with 
+#' # a covariate, a random intercept and an offset term
+#' # Random intercept has bimodal density
+#' #############################
+#' 
+#' # Generate data:
+#' K = 200 #Number of samples
+#' set.seed(2)
+#' # A exponentially distributed covariate:
+#' covariates = matrix(rexp(K,rate = 2),nrow = K) 
+#' # Value of the slope coefficient:
+#' real_beta = 0.5
+#' 
+#' #indicator for the component in the bimodel intercept distribution.
+#' u = sample(c(0,1),size = K,replace = T) 
+#' #draw a random intrinsic size, known to the user.
+#' extrinsic_size = runif(n = K,1,100)
+#' offset = log(extrinsic_size) #convert to log scale.
+#' u2 = rnorm(K,2 + 3*u,0.5) # this is the true value of gamma_i's !
+#' 
+#' # generate data (note how the offset/extrinsic size affects measurements):
+#' x = rpois(K,
+#' lambda = extrinsic_size * exp(u2 + real_beta* covariates)
+#' )
+#' 
+#' 
+#' # Fit a model:
+#' comp_obj = mcleod.computational.parameters(nr.gibbs = 1000,nr.gibbs.burnin = 500)
+#' 
+#' res = mcleod(x, n.smp = NULL, #n.smp is null for Pois regression
+#'              a.limits = c(-2,8), #set \vec{a}
+#'              computational_parameters = comp_obj,
+#'              covariates = covariates, # pass covariates
+#'              Noise_Type = MCLEOD.POISSON.ERRORS, #Poisson regression
+#'              offset_vec = offset #pass offset term
+#' )
+#' 
+#' 
+#' # Estimate gamma_i's:
+#' gamma_estimate = mcleod.posterior.estimates.random.effect(X = x,
+#'                   N=NULL, mcleod_res = res,covariates = covariates,
+#'                   offset_vec = offset)
+#' 
+#' # We can check estimation accuracy for gamma_i's using the next plot:
+#' # plot(u2,gamma_estimate)
+#' # abline(0,1,col = 'red')
+#' 
 mcleod.posterior.estimates.random.effect = function(X,N,mcleod_res,covariates = NULL,method = 'mean',offset_vec = rep(0,length(X))){
   
   if(!(method %in% c('mean','mode'))){
@@ -1503,7 +1773,138 @@ mcleod.posterior.estimates.random.effect = function(X,N,mcleod_res,covariates = 
 #' @export
 #'
 #' @examples
-#'
+#'  # For full description of package model and workflow,
+#'  # including this function, Type browseVignettes(package = 'mcleod') 
+#'  # in the R console and check the package vignette
+#' #############################
+#' # Example 1: Binomial sampling, no covariates. 
+#' #############################
+#' 
+#' # Generate Data:
+#' N = 30
+#' K = 300
+#' set.seed(1)
+#' u = sample(c(0,1),size = K,replace = T)
+#' x = rbinom(K,size = N,prob =inv.log.odds(rnorm(K,-1+3*u,sd = 0.3)))
+#' n = rep(N,K)
+#' head(cbind(x,n))
+#' 
+#' # Fit model
+#' res = mcleod(x, n)
+#' 
+#' # Prediction intervals for out-of-sample observations with N_i = 30 or 60;
+#' pred_CI = mcleod.predictive.interval(N = c(30,60),
+#'                                     mcleod_res = res,
+#'                                     Interval.Coverage = 0.95)
+#' pred_CI
+#' 
+#' #############################
+#' # Example 2: Poisson sampling, no covariates. 
+#' #############################
+#' 
+#' # Generate Data:
+#' K = 200 # number of samples
+#' set.seed(1)
+#' #u sets right or left component in the mix. dist. for each obs.:
+#' u = sample(c(0,1),size = K,replace = T)
+#' u2 = exp(rnorm(K,2 + 3*u,0.5)) # The true values of lambda_i
+#' x = rpois(K,lambda = u2 ) #sample the obs
+#' 
+#' # Fit model
+#' res = mcleod(x, n.smp = NULL,a.limits = c(-2,8),
+#'              Noise_Type = MCLEOD.POISSON.ERRORS)
+#' 
+#' # Prediction intervals for out-of-sample observations:
+#' # Note that there are no N_i or covariates, so all observations are i.i.d.,
+#' # thus, the function reports a single prediction interval:
+#' 
+#' pred_CI = mcleod.predictive.interval(N = NULL,mcleod_res = res,
+#'           Interval.Coverage = 0.95)
+#' pred_CI
+#' 
+#' 
+#' #############################
+#' # Example 3: Binomial regression with 
+#' # two covariates and a random intercept
+#' #############################
+#' 
+#' # Generate data:
+#' N = 30 #Number of draws per binomial observations
+#' K = 200 #Number of samples
+#' set.seed(1)
+#' covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K) #Generate covariates
+#' colnames(covariates) = c('covariate 1','covariate 2')
+#' #define slopes:
+#' real_beta_1 = -1
+#' real_beta_2 = 1
+#' random_inter = rcauchy(K,location = 0,scale = 0.5)
+#' #sample
+#' x = rbinom(K,size = N,
+#'           prob = inv.log.odds(random_inter +
+#'           real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
+#' n = rep(N,K)
+#' 
+#' # fit model:
+#' res = mcleod(x, n, covariates = covariates)
+#' 
+#' 
+#' # Prediction intervals for 2 out-of-sample observations:
+#' # one with N_1 =30, Z_1 = c(0,0); and another with N_2 =40, Z_2 = (1,1);
+#' pred_CI = mcleod.predictive.interval(N = c(30,40),
+#'                                      mcleod_res = res,
+#'                                      covariates = rbind(c(0,0),c(1,1)),
+#'                                      Interval.Coverage = 0.8)
+#' pred_CI
+#' 
+#' #############################
+#' # Example 4: Poisson regression with 
+#' # a covariate, a random intercept and an offset term
+#' # Random intercept has bimodal density
+#' #############################
+#' 
+#' # Generate data:
+#' K = 200 #Number of samples
+#' set.seed(2)
+#' # A exponentially distributed covariate:
+#' covariates = matrix(rexp(K,rate = 2),nrow = K) 
+#' # Value of the slope coefficient:
+#' real_beta = 0.5
+#' 
+#' #indicator for the component in the bimodel intercept distribution.
+#' u = sample(c(0,1),size = K,replace = T) 
+#' #draw a random intrinsic size, known to the user.
+#' extrinsic_size = runif(n = K,1,100)
+#' offset = log(extrinsic_size) #convert to log scale.
+#' u2 = rnorm(K,2 + 3*u,0.5) # this is the true value of gamma_i's !
+#' 
+#' # generate data (note how the offset/extrinsic size affects measurements):
+#' x = rpois(K,
+#' lambda = extrinsic_size * exp(u2 + real_beta* covariates)
+#' )
+#' 
+#' 
+#' # Fit a model:
+#' comp_obj = mcleod.computational.parameters(nr.gibbs = 1000,nr.gibbs.burnin = 500)
+#' 
+#' res = mcleod(x, n.smp = NULL, #n.smp is null for Pois regression
+#'              a.limits = c(-2,8), #set \vec{a}
+#'              computational_parameters = comp_obj,
+#'              covariates = covariates, # pass covariates
+#'              Noise_Type = MCLEOD.POISSON.ERRORS, #Poisson regression
+#'              offset_vec = offset #pass offset term
+#' )
+#' 
+#' 
+#' # Predictive intervals for two observations:
+#' # First observation with Z_1 = 0, extrinsic_size = 1
+#' # Second observation with Z_1 = 1, extrinsic_size = 4
+#' pred_CI = mcleod.predictive.interval(N = NULL,mcleod_res = res,
+#'           covariates = matrix(c(0,1),ncol = 1),
+#'           offset_vec =  log(c(1,4)),
+#'           Interval.Coverage = 0.85)
+#'           pred_CI
+#' 
+#' 
 mcleod.predictive.interval = function(N,mcleod_res,covariates = NULL, offset_vec = NULL, Interval.Coverage = 0.95,Nr_Simulated_Values = 1000){
   #extract parameters from mcleod res object
   N.gibbs = mcleod_res$parameters_list$nr.gibbs

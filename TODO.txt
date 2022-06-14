@@ -9,24 +9,6 @@
 - add warning rho is muliple of grid size
 - add citations to papers and dissertation
 
-################
-V log.odds
-V inv.log.odds
-####################
-V mcleod
-V plot.posterior
-V mcleod.get.posterior.mixing.dist
-####################
-V mcleod.prior.parameters
-#########################
-V mcleod.computational.parameters
-#########################
-
-results.covariate.coefficients.posterior
-mcleod.covariates.estimation.parameters
-#########################
-mcleod.posterior.estimates.random.effect
-mcleod.predictive.interval
 #########################
 mcleod.estimate.CI
 mcleod.CI.estimation.parameters
