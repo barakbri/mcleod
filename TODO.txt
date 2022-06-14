@@ -10,19 +10,20 @@
 - add citations to papers and dissertation
 
 ################
-log.odds
-inv.log.odds
+V log.odds
+V inv.log.odds
 ####################
-mcleod
-plot.posterior
-mcleod.get.posterior.mixing.dist
+V mcleod
+V plot.posterior
+V mcleod.get.posterior.mixing.dist
 ####################
-mcleod.prior.parameters
+V mcleod.prior.parameters
 #########################
-mcleod.computational.parameters
+V mcleod.computational.parameters
 #########################
-mcleod.covariates.estimation.parameters
+
 results.covariate.coefficients.posterior
+mcleod.covariates.estimation.parameters
 #########################
 mcleod.posterior.estimates.random.effect
 mcleod.predictive.interval

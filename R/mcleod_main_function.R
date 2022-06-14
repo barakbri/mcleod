@@ -46,7 +46,125 @@ MCLEOD.NORMAL.MEAN.IS.VAR.ERRORS = 2L
 #' @export
 #'
 #' @examples
-#' See the package vignette
+#'  # For full description of package model and workflow,
+#'  # including this function, Type browseVignettes(package = 'mcleod') 
+#'  # in the R console and check the package vignette
+#'
+#' #generate data
+#' library(mcleod)
+#' N = 30
+#' K = 300
+#' set.seed(1)
+#' u = sample(c(0,1),size = K,replace = T)
+#' x = rbinom(K,size = N,prob =inv.log.odds(rnorm(K,-1+3*u,sd = 0.3)))
+#' n = rep(N,K)
+#' 
+#' ###################################
+#' # Example 1 -  how to change the number of levels for the Polya tree prior
+#' ###################################
+#' prior_obj  = mcleod.prior.parameters( #construct object defining the prior
+#'   prior.type =MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL, #type of prior
+#'   Beta.Heirarchical.Levels = 6
+#' )
+#' 
+#' res = mcleod(x, n, prior_parameters = prior_obj) #pass object to main function as argument
+#' 
+#' ###################################
+#' # Example 2 -  how to change the prior to a 2-level Dirichlet tree
+#' ###################################
+#' prior_obj  = mcleod.prior.parameters(
+#'   prior.type =MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET, # define a 2-layer Dirichlet tree
+#'   Two.Layer.Dirichlet.Intervals = 64, #number of segments
+#'   # Note: Two.Layer.Dirichlet.Intervals must
+#'   # be an integer multiple of 
+#'   #Two.Layer.Dirichlet.Nodes.in.First.Layer
+#'   Two.Layer.Dirichlet.Nodes.in.First.Layer = 8
+#' )
+#' 
+#' res = mcleod(x, n, prior_parameters = prior_obj) #pass as argument
+#' 
+#' 
+#' #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#' # Example 3 (Advanced)  - How to change 
+#' # hyper-parameters for the Polya tree prior
+#' #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#' #For, example, how to change all hyper parameters to 2
+#' # We form two matrices, for $\alpha^{L}$ and $\alpha^{U}$.
+#' # In each matrix, the [l,i] entry gives the appropriate hyper parameter
+#' # for the ith node on the lth level.
+#' 
+#' L = 5 # number of levels
+#' alpha_L = matrix(NA,nrow = L,ncol = 2^(L-1)) # hyper-parameter matrices 
+#' alpha_U = matrix(NA,nrow = L,ncol = 2^(L-1))
+#' 
+#' # Fill all entries to a value of 2
+#' for(l in 1:L){
+#'    for(k in 1:2^(l-1)){
+#'       alpha_L[l,k] = 2
+#'       alpha_U[l,k] = 2
+#'    }
+#' }
+#' 
+#' # we pass the hyper-paramers to the mcleod.prior.parameters(...) function
+#' mcleod_res = mcleod(x,n,
+#'            a.limits = c(-4,4),
+#'            
+#'            #pass prior hyper parameters
+#'            prior_param = mcleod.prior.parameters(
+#'                   prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,
+#'                   Beta.Heirarchical.Levels = L,
+#'                   #NOTE: THESE ARE THE MATRICES FOR THE HYPER-PARAMETERS:
+#'                   Prior_Hyper_Parameters_BetaH_L = alpha_L,
+#'                   Prior_Hyper_Parameters_BetaH_U = alpha_U),
+#'                   
+#'            # set the number of iterations
+#'            computational_parameters = mcleod.computational.parameters(
+#'                   nr.gibbs = 2000,
+#'                   nr.gibbs.burnin = 1000)
+#'          )
+#' 
+#' mcleod::plot.posterior(mcleod_res)
+#' 
+#' ###################
+#' # Example 4 (Advanced)  - How to change hyper-parameters
+#' # for the Two-Level Dirichlet tree prior
+#' ###################
+#' # Set tree structure
+#' Nodes_in_first_layer = 8
+#' Total_nr_nodes = 64
+#' 
+#' #set matrix for hyper parameters.
+#' Two_Level_Dirichlet_Tree_Hyperparameters = matrix(NA,nrow = 2,ncol = Total_nr_nodes)
+#' 
+#' #Dirichlet at top of tree is Dirichlet(2,2,2,2,2,2,2,2)
+#' Two_Level_Dirichlet_Tree_Hyperparameters[1,1:Nodes_in_first_layer] = 2
+#' 
+#' # At the middle level we have 8 Dirichlet random variables.
+#' # We set all of them to be Dirichlet(2,2,2,2,2,2,2,2) as well.
+#' 
+#' Two_Level_Dirichlet_Tree_Hyperparameters[2,1:Total_nr_nodes] = 2
+#' 
+#' # we pass the hyper-paramers to the mcleod.prior.parameters(...) function
+#' mcleod_res = mcleod(x,n,
+#'              a.limits = c(-4,4),
+#'              
+#'              #Define prior
+#'              prior_param = mcleod.prior.parameters(
+#'                        #Define as 2-layer Dirichlet tree
+#'                        prior.type = MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET,
+#'                        #set tree structure
+#'                        Two.Layer.Dirichlet.Intervals = Total_nr_nodes,
+#'                        Two.Layer.Dirichlet.Nodes.in.First.Layer =  Nodes_in_first_layer,
+#'                        #NOTE: HERE WE PASS THE HYPER-PARAMETERS
+#'                        Prior_Hyper_Parameters_2LDT = Two_Level_Dirichlet_Tree_Hyperparameters),
+#' 
+#'                        #Set the number of iterations
+#'              computational_parameters = mcleod.computational.parameters(
+#'                        nr.gibbs = 2000,
+#'                        nr.gibbs.burnin = 1000)
+#' )
+#' 
+#' mcleod::plot.posterior(mcleod_res)
 mcleod.prior.parameters = function(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL,
                                    Beta.Heirarchical.Levels = 6,
                                    Two.Layer.Dirichlet.Intervals = 64,
@@ -134,7 +252,25 @@ mcleod.prior.parameters = function(prior.type = MCLEOD.PRIOR.TYPE.BETA.HEIRARCHI
 #' @return An object of size 'mcleod.computational.parameters.obj'
 #' @export
 #'
-#' @examples See the package vignette
+#' @examples
+#'  # For full description of package model and workflow,
+#'  # including this function, Type browseVignettes(package = 'mcleod') 
+#'  # in the R console and check the package vignette
+#'
+#' library(mcleod)
+#' N = 30
+#' K = 300
+#' set.seed(1)
+#' u = sample(c(0,1),size = K,replace = T)
+#' x = rbinom(K,size = N,prob =inv.log.odds(rnorm(K,-1+3*u,sd = 0.3)))
+#' n = rep(N,K)
+#' 
+#' # Example how to change the number of MCMC samples, and burn-in length
+#' comp_obj = mcleod.computational.parameters(
+#'   nr.gibbs = 500, #define the number of iter.s
+#'   nr.gibbs.burnin = 250) 
+#' 
+#' res = mcleod(x, n, computational_parameters = comp_obj) # pass object as argument
 mcleod.computational.parameters = function(nr.gibbs = 500,
                                                    nr.gibbs.burnin = 250,
                                                    integration_step_size = 0.01,
@@ -295,7 +431,168 @@ mcleod.covariates.estimation.parameters = function(proposal_sd = c(0.05),
 #' @export
 #'
 #' @examples
-#' see package vignette
+#'  # For full description of package model and workflow,
+#'  # including this function, Type browseVignettes(package = 'mcleod') 
+#'  # in the R console and check the package vignette
+#'
+#' library(mcleod)
+#' ##################################
+#' # Example 1: Binomial sampling distribution, default parameters:
+#' ##################################
+#' N = 30
+#' K = 300
+#' set.seed(1)
+#' u = sample(c(0,1),size = K,replace = T)
+#' x = rbinom(K,size = N,prob =inv.log.odds(rnorm(K,-1+3*u,sd = 0.3)))
+#' n = rep(N,K)
+#' 
+#' #fit model
+#' res = mcleod(x, n)
+#' 
+#' #plot posterior mixing distribution:
+#' posterior_mixing_dist = mcleod.get.posterior.mixing.dist(res)
+#' 
+#' #' x_points = seq(-5,5,0.01)
+#' plot(x_points, posterior_mixing_dist$density(x_points),
+#' type = 'l',xlab = 'theta',ylab = 'Density')
+#' 
+#' x_points = seq(-5,5,0.01)
+#' plot(x_points, posterior_mixing_dist$CDF(x_points),
+#' type = 'l',xlab = 'theta',ylab = 'Density')
+#' 
+#' # Plot CDF with distribution of posterior samples
+#' plot.posterior(res)
+#' 
+#' #############################
+#' # Example 2: changing parameters:
+#' #############################
+#' # Example 2.1 -  how to change the support of the mixing distribution:
+#' res = mcleod(x, n, a.limits = c(-5,5))
+#' 
+#' # Example 2.2 -  how to change the number of levels for the Polya tree prior
+#' prior_obj  = mcleod.prior.parameters( #construct object defining the prior
+#'   prior.type =MCLEOD.PRIOR.TYPE.BETA.HEIRARCHICAL, #type of prior
+#'   Beta.Heirarchical.Levels = 6
+#' )
+#' 
+#' res = mcleod(x, n, prior_parameters = prior_obj) #pass object to main function as argument
+#' 
+#' # Example 2.3 -  how to change the prior to a 2-level Dirichlet tree
+#' prior_obj  = mcleod.prior.parameters(
+#'   prior.type =MCLEOD.PRIOR.TYPE.TWO.LAYER.DIRICHLET, # define a 2-layer Dirichlet tree
+#'   Two.Layer.Dirichlet.Intervals = 64, #number of segments
+#'   # Note: Two.Layer.Dirichlet.Intervals must
+#'   # be an integer multiple of 
+#'   #Two.Layer.Dirichlet.Nodes.in.First.Layer
+#'   Two.Layer.Dirichlet.Nodes.in.First.Layer = 8
+#' )
+#' 
+#' res = mcleod(x, n, prior_parameters = prior_obj) #pass as argument
+#' 
+#' # Example 2.4 -  how to change the number of MCMC samples, and burn-in length
+#' comp_obj = mcleod.computational.parameters(
+#'   nr.gibbs = 500, #define the number of iter.s
+#'   nr.gibbs.burnin = 250) 
+#' 
+#' res = mcleod(x, n, computational_parameters = comp_obj) # pass object as argument
+#' 
+#' #############################
+#' # Example 3: Estimating the mixing distribution with Poisson samples
+#' #############################
+#' 
+#' #Generate data
+#' K = 200 # number of samples
+#' set.seed(1)
+#' #u sets right or left component in the mix. dist. for each obs.:
+#' u = sample(c(0,1),size = K,replace = T) 
+#' x = rpois(K,lambda = exp(rnorm(K,2 + 3*u,0.5)) ) #sample the obs
+#' 
+#' # Fit model:
+#' res = mcleod(x, n.smp = NULL,a.limits = c(-2,8),Noise_Type = MCLEOD.POISSON.ERRORS)
+#' 
+#' # Plot the CDF of the mixing distribution, toghether with posterior samples
+#' plot.posterior(res)
+#' 
+#' #############################
+#' # Example 4: Binomial regression with a random normal intercept
+#' #############################
+#' # Generate data:
+#' N = 30 #Number of draws per binomial observations
+#' K = 200 #Number of samples
+#' set.seed(1)
+#' covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K) #Generate covariates
+#' colnames(covariates) = c('covariate 1','covariate 2')
+#' #define slopes:
+#' real_beta_1 = -1
+#' real_beta_2 = 1
+#' #sample
+#' x = rbinom(K,size = N,
+#' prob = inv.log.odds(rcauchy(K,location = 0,scale = 0.5) +
+#' real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
+#' n = rep(N,K)
+#' 
+#' # Fit model:
+#' res = mcleod(x, n, covariates = covariates)
+#' 
+#' #Plot posterior for coefficients:
+#' coeffs = mcleod::results.covariate.coefficients.posterior(res)
+#' 
+#' # Posterior mean for coefficients:
+#' coeffs$posterior.means
+#' 
+#' #Posterior distribution of random intercept:
+#' plot.posterior(res)
+#' 
+#' #############################
+#' # Example 5: Poisson regression with a random normal intercept and an offset term
+#' #############################
+#' 
+#' # generate data
+#' K = 200 #Number of samples
+#' set.seed(2)
+#' # A exponentially distributed covariate:
+#' covariates = matrix(rexp(K,rate = 2),nrow = K) 
+#' # Value of the slope coefficient:
+#' real_beta = 0.5
+#' 
+#' #indicator for the component in the bimodel intercept distribution.
+#' u = sample(c(0,1),size = K,replace = T) 
+#' #draw a random intrinsic size, known to the user.
+#' extrinsic_size = runif(n = K,1,100)
+#' offset = log(extrinsic_size) #convert to log scale.
+#' 
+#' #generate data, note how the offset term affects the rate (offset is additive to log lambda):
+#' x = rpois(K,
+#' lambda = extrinsic_size * exp(rnorm(K,2 + 3*u,0.5) + real_beta* covariates)
+#' )
+#' 
+#' #Plot data
+#' hist(x,main='Dist. of Xi for Poisson regression with offset term',breaks = 50)
+#' 
+#' #set the number of iterations
+#' comp_obj = mcleod.computational.parameters(nr.gibbs = 3000,nr.gibbs.burnin = 500)
+#' 
+#' #fit model
+#' res = mcleod(x, n.smp = NULL, #n.smp is null for Pois regression
+#'      a.limits = c(-2,8),
+#'      computational_parameters = comp_obj,
+#'      covariates = covariates, # pass covariates
+#'      Noise_Type = MCLEOD.POISSON.ERRORS, #Poisson regression
+#'      offset_vec = offset #pass offset term
+#' )
+#' 
+#' # posterior dist of slope coefficients
+#' coeffs = mcleod::results.covariate.coefficients.posterior(res)
+#' 
+#' # posterior mean
+#' print(coeffs$posterior.means)
+#' 
+#' # posterior distribution of random intercepts:
+#' posterior_dist_gamma = mcleod.get.posterior.mixing.dist(res)
+#' 
+#' x_points = seq(-2,8,0.01)
+#' plot(x_points, posterior_mixing_dist$density(x_points),
+#' type = 'l',xlab = 'theta',ylab = 'Density')
 mcleod	<- function( x.smp,
                      n.smp,
                      a.limits = c(-4,4),
@@ -642,7 +939,51 @@ mcleod	<- function( x.smp,
 #' @export
 #'
 #' @examples
-#' See package vignette
+#'  # For full description of package model and workflow,
+#'  # including this function, Type browseVignettes(package = 'mcleod') 
+#'  # in the R console and check the package vignette
+#'
+#' library(mcleod)
+#' ##################################
+#' # Example 1: Binomial sampling distribution:
+#' # The function plots the posterior mixing distribution
+#' ##################################
+#' N = 30
+#' K = 300
+#' set.seed(1)
+#' u = sample(c(0,1),size = K,replace = T)
+#' x = rbinom(K,size = N,prob =inv.log.odds(rnorm(K,-1+3*u,sd = 0.3)))
+#' n = rep(N,K)
+#' 
+#' #fit model
+#' res = mcleod(x, n)
+#' # Plot CDF with distribution of posterior samples
+#' plot.posterior(res)
+#' 
+#' #############################
+#' # Example 2: Binomial regression with a random normal intercept
+#' # The function plots the posterior distribution of the random intercept
+#' #############################
+#' # Generate data:
+#' N = 30 #Number of draws per binomial observations
+#' K = 200 #Number of samples
+#' set.seed(1)
+#' covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K) #Generate covariates
+#' colnames(covariates) = c('covariate 1','covariate 2')
+#' #define slopes:
+#' real_beta_1 = -1
+#' real_beta_2 = 1
+#' #sample
+#' x = rbinom(K,size = N,
+#' prob = inv.log.odds(rcauchy(K,location = 0,scale = 0.5) +
+#' real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
+#' n = rep(N,K)
+#' 
+#' # Fit model:
+#' res = mcleod(x, n, covariates = covariates)
+#' 
+#' #Posterior distribution of random intercept:
+#' plot.posterior(res)
 plot.posterior	<- function(mcleod.obj, plot_only_point_estimate = F)
 {
   library(ggplot2)
@@ -776,7 +1117,64 @@ results.covariate.coefficients.posterior = function(mcleod.obj, plot.posterior =
 #' @export
 #'
 #' @examples
-#' see package vignette
+#'  # For full description of package model and workflow,
+#'  # including this function, Type browseVignettes(package = 'mcleod') 
+#'  # in the R console and check the package vignette
+#'
+#' library(mcleod)
+#' ##################################
+#' # Example 1: Binomial sampling distribution, default parameters:
+#' # The function plots the posterior mixing distribution
+#' ##################################
+#' N = 30
+#' K = 300
+#' set.seed(1)
+#' u = sample(c(0,1),size = K,replace = T)
+#' x = rbinom(K,size = N,prob =inv.log.odds(rnorm(K,-1+3*u,sd = 0.3)))
+#' n = rep(N,K)
+#' 
+#' #fit model
+#' res = mcleod(x, n)
+#' 
+#' #plot posterior mixing distribution:
+#' posterior_mixing_dist = mcleod.get.posterior.mixing.dist(res)
+#' 
+#' #' x_points = seq(-5,5,0.01)
+#' plot(x_points, posterior_mixing_dist$density(x_points),
+#' type = 'l',xlab = 'theta',ylab = 'Density')
+#' 
+#' x_points = seq(-5,5,0.01)
+#' plot(x_points, posterior_mixing_dist$CDF(x_points),
+#' type = 'l',xlab = 'theta',ylab = 'Density')
+#' 
+#' #############################
+#' # Example 2: Binomial regression with a random normal intercept
+#' #############################
+#' # Generate data:
+#' N = 30 #Number of draws per binomial observations
+#' K = 200 #Number of samples
+#' set.seed(1)
+#' covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K) #Generate covariates
+#' colnames(covariates) = c('covariate 1','covariate 2')
+#' #define slopes:
+#' real_beta_1 = -1
+#' real_beta_2 = 1
+#' #sample
+#' x = rbinom(K,size = N,
+#' prob = inv.log.odds(rcauchy(K,location = 0,scale = 0.5) +
+#' real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
+#' n = rep(N,K)
+#' 
+#' # Fit model:
+#' res = mcleod(x, n, covariates = covariates)
+#' 
+#' 
+#' # posterior distribution of random intercepts:
+#' posterior_dist_gamma = mcleod.get.posterior.mixing.dist(res)
+#' 
+#' x_points = seq(-3,3,0.01)
+#' plot(x_points, posterior_mixing_dist$density(x_points),
+#' type = 'l',xlab = 'theta',ylab = 'Density')
 mcleod.get.posterior.mixing.dist = function(res,aggregate_by = mean,specific_iter = NULL){
   if(class(res) != CLASS.NAME.MCLEOD){
     stop('input argument res for mcleod.get.posterior.mixing.dist must be an object returned from function mcleod')
@@ -1105,7 +1503,7 @@ mcleod.posterior.estimates.random.effect = function(X,N,mcleod_res,covariates = 
 #' @export
 #'
 #' @examples
-#' See package vignette
+#'
 mcleod.predictive.interval = function(N,mcleod_res,covariates = NULL, offset_vec = NULL, Interval.Coverage = 0.95,Nr_Simulated_Values = 1000){
   #extract parameters from mcleod res object
   N.gibbs = mcleod_res$parameters_list$nr.gibbs

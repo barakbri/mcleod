@@ -9,6 +9,10 @@
 #' @export
 #'
 #' @examples
+#' 
+#' library(mcleod)
+#' log.odds(0.5)
+#' 
 log.odds			<- function(p){
   log(p / (1-p))
 } 		
@@ -21,6 +25,10 @@ log.odds			<- function(p){
 #' @export
 #'
 #' @examples
+#' 
+#' library(mcleod)
+#' inv.log.odds(0)
+#' 
 inv.log.odds		<- function(theta){
   exp(theta) / (1 +exp(theta))
 }	

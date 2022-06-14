@@ -36,5 +36,5 @@ The function computes prediction intervals, for out-of-sample observations (i.e.
 The function computes prediction intervals by simulating counts using the fitted model, i.e., sampling values from the random effect from the fitted prior, adjusting for covariates and offset terms, and using Binomial/Poisson sampling to generate counts. A higher number of simulation replicates, determined by \code{Nr_Simulated_Values}, means more accurate prediction intervals. For most applications, 1000 replicates are satisfactory. However, if tail probabilities are needed (e.g. 0.9999 prediction interval), a larger value for \code{Nr_Simulated_Values} needs to be set.
 }
 \examples{
-See package vignette
+
 }

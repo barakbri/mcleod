@@ -33,5 +33,62 @@ The function computes the point-wise posterior mean/median of the mixing distrib
 Posterior mean/ median computed in a pointwise manner, across points of the support, in order to obtain an estimate of the mixing distribution (which is a function). Burn-in samples (specified by the function \code{\link{mcleod}}) are removed from the MCMC samples when computing estiamtes.
 }
 \examples{
-see package vignette
+ # For full description of package model and workflow,
+ # including this function, Type browseVignettes(package = 'mcleod') 
+ # in the R console and check the package vignette
+
+library(mcleod)
+##################################
+# Example 1: Binomial sampling distribution, default parameters:
+# The function plots the posterior mixing distribution
+##################################
+N = 30
+K = 300
+set.seed(1)
+u = sample(c(0,1),size = K,replace = T)
+x = rbinom(K,size = N,prob =inv.log.odds(rnorm(K,-1+3*u,sd = 0.3)))
+n = rep(N,K)
+
+#fit model
+res = mcleod(x, n)
+
+#plot posterior mixing distribution:
+posterior_mixing_dist = mcleod.get.posterior.mixing.dist(res)
+
+#' x_points = seq(-5,5,0.01)
+plot(x_points, posterior_mixing_dist$density(x_points),
+type = 'l',xlab = 'theta',ylab = 'Density')
+
+x_points = seq(-5,5,0.01)
+plot(x_points, posterior_mixing_dist$CDF(x_points),
+type = 'l',xlab = 'theta',ylab = 'Density')
+
+#############################
+# Example 2: Binomial regression with a random normal intercept
+#############################
+# Generate data:
+N = 30 #Number of draws per binomial observations
+K = 200 #Number of samples
+set.seed(1)
+covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K) #Generate covariates
+colnames(covariates) = c('covariate 1','covariate 2')
+#define slopes:
+real_beta_1 = -1
+real_beta_2 = 1
+#sample
+x = rbinom(K,size = N,
+prob = inv.log.odds(rcauchy(K,location = 0,scale = 0.5) +
+real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
+n = rep(N,K)
+
+# Fit model:
+res = mcleod(x, n, covariates = covariates)
+
+
+# posterior distribution of random intercepts:
+posterior_dist_gamma = mcleod.get.posterior.mixing.dist(res)
+
+x_points = seq(-3,3,0.01)
+plot(x_points, posterior_mixing_dist$density(x_points),
+type = 'l',xlab = 'theta',ylab = 'Density')
 }

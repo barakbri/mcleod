@@ -30,5 +30,22 @@ An object of size 'mcleod.computational.parameters.obj'
 Returns an object of type 'mcleod.computational.parameters.obj' used to set the computational parameters for the Gibbs sampler, used for estimating the random effect distribution.
 }
 \examples{
-See the package vignette
+ # For full description of package model and workflow,
+ # including this function, Type browseVignettes(package = 'mcleod') 
+ # in the R console and check the package vignette
+
+library(mcleod)
+N = 30
+K = 300
+set.seed(1)
+u = sample(c(0,1),size = K,replace = T)
+x = rbinom(K,size = N,prob =inv.log.odds(rnorm(K,-1+3*u,sd = 0.3)))
+n = rep(N,K)
+
+# Example how to change the number of MCMC samples, and burn-in length
+comp_obj = mcleod.computational.parameters(
+  nr.gibbs = 500, #define the number of iter.s
+  nr.gibbs.burnin = 250) 
+
+res = mcleod(x, n, computational_parameters = comp_obj) # pass object as argument
 }

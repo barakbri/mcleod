@@ -15,3 +15,9 @@ log(p/(1-p))
 \description{
 Compute log-odds from probability
 }
+\examples{
+
+library(mcleod)
+log.odds(0.5)
+
+}

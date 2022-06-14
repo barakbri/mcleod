@@ -15,3 +15,9 @@ exp(theta) / (1 +exp(theta))
 \description{
 Compute probability from log-odds
 }
+\examples{
+
+library(mcleod)
+inv.log.odds(0)
+
+}
