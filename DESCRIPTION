@@ -5,7 +5,7 @@ Version: 1.1.0
 Date: 2022-03-09
 Author: Barak Brill, Daniel Yekutieli
 Maintainer: Barak Brill <barakbri@mail.tau.ac.il>
-Description: The package contains several heirarchical Bayesian methods for estimating the mixing distribution of Binomial and Poisson sampels. Methods include regularized estimators of the CDF of the mixing distribution, confidence intervals for the CDF of the mixing distribution, and binomial and Poisson regression with a random intercept term following a general distribution.
+Description: The package contains several heirarchical Bayesian methods for estimating the mixing distribution of Binomial and Poisson samples. Methods include regularized estimators of the CDF of the mixing distribution, confidence intervals for the CDF of the mixing distribution, and binomial and Poisson regression model where the random intercept term may have a general distribution.
 License: GPL (>= 2)
 Imports: Rcpp (>= 1.0.0),ggplot2, doRNG,doParallel,parallel,hash,RcppThread
 LinkingTo: 

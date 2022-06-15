@@ -7,6 +7,6 @@
 \alias{mcleod-pkg}
 \title{mcleod: Monte Carlo methods for Estimating Latent OverDispersion of binomial and Poisson random variables.}
 \description{
-The package contains several heirarchical Bayesian methods for estimating the mixing distribution of Binomial and Poisson sampels. Methods include regularized estimators of the CDF of the mixing distribution, confidence intervals for the CDF of the mixing distribution, and binomial and Poisson regression with a random intercept term following a general distribution.
+The package contains several heirarchical Bayesian methods for estimating the mixing distribution of Binomial and Poisson samples. Methods include regularized estimators of the CDF of the mixing distribution, confidence intervals for the CDF of the mixing distribution, and binomial and Poisson regression model where the random intercept term may have a general distribution.
 }
 \keyword{internal}

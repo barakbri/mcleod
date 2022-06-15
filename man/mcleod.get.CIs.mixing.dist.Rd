@@ -25,5 +25,30 @@ Pointwise confidence intervals computed in confidence levels set by \code{mcleod
 Resolution of \code{log.odds} given by parameter \code{theta_vec} in \code{mcleod.CI.estimation.parameters} (used to define object passed to \code{mcleod.estimate.CI}).
 }
 \examples{
-see package vignette
+ # For full description of package model and workflow,
+ # including this function, Type browseVignettes(package = 'mcleod') 
+ # in the R console and check the package vignette
+ 
+ ################################
+ ## Example 
+ ################################
+ #Generate data
+ 
+ n = 500
+ N = rep(20,n) 
+ set.seed(1)
+ p = inv.log.odds(rnorm(n,-2,0.5)+3*rbinom(n,1,0.3))
+ X = rbinom(n = n,size = N,prob = p)
+ 
+ # Compute point-wise CIs for the mixing distribution
+ CI.est.res = mcleod.estimate.CI(X = X, N = N,
+         CI_param = mcleod.CI.estimation.parameters(rho.set.value = 0.25))
+ 
+ # Plot the pointwise CIs
+ plot.mcleod.CI(mcleod.CI.obj = CI.est.res)
+ 
+ # Retreive CIs for each log-odds value as a data table
+ dt_CIs = mcleod.get.CIs.mixing.dist(CI.est.res)
+ dt_CIs
+ 
 }

@@ -27,7 +27,7 @@ mcleod.prior.parameters(
 
 \item{Prior_Hyper_Parameters_BetaH_U}{matrix of size (L, (2^(L-1))). Each row represents a level in the tree. Values in the lth row of the matrix, in entries 1 to 2^(l-1), correspond to the alpha_2 parameters of beta random variables, in the lth level of the polya tree.}
 
-\item{Prior_Hyper_Parameters_2LDT}{a matrix with dimensions (2,Two.Layer.Dirichlet.Intervals). The leftmost \code{Two.Layer.Dirichlet.Intervals} entries in the first row give the intensity parameters for the Dirichlet variable at the root of the tree. The values for the second row give the intensity parameters for the dirichlet random variables at the middle level: each \code{Two.Layer.Dirichlet.Intervals / Two.Layer.Dirichlet.Nodes.in.First.Layer} define the intensity parameters of a single Dirichlet random variable, from the leftmost to rightmost variables. See example on how to use in the package vignette.}
+\item{Prior_Hyper_Parameters_2LDT}{a matrix with dimensions (2,Two.Layer.Dirichlet.Intervals). In the first row, the leftmost \code{Two.Layer.Dirichlet.Intervals} entries give the intensity parameters for the Dirichlet variable at the root of the tree. The values for the second row give the intensity parameters for the dirichlet random variables at the middle level: each \code{Two.Layer.Dirichlet.Intervals / Two.Layer.Dirichlet.Nodes.in.First.Layer} define the intensity parameters of a single Dirichlet random variable, from the leftmost to rightmost variables. See example on how to use in the package vignette.}
 }
 \value{
 An object of type \code{mcleod.prior.def.obj}

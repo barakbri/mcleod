@@ -41,7 +41,7 @@ MCLEOD.NORMAL.MEAN.IS.VAR.ERRORS = 2L
 #' @param Two.Layer.Dirichlet.Nodes.in.First.Layer Number of nodes in the first level of the Dirichlet tree. \code{Two.Layer.Dirichlet.Intervals} must be an integer multiple of \code{Two.Layer.Dirichlet.Nodes.in.First.Layer}
 #' @param Prior_Hyper_Parameters_BetaH_L A matrix of size (L, (2^(L-1))). Each row represents a level in the tree. Values in the lth row of the matrix, in entries 1 to 2^(l-1), correspond to the alpha_1 parameters of beta random variables, in the lth level of the polya tree.
 #' @param Prior_Hyper_Parameters_BetaH_U matrix of size (L, (2^(L-1))). Each row represents a level in the tree. Values in the lth row of the matrix, in entries 1 to 2^(l-1), correspond to the alpha_2 parameters of beta random variables, in the lth level of the polya tree.
-#' @param Prior_Hyper_Parameters_2LDT a matrix with dimensions (2,Two.Layer.Dirichlet.Intervals). The leftmost \code{Two.Layer.Dirichlet.Intervals} entries in the first row give the intensity parameters for the Dirichlet variable at the root of the tree. The values for the second row give the intensity parameters for the dirichlet random variables at the middle level: each \code{Two.Layer.Dirichlet.Intervals / Two.Layer.Dirichlet.Nodes.in.First.Layer} define the intensity parameters of a single Dirichlet random variable, from the leftmost to rightmost variables. See example on how to use in the package vignette.
+#' @param Prior_Hyper_Parameters_2LDT a matrix with dimensions (2,Two.Layer.Dirichlet.Intervals). In the first row, the leftmost \code{Two.Layer.Dirichlet.Intervals} entries give the intensity parameters for the Dirichlet variable at the root of the tree. The values for the second row give the intensity parameters for the dirichlet random variables at the middle level: each \code{Two.Layer.Dirichlet.Intervals / Two.Layer.Dirichlet.Nodes.in.First.Layer} define the intensity parameters of a single Dirichlet random variable, from the leftmost to rightmost variables. See example on how to use in the package vignette.
 #' @return An object of type \code{mcleod.prior.def.obj}
 #' @export
 #'
@@ -1171,7 +1171,9 @@ plot.posterior	<- function(mcleod.obj, plot_only_point_estimate = F)
 #' 
 #' # Plot Metropolis Hastings proposals for \vec{\beta}.
 #' # Accepted proposals in red, rejections in black.
-#' coeffs = mcleod::results.covariate.coefficients.posterior(res,plot.posterior = F,plot.MH.proposal.by.iteration = T)
+#' 
+#' coeffs = mcleod::results.covariate.coefficients.posterior(
+#'      res,plot.posterior = F,plot.MH.proposal.by.iteration = T)
 results.covariate.coefficients.posterior = function(mcleod.obj, plot.posterior = T, plot.MH.proposal.by.iteration = F,aggregate_by = mean){
 
   if(class(mcleod.obj) != CLASS.NAME.MCLEOD){
@@ -1565,7 +1567,8 @@ checks.input.posthoc.analysis = function(X, N, mcleod_res, offset_vec, is_Noise_
 #' res = mcleod(x, n, covariates = covariates)
 #' 
 #' # we estimate the random intercept using:
-#' gamma_estimate = mcleod.posterior.estimates.random.effect(X = x, N = n, mcleod_res = res, covariates = covariates, method = 'mean')
+#' gamma_estimate = mcleod.posterior.estimates.random.effect(
+#'   X = x, N = n, mcleod_res = res, covariates = covariates, method = 'mean')
 #' 
 #' # we can check estimates accuracy by comparing to true values:
 #' # plot(gamma_estimate,random_inter,xlim = c(-2,2),ylim = c(-2,2))

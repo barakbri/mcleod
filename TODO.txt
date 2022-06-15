@@ -1,23 +1,8 @@
 #todo
-
-- unit test - add simple use cases
-- add code examples to documentation
-- recompile vignette and manual
-
 - register function for printing main object and CI object.
 - add regression test and input checks
 - add warning rho is muliple of grid size
 - add citations to papers and dissertation
-
-#########################
-mcleod.estimate.CI
-mcleod.CI.estimation.parameters
-plot.mcleod.CI
-mcleod.get.CIs.mixing.dist
-#########################
-mcleod.estimate.CI.single.theta
-mcleod.estimate.CI.single.q
-#########################
 
 
 

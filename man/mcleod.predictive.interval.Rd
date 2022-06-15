@@ -36,5 +36,136 @@ The function computes prediction intervals, for out-of-sample observations (i.e.
 The function computes prediction intervals by simulating counts using the fitted model, i.e., sampling values from the random effect from the fitted prior, adjusting for covariates and offset terms, and using Binomial/Poisson sampling to generate counts. A higher number of simulation replicates, determined by \code{Nr_Simulated_Values}, means more accurate prediction intervals. For most applications, 1000 replicates are satisfactory. However, if tail probabilities are needed (e.g. 0.9999 prediction interval), a larger value for \code{Nr_Simulated_Values} needs to be set.
 }
 \examples{
+ # For full description of package model and workflow,
+ # including this function, Type browseVignettes(package = 'mcleod') 
+ # in the R console and check the package vignette
+#############################
+# Example 1: Binomial sampling, no covariates. 
+#############################
+
+# Generate Data:
+N = 30
+K = 300
+set.seed(1)
+u = sample(c(0,1),size = K,replace = T)
+x = rbinom(K,size = N,prob =inv.log.odds(rnorm(K,-1+3*u,sd = 0.3)))
+n = rep(N,K)
+head(cbind(x,n))
+
+# Fit model
+res = mcleod(x, n)
+
+# Prediction intervals for out-of-sample observations with N_i = 30 or 60;
+pred_CI = mcleod.predictive.interval(N = c(30,60),
+                                    mcleod_res = res,
+                                    Interval.Coverage = 0.95)
+pred_CI
+
+#############################
+# Example 2: Poisson sampling, no covariates. 
+#############################
+
+# Generate Data:
+K = 200 # number of samples
+set.seed(1)
+#u sets right or left component in the mix. dist. for each obs.:
+u = sample(c(0,1),size = K,replace = T)
+u2 = exp(rnorm(K,2 + 3*u,0.5)) # The true values of lambda_i
+x = rpois(K,lambda = u2 ) #sample the obs
+
+# Fit model
+res = mcleod(x, n.smp = NULL,a.limits = c(-2,8),
+             Noise_Type = MCLEOD.POISSON.ERRORS)
+
+# Prediction intervals for out-of-sample observations:
+# Note that there are no N_i or covariates, so all observations are i.i.d.,
+# thus, the function reports a single prediction interval:
+
+pred_CI = mcleod.predictive.interval(N = NULL,mcleod_res = res,
+          Interval.Coverage = 0.95)
+pred_CI
+
+
+#############################
+# Example 3: Binomial regression with 
+# two covariates and a random intercept
+#############################
+
+# Generate data:
+N = 30 #Number of draws per binomial observations
+K = 200 #Number of samples
+set.seed(1)
+covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K) #Generate covariates
+colnames(covariates) = c('covariate 1','covariate 2')
+#define slopes:
+real_beta_1 = -1
+real_beta_2 = 1
+random_inter = rcauchy(K,location = 0,scale = 0.5)
+#sample
+x = rbinom(K,size = N,
+          prob = inv.log.odds(random_inter +
+          real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
+n = rep(N,K)
+
+# fit model:
+res = mcleod(x, n, covariates = covariates)
+
+
+# Prediction intervals for 2 out-of-sample observations:
+# one with N_1 =30, Z_1 = c(0,0); and another with N_2 =40, Z_2 = (1,1);
+pred_CI = mcleod.predictive.interval(N = c(30,40),
+                                     mcleod_res = res,
+                                     covariates = rbind(c(0,0),c(1,1)),
+                                     Interval.Coverage = 0.8)
+pred_CI
+
+#############################
+# Example 4: Poisson regression with 
+# a covariate, a random intercept and an offset term
+# Random intercept has bimodal density
+#############################
+
+# Generate data:
+K = 200 #Number of samples
+set.seed(2)
+# A exponentially distributed covariate:
+covariates = matrix(rexp(K,rate = 2),nrow = K) 
+# Value of the slope coefficient:
+real_beta = 0.5
+
+#indicator for the component in the bimodel intercept distribution.
+u = sample(c(0,1),size = K,replace = T) 
+#draw a random intrinsic size, known to the user.
+extrinsic_size = runif(n = K,1,100)
+offset = log(extrinsic_size) #convert to log scale.
+u2 = rnorm(K,2 + 3*u,0.5) # this is the true value of gamma_i's !
+
+# generate data (note how the offset/extrinsic size affects measurements):
+x = rpois(K,
+lambda = extrinsic_size * exp(u2 + real_beta* covariates)
+)
+
+
+# Fit a model:
+comp_obj = mcleod.computational.parameters(nr.gibbs = 1000,nr.gibbs.burnin = 500)
+
+res = mcleod(x, n.smp = NULL, #n.smp is null for Pois regression
+             a.limits = c(-2,8), #set \vec{a}
+             computational_parameters = comp_obj,
+             covariates = covariates, # pass covariates
+             Noise_Type = MCLEOD.POISSON.ERRORS, #Poisson regression
+             offset_vec = offset #pass offset term
+)
+
+
+# Predictive intervals for two observations:
+# First observation with Z_1 = 0, extrinsic_size = 1
+# Second observation with Z_1 = 1, extrinsic_size = 4
+pred_CI = mcleod.predictive.interval(N = NULL,mcleod_res = res,
+          covariates = matrix(c(0,1),ncol = 1),
+          offset_vec =  log(c(1,4)),
+          Interval.Coverage = 0.85)
+          pred_CI
+
 
 }

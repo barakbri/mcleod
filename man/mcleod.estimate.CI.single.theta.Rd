@@ -36,5 +36,29 @@ The function receives input parameters as defined for \code{\link{mcleod.estimat
 This function is actually a "convenience wrapper" for \code{\link{mcleod.estimate.CI}}. It is used to make sure that the only point where CIs are computed is at log-odds=theta, and that calibration of rho is also done for this point alone.
 }
 \examples{
- See package vignette.
+ # For full description of package model and workflow,
+ # including this function, Type browseVignettes(package = 'mcleod') 
+ # in the R console and check the package vignette
+ 
+ ################################
+ ## Example - computing CI for a single value of theta
+ ################################
+ #Generate data
+ 
+ n = 500
+ N = rep(20,n) 
+ set.seed(1)
+ p = inv.log.odds(rnorm(n,-2,0.5)+3*rbinom(n,1,0.3))
+ X = rbinom(n = n,size = N,prob = p)
+   
+ CI.res = mcleod.estimate.CI.single.theta(X = X, N = N,
+ 
+   # the quantile for which the CI is needed
+   theta = 0,
+   
+   # resolution for the CI, in terms of CDF values
+   CI_param = mcleod.CI.estimation.parameters(q_vec = seq(0.05,0.95,0.01),
+                                              rho.set.value = 0.25) )
+ 
+ CI.res
 }

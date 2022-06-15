@@ -61,9 +61,18 @@ n = rep(N,K)
 # Fit model:
 res = mcleod(x, n, covariates = covariates)
 
-#Plot posterior for coefficients:
+# Plot posterior for coefficients (burn-in in red):
 coeffs = mcleod::results.covariate.coefficients.posterior(res)
 
 # Posterior mean for coefficients:
 coeffs$posterior.means
+
+# MCMC samples for \vec{\beta}
+head(t(coeffs$beta_smp))
+
+# Plot Metropolis Hastings proposals for \vec{\beta}.
+# Accepted proposals in red, rejections in black.
+
+coeffs = mcleod::results.covariate.coefficients.posterior(
+     res,plot.posterior = F,plot.MH.proposal.by.iteration = T)
 }

@@ -80,3 +80,53 @@ Constructs an object containing the parameters used in \code{\link{mcleod.estima
 \details{
 See package vignette for a thorough explanantion on how the mixing distribution is estimated. Also, see package vignette on the meaning of the parameter rho, the procedure for estimating rho, and its parameters.
 }
+\examples{
+ # For full description of package model and workflow,
+ # including this function, Type browseVignettes(package = 'mcleod') 
+ # in the R console and check the package vignette
+ 
+ ################################
+ ## Example - changing CI definitions
+ ################################
+ #Generate data
+ 
+ n = 500
+ N = rep(20,n) 
+ set.seed(1)
+ p = inv.log.odds(rnorm(n,-2,0.5)+3*rbinom(n,1,0.3))
+ X = rbinom(n = n,size = N,prob = p)
+ 
+ 
+ # We construct a CI object holding the different definitions
+   
+ CI_param = mcleod.CI.estimation.parameters(
+ 
+   # grid of mixing distribution quantiles. 
+   # Here we work with 0.1 steps, instead of 0.25
+   theta_vec = seq(-4,4,0.1),
+   
+   # grid of CDF values. Previous grid has 0.05 jumps
+   q_vec = seq(0.05,0.95,0.025),
+     
+   # We change the confidence level to 0.9 (instead of the default 95\% CI)
+   alpha.CI = 0.9,
+     
+   # we consider 0.1,0.2,0.3 as possible values for rho
+   rho.possible.values = seq(0.1,0.3,0.1))
+   
+ # we pass CI_param as an object, and also set the 
+ # relative part of samples used for calibrating rho
+ # here we pick 10\% of the data. Values in the range 0.1-0.2 are reasonable
+   
+ CI.est.res = mcleod.estimate.CI(X = X,
+                                 N = N,
+                                 CI_param = CI_param,
+                                 ratio_holdout = 0.1)
+ # Plot the pointwise CIs
+ plot.mcleod.CI(mcleod.CI.obj = CI.est.res)
+ 
+ # Retreive CIs for each log-odds value as a data table
+ dt_CIs = mcleod.get.CIs.mixing.dist(CI.est.res)
+ dt_CIs
+ 
+}

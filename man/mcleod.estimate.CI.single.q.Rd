@@ -27,7 +27,7 @@ mcleod.estimate.CI.single.q(
 \item{verbose}{Same parameter as in \code{\link{mcleod.estimate.CI}}.}
 }
 \value{
-
+Vector with two entries name 'Lower' and 'Upper', denoting the two-sided CI, in terms of theta (log-odds) values, for a given CDF value.
 }
 \description{
 The function receives input parameters as defined for \code{\link{mcleod.estimate.CI}}, together with a single CDF/percentile value (name \code{q}). The function returns a confidence interval for the mixing distribution at the required percentile. For example, using a value of \code{q=0.5} will return a confidence interval, in terms of theta (log-odds), for the median of the mixing distribution.
@@ -36,5 +36,29 @@ The function receives input parameters as defined for \code{\link{mcleod.estimat
 This function is actually a "convenience wrapper" for \code{\link{mcleod.estimate.CI}}. It is used to make sure that CIs are computed for the required percentile alone. In addition, calibration of rho is done for a single theta/log-odds point: the theta for which the mixing distribution in the holdout data obtains the value closest to \code{q}.
 }
 \examples{
- See package vignette.
+ # For full description of package model and workflow,
+ # including this function, Type browseVignettes(package = 'mcleod') 
+ # in the R console and check the package vignette
+ 
+ ################################
+ ## Example - computing CI (in terms of theta) at a give CDF value
+ ################################
+ #Generate data
+ 
+ n = 500
+ N = rep(20,n) 
+ set.seed(1)
+ p = inv.log.odds(rnorm(n,-2,0.5)+3*rbinom(n,1,0.3))
+ X = rbinom(n = n,size = N,prob = p)
+   
+ CI.res = mcleod.estimate.CI.single.q(X = X,N = N,q = 0.5, #the wanted CDF value
+ 
+    #set resolution:
+    
+    CI_param = mcleod.CI.estimation.parameters(theta_vec = seq(-3,3,0.05),
+                                               rho.set.value = 0.25), 
+                                               
+    verbose = F) # can ask to print progress. Takes around 2 minutes.
+   
+ CI.res
 }

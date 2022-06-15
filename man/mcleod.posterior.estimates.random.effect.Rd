@@ -27,7 +27,7 @@ mcleod.posterior.estimates.random.effect(
 \item{offset_vec}{A vector of offset values, for the linear predictor term. See full definition in the function vignette.}
 }
 \value{
-Vector of estimates for \eqn{P_i} (for binomial data) , \eqn{\lambda_i} (for Poisson data), or \eqn{\gamma_i} (observation's random intercept, for data with covariates). Entries correspond to entries of \code{X}
+Vector of estimates for \eqn{log(P_i/(1-P_i))} (for binomial data) , \eqn{log(\lambda_i)} (for Poisson data), or \eqn{\gamma_i} (observation's random intercept, for data with covariates). Entries correspond to entries of \code{X}
 }
 \description{
 Function computes posterior estimates for \eqn{P_i} and \eqn{\lambda_i} for observations, based on observed counts and fitted \code{\link{mcleod}} model. The function receives as input the fitted mcleod model, as well as the observables for the data: the observed counts (X, for both Poisson and Binomial observations), number of draws (relevant for binomial observations), covariates and offset term. The type of data supplied (Binomial/Poisson, with or without covariates) should be identical to the type of data used to fit the \code{\link{mcleod}} model supplied.
@@ -36,5 +36,148 @@ Function computes posterior estimates for \eqn{P_i} and \eqn{\lambda_i} for obse
 For data with covariates, the returned values are estimates for \eqn{\gamma_i}, the observation specific random intercept term.
 }
 \examples{
-See package vignette
+ # For full description of package model and workflow,
+ # including this function, Type browseVignettes(package = 'mcleod') 
+ # in the R console and check the package vignette
+#############################
+# Example 1: Binomial sampling, no covariates. 
+#############################
+
+# Generate Data:
+N = 30
+K = 300
+set.seed(1)
+u = sample(c(0,1),size = K,replace = T)
+x = rbinom(K,size = N,prob =inv.log.odds(rnorm(K,-1+3*u,sd = 0.3)))
+n = rep(N,K)
+head(cbind(x,n))
+
+# Fit model
+res = mcleod(x, n)
+
+# Estimate log(P_i/(1-P_i)) for the training data (can also be done for out-of-sample data)
+estimated_log_odds = mcleod.posterior.estimates.random.effect(X = x,
+                     N = n,mcleod_res = res)
+
+# The following values are the estimated "log-odds",
+# given x,n and the fitted mcleod model
+head(estimated_log_odds)
+
+# Values can be convert to P scale using inv.log.odds(...):
+head(inv.log.odds(head(estimated_log_odds)))
+
+#############################
+# Example 2: Poisson sampling, no covariates. 
+#############################
+
+# Generate Data:
+K = 200 # number of samples
+set.seed(1)
+#u sets right or left component in the mix. dist. for each obs.:
+u = sample(c(0,1),size = K,replace = T)
+u2 = exp(rnorm(K,2 + 3*u,0.5)) # The true values of lambda_i
+x = rpois(K,lambda = u2 ) #sample the obs
+
+# Fit model
+res = mcleod(x, n.smp = NULL,a.limits = c(-2,8),
+             Noise_Type = MCLEOD.POISSON.ERRORS)
+
+# Estimate log(lambda) for the training data 
+# (can also be done for out-of-sample data)
+estimated_log_lambda = mcleod.posterior.estimates.random.effect(X = x,
+                            N = NULL, mcleod_res = res)
+head(estimated_log_lambda)
+
+# Values can be convert to lambda scale using exp(...):
+head(exp(estimated_log_lambda))
+
+# We can check accuracy of estimated lambda_i to true vailes using this plot:
+#plot(log(u2),estimated_log_lambda)
+#abline(0,1,col = 'red')
+
+# Prediction intervals for out-of-sample observations:
+# Note that there are no N_i or covariates, so all observations are i.i.d.,
+# thus, the function reports a single prediction interval:
+
+
+#############################
+# Example 3: Binomial regression with 
+# two covariates and a random intercept
+#############################
+
+# Generate data:
+N = 30 #Number of draws per binomial observations
+K = 200 #Number of samples
+set.seed(1)
+covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K) #Generate covariates
+colnames(covariates) = c('covariate 1','covariate 2')
+#define slopes:
+real_beta_1 = -1
+real_beta_2 = 1
+random_inter = rcauchy(K,location = 0,scale = 0.5)
+#sample
+x = rbinom(K,size = N,
+          prob = inv.log.odds(random_inter +
+          real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
+n = rep(N,K)
+
+# fit model:
+res = mcleod(x, n, covariates = covariates)
+
+# we estimate the random intercept using:
+gamma_estimate = mcleod.posterior.estimates.random.effect(
+  X = x, N = n, mcleod_res = res, covariates = covariates, method = 'mean')
+
+# we can check estimates accuracy by comparing to true values:
+# plot(gamma_estimate,random_inter,xlim = c(-2,2),ylim = c(-2,2))
+# abline(0,1,col = 'red')
+
+#############################
+# Example 4: Poisson regression with 
+# a covariate, a random intercept and an offset term
+# Random intercept has bimodal density
+#############################
+
+# Generate data:
+K = 200 #Number of samples
+set.seed(2)
+# A exponentially distributed covariate:
+covariates = matrix(rexp(K,rate = 2),nrow = K) 
+# Value of the slope coefficient:
+real_beta = 0.5
+
+#indicator for the component in the bimodel intercept distribution.
+u = sample(c(0,1),size = K,replace = T) 
+#draw a random intrinsic size, known to the user.
+extrinsic_size = runif(n = K,1,100)
+offset = log(extrinsic_size) #convert to log scale.
+u2 = rnorm(K,2 + 3*u,0.5) # this is the true value of gamma_i's !
+
+# generate data (note how the offset/extrinsic size affects measurements):
+x = rpois(K,
+lambda = extrinsic_size * exp(u2 + real_beta* covariates)
+)
+
+
+# Fit a model:
+comp_obj = mcleod.computational.parameters(nr.gibbs = 1000,nr.gibbs.burnin = 500)
+
+res = mcleod(x, n.smp = NULL, #n.smp is null for Pois regression
+             a.limits = c(-2,8), #set \vec{a}
+             computational_parameters = comp_obj,
+             covariates = covariates, # pass covariates
+             Noise_Type = MCLEOD.POISSON.ERRORS, #Poisson regression
+             offset_vec = offset #pass offset term
+)
+
+
+# Estimate gamma_i's:
+gamma_estimate = mcleod.posterior.estimates.random.effect(X = x,
+                  N=NULL, mcleod_res = res,covariates = covariates,
+                  offset_vec = offset)
+
+# We can check estimation accuracy for gamma_i's using the next plot:
+# plot(u2,gamma_estimate)
+# abline(0,1,col = 'red')
+
 }

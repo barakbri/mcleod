@@ -43,5 +43,94 @@ A piecewise constant prior density function with M segments has M+1 partitioning
 The parameter \code{beta_init} sets the initial values for \eqn{\vec{\beta}} in the MCMC sampler. The default value is \code{NULL}, meaning a normal random intercept regression will be used to guess an initial estimate. The type of regression used is either Binomial or Poisson, depending on the sampling distribution defined when calling \code{\link{mcleod}}.
 }
 \examples{
-See the package vignette
+ # For full description of package model and workflow,
+ # including this function, Type browseVignettes(package = 'mcleod') 
+ # in the R console and check the package vignette
+
+library(mcleod)
+#############################
+# Example 1: Binomial regression with a random normal intercept
+# Example shows how to change the Standard deviation for  
+# for the prior and the proposal distributions
+#############################
+N = 30 # Number of draws per sample
+K = 300 #Number of samples
+set.seed(2)
+covariates = matrix(rexp(K),nrow = K) # exponentially distributed coefficients
+real_beta = -0.5 #the real value of the coefficient
+ 
+u = sample(c(0,1),size = K,replace = T)
+x = rbinom(K,size = N,
+         prob =inv.log.odds(rnorm(K,-1+3*u,sd = 0.3) +
+                              real_beta*covariates))
+n = rep(N,K)
+
+hist(x,main ='Dist. of Xi across samples',breaks = 30)
+
+#Generate object with parameters for covariate estimation
+coeffs_obj  = mcleod.covariates.estimation.parameters(
+                beta_prior_sd = 1.5,
+                proposal_sd = 0.025)
+
+
+comp_params = mcleod.computational.parameters(nr.gibbs = 3000)
+# In addition to covariates, pass coeffs_obj as an argument 
+res = mcleod(x,
+             n,
+             covariates = covariates,
+             covariates_estimation_parameters = coeffs_obj,
+             computational_parameters = comp_params
+             )
+
+#############################
+# Example 2: Specifying non-normal prior for \vec{\beta}
+#############################
+# In this example, we have a bivariate vector of covariates, and
+# specify a cauchy prior for \vec{\beta}
+
+# Generate data:
+
+N = 30 #nr draws per sample
+K = 200 #nr samples
+set.seed(1)
+covariates = matrix(rnorm(K*2,sd = 0.5),nrow = K) #generate covariates
+real_beta_1 = -1 #true values for slopes
+real_beta_2 = 1
+#generate data:
+x = rbinom(K,size = N,prob = inv.log.odds(rnorm(K,0,sd = 1)
+          + real_beta_1*covariates[,1] + real_beta_2*covariates[,2]))
+n = rep(N,K)
+
+# We proceed to generete a discetized representation of the prior
+# we descretize the range (-5,5)
+beta_prior_points = seq(-5,5,0.01)
+
+# for each segment, we compute the probability for the slope to be in the segment
+beta_prior_probs = pcauchy(beta_prior_points[-1]) - 
+                  pcauchy(beta_prior_points[-length(beta_prior_points)])
+
+# we renormalize, since we cropped the support to be (-5,5)
+beta_prior_probs = beta_prior_probs/ sum(beta_prior_probs)
+
+# plot the prior
+plot(beta_prior_points[-1],beta_prior_probs,
+      type = 'l',xlab = 'theta',
+      ylab = 'probability in bin of beta_prior_probs')
+
+# since we have two covariates, we duplicate the prior 
+# across two columns. Generally we can have different priors
+# for different components of \vec{\beta}
+beta_prior_probs = matrix(c(beta_prior_probs, beta_prior_probs),ncol = 2)
+
+#generate prior definitions' object with the new prior dist.:
+coeffs_obj = mcleod.covariates.estimation.parameters(
+      Manual_Prior_Values = beta_prior_points,
+      Manual_Prior_Probs = beta_prior_probs)
+
+#fit model and get results:
+res = mcleod(x, n, covariates = covariates,
+               covariates_estimation_parameters = coeffs_obj)
+
+coeffs = mcleod::results.covariate.coefficients.posterior(res,plot.posterior = F)
+coeffs$posterior.means
 }
