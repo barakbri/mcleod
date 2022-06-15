@@ -1,4 +1,7 @@
 #todo
+- fix PDF vignette not opening
+- fix no additional command for installing package
+- add example for setting a custom Pki
 - register function for printing main object and CI object.
 - add regression test and input checks
 - add warning rho is muliple of grid size
