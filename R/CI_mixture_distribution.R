@@ -1918,7 +1918,9 @@ plot.mcleod.CI=function(mcleod.CI.obj,
                         X_axis_as_Prob = T,
                         add_CI_curves_on_top_of_plot=F,
                         point_estimate_color = 'red',
-                        CI_curves_color = 'black',title = ''){
+                        CI_curves_color = 'black',
+                        title = '',
+                        plot_Point_Estimate = T){
   
   not_valid_object_error_msg = 'mcleod.CI.obj must be a result returned from mcleod.estimate.CI(...), run with parameter compute_CI_curves set to true.'
   if(class(mcleod.CI.obj) != CLASS.NAME.MCLEOD.CI){
@@ -1941,9 +1943,21 @@ plot.mcleod.CI=function(mcleod.CI.obj,
     x_axis_theta = inv.log.odds(x_axis_theta)
   }
   #if this is not an added plot, we plot the point estimate for the data
-  if(!add_CI_curves_on_top_of_plot)
-    plot(x_axis,mcleod.CI.obj$CDF_data,
-         col =  point_estimate_color,type = 'b',pch = 20,xlab = x_axis_label,ylab = 'CDF',main = title)
+  if(!add_CI_curves_on_top_of_plot){
+    if(plot_Point_Estimate){
+      plot(x_axis,mcleod.CI.obj$CDF_data,
+           col =  point_estimate_color,type = 'b',pch = 20,xlab = x_axis_label,ylab = 'CDF',main = title)  
+    }
+  }
+  
+  if(!plot_Point_Estimate & !add_CI_curves_on_top_of_plot){
+    plot(x_axis_theta,curve_obj$q_star_LE,col = CI_curves_color,xlab = x_axis_label,ylab = 'CDF',main = title,xlim = range(x_axis),ylim = c(0,1),type = 'l')
+  }
+  
+  if(plot_Point_Estimate & add_CI_curves_on_top_of_plot){
+    lines(x_axis,mcleod.CI.obj$CDF_data,
+         col =  point_estimate_color,type = 'b',pch = 20)  
+  }
   
   #plot the CI lines, in the color the user requested
   lines(x_axis_theta,curve_obj$q_star_LE,col = CI_curves_color)
