@@ -1,4 +1,4 @@
-WORK_WITH_THREADS = F # A constant setting if computation of the CIs for the mixing distribution should be done in a multithreaded computation. Currently, this is disabled, since the open/close times of many threads are slower than simply holding multiple R processes open and sendig commands to them.
+WORK_WITH_THREADS = T # A constant setting if computation of the CIs for the mixing distribution should be done in a multithreaded computation. Currently, this is disabled, since the open/close times of many threads are slower than simply holding multiple R processes open and sendig commands to them.
 
 # Classes related to CI estimation of the mixing distribution:
 CLASS.NAME.MCLEOD.CI = 'mcleod.CI.obj' # this is the resulting object, when estimating the mixing distribution
@@ -1883,6 +1883,12 @@ mcleod.estimate.CI = function(X,
 #' @param point_estimate_color Color for the posterior median of the mixing distribution. Medians are taken point-wise across the support.
 #' @param CI_curves_color Color for the curves showing the pointwise confidence intervals.
 #' @param title Title for the plot
+#' @param type overrides the plot type use 'l' or 'p'
+#' @param override_xlab used to override the plot x label
+#' @param lwd line width for CDF estimate
+#' @param lwd_CI_curves = line width for pointwise CI curves
+#' @param lty = line type for CDF estimate
+#' @param lty_CI_curves = line type for pointwise CI curves
 #'
 #' @return NONE
 #' @export
@@ -1920,6 +1926,12 @@ plot.mcleod.CI=function(mcleod.CI.obj,
                         point_estimate_color = 'red',
                         CI_curves_color = 'black',
                         title = '',
+                        type = 'p',
+                        lwd = 1,
+                        lwd_CI_curves = 1,
+                        lty = 1,
+                        lty_CI_curves = 1,
+                        override_xlab = NULL,
                         plot_Point_Estimate = T){
   
   not_valid_object_error_msg = 'mcleod.CI.obj must be a result returned from mcleod.estimate.CI(...), run with parameter compute_CI_curves set to true.'
@@ -1942,26 +1954,28 @@ plot.mcleod.CI=function(mcleod.CI.obj,
     x_axis_label = 'P'
     x_axis_theta = inv.log.odds(x_axis_theta)
   }
+  if(!is.null(override_xlab))
+    x_axis_label = override_xlab
   #if this is not an added plot, we plot the point estimate for the data
   if(!add_CI_curves_on_top_of_plot){
     if(plot_Point_Estimate){
       plot(x_axis,mcleod.CI.obj$CDF_data,
-           col =  point_estimate_color,type = 'b',pch = 20,xlab = x_axis_label,ylab = 'CDF',main = title)  
+           col =  point_estimate_color,pch = 20,xlab = x_axis_label,ylab = 'CDF',main = title,type = type,lwd= lwd,lty = lty)  
     }
   }
   
   if(!plot_Point_Estimate & !add_CI_curves_on_top_of_plot){
-    plot(x_axis_theta,curve_obj$q_star_LE,col = CI_curves_color,xlab = x_axis_label,ylab = 'CDF',main = title,xlim = range(x_axis),ylim = c(0,1),type = 'l')
+    plot(x_axis_theta,curve_obj$q_star_LE,col = CI_curves_color,xlab = x_axis_label,ylab = 'CDF',main = title,xlim = range(x_axis),ylim = c(0,1),type = type,lwd= lwd_CI_curves,lty = lty_CI_curves)
   }
   
   if(plot_Point_Estimate & add_CI_curves_on_top_of_plot){
     lines(x_axis,mcleod.CI.obj$CDF_data,
-         col =  point_estimate_color,type = 'b',pch = 20)  
+         col =  point_estimate_color,type = 'b',pch = 20,lwd= lwd,lty = lty)  
   }
   
   #plot the CI lines, in the color the user requested
-  lines(x_axis_theta,curve_obj$q_star_LE,col = CI_curves_color)
-  lines(x_axis_theta,curve_obj$q_star_GE,col = CI_curves_color)
+  lines(x_axis_theta,curve_obj$q_star_LE,col = CI_curves_color,lwd= lwd_CI_curves,lty = lty_CI_curves)
+  lines(x_axis_theta,curve_obj$q_star_GE,col = CI_curves_color,lwd= lwd_CI_curves,lty = lty_CI_curves)
 }
 
 

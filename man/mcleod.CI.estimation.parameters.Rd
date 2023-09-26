@@ -71,9 +71,6 @@ mcleod.CI.estimation.parameters(
 
 \item{nr.cores}{When computations are done on multiple cores - set the number of cores. The default value is ceiling(detectCores()/2)}
 }
-\value{
-
-}
 \description{
 Constructs an object containing the parameters used in \code{\link{mcleod.estimate.CI}} for estimating point-wise confidence intervals for quantiles and percentiles of the mixing distribution, for binomial/poisson generated samples.
 }

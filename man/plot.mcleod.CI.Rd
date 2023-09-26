@@ -10,7 +10,14 @@
   add_CI_curves_on_top_of_plot = F,
   point_estimate_color = "red",
   CI_curves_color = "black",
-  title = ""
+  title = "",
+  type = "p",
+  lwd = 1,
+  lwd_CI_curves = 1,
+  lty = 1,
+  lty_CI_curves = 1,
+  override_xlab = NULL,
+  plot_Point_Estimate = T
 )
 }
 \arguments{
@@ -25,6 +32,18 @@
 \item{CI_curves_color}{Color for the curves showing the pointwise confidence intervals.}
 
 \item{title}{Title for the plot}
+
+\item{type}{overrides the plot type use 'l' or 'p'}
+
+\item{lwd}{line width for CDF estimate}
+
+\item{lwd_CI_curves}{= line width for pointwise CI curves}
+
+\item{lty}{= line type for CDF estimate}
+
+\item{lty_CI_curves}{= line type for pointwise CI curves}
+
+\item{override_xlab}{used to override the plot x label}
 }
 \value{
 NONE

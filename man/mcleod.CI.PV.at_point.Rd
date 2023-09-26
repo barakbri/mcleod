@@ -41,9 +41,6 @@ mcleod.CI.PV.at_point(
 
 \item{do_serial}{should computation be done serially}
 }
-\value{
-
-}
 \description{
 Function computes PV for a given GE/LE hypothesis
 }
