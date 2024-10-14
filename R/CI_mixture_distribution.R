@@ -1,4 +1,4 @@
-WORK_WITH_THREADS = T # A constant setting if computation of the CIs for the mixing distribution should be done in a multithreaded computation. Currently, this is disabled, since the open/close times of many threads are slower than simply holding multiple R processes open and sendig commands to them.
+WORK_WITH_THREADS = F # A constant setting if computation of the CIs for the mixing distribution should be done in a multithreaded computation. Currently, this is disabled, since the open/close times of many threads are slower than simply holding multiple R processes open and sendig commands to them.
 
 # Classes related to CI estimation of the mixing distribution:
 CLASS.NAME.MCLEOD.CI = 'mcleod.CI.obj' # this is the resulting object, when estimating the mixing distribution
