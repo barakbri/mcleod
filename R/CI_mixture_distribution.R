@@ -780,7 +780,7 @@ mcleod.CI.PV.at_point = function(bank,
   #another possible check we can do, is run a small number of iterations (alpha*nr.perm) and check if all of them are more extreme than the data.
   # If (alpha*nr.perm) null samples are more extreme than the data, you know that the PV is > alpha for sure, no need to compute an exact Pvalue using nr.perm data generations.
   if(do_check_vs_minimum_number_of_required_iterations){
-    minimal_required_number_of_iterations = ceiling(alpha*nr.perm)
+    minimal_required_number_of_iterations = 10
     
     null_stat_values_for_quick_test = mcleod.CI.deconv.bank.get_median_curves_for_worst_case_hypothesis_at_point(bank,
                                                                                                                  ind_theta = ind_theta,
@@ -789,8 +789,8 @@ mcleod.CI.PV.at_point = function(bank,
                                                                                                                  nr.perms = minimal_required_number_of_iterations,
                                                                                                                  is_GE = is_GE,
                                                                                                                  do_serial = do_serial)
-    if(( is_GE & all(null_stat_values_for_quick_test >= CDF_value)) |
-       (!is_GE & all(null_stat_values_for_quick_test <= CDF_value))){
+    if(( is_GE & mean(null_stat_values_for_quick_test >= CDF_value)>=0.2) |
+       (!is_GE & mean(null_stat_values_for_quick_test <= CDF_value)>=0.2)){
       return(1)
     }
     
@@ -2075,7 +2075,9 @@ mcleod.estimate.CI.single.theta = function(X, N, theta,
   }else{
     Upper = CI.est.res$bank$CI_param$q_vec[min(ind_LE_lower_than_alpha_one_sided)]
   }
-  
+  if(verbose){
+    cat(paste0('Selected rho = ',CI.est.res$rho_calibration_obj$rho_approx_fun_GE(0)),'\n\r')
+  }
   ret = c('Lower' = Lower,'Upper' = Upper)
   return(ret)
 }
@@ -2180,7 +2182,9 @@ mcleod.estimate.CI.single.q = function(X, N, q,
   }else{
     Lower = CI.est.res$bank$CI_param$theta_vec[max(ind_LE_lower_than_alpha_one_sided)]
   }
-  
+  if(verbose){
+    cat(paste0('Selected rho = ',CI.est.res$rho_calibration_obj$rho_approx_fun_GE(0)),'\n\r')
+  }
   ret = c('Lower' = Lower,'Upper' = Upper)
   return(ret)
 }
