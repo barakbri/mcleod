@@ -14,3 +14,7 @@ devtools::install_github('barakbri/mcleod', build_vignettes = TRUE)
 # Where to start
 After installation, type `browseVignettes(package = 'mcleod')` in the console and press the *PDF* link to see the package vigenette. The vignette goes over the statistical method, as well as simple and advanced use cases.
 
+
+# Reproducing paper results
+A github repository with scripts used to reproduce paper results is at: https://github.com/barakbri/Bayes_CI_Scripts
+
